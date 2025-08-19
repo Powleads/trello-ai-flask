@@ -118,6 +118,22 @@ def mark_card_resolved(card_id, assigned_user):
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
+# Simple authentication system
+from functools import wraps
+
+# Login credentials from environment variables
+LOGIN_USERNAME = os.environ.get('LOGIN_USERNAME', 'admin@justgoingviral.com')
+LOGIN_PASSWORD = os.environ.get('LOGIN_PASSWORD', 'A!Wellness2!')
+
+def login_required(f):
+    """Decorator to require login for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Team member data
 TEAM_MEMBERS = {
     'Criselle': '639494048499@c.us',
@@ -158,17 +174,46 @@ try:
 except Exception as e:
     print(f"Warning: Trello client initialization failed: {e}")
 
+# ===== AUTHENTICATION ROUTES =====
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+            session['logged_in'] = True
+            session['username'] = username
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error='Invalid credentials. Please try again.')
+    
+    # If already logged in, redirect to dashboard
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 # ===== MAIN ROUTES =====
 
 @app.route('/')
+@login_required
 def index():
     return render_template('dashboard.html')
 
 @app.route('/google-meet')
+@login_required
 def google_meet_app():
     return render_template('google_meet_app.html')
 
 @app.route('/team-tracker')
+@login_required
 def team_tracker_app():
     return render_template('team_tracker.html', 
                          cards=app_data['cards_needing_updates'],
@@ -1178,6 +1223,7 @@ def generate_meeting_comment(transcript_text, card_name, match_context="", card_
         return f"📅 Meeting Update - {datetime.now().strftime('%B %d, %Y')}\n\nThis card was discussed in today's team meeting. Enhanced assignment detection encountered an error.\n\nPlease update with current status and confirm assignment.\n\n---\n*Auto-generated from meeting transcript*"
 
 @app.route('/api/process-transcript', methods=['POST'])
+@login_required
 def process_transcript():
     """Complete transcript processing with Google Docs and Trello commenting."""
     try:

@@ -84,11 +84,15 @@
                     </button>
                 </div>
                 
-                <!-- Settings -->
+                <!-- User Actions -->
                 <div class="flex items-center space-x-3">
+                    <span class="text-sm text-gray-600">{{ session.username or 'Admin' }}</span>
                     <button class="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">
                         <i data-lucide="settings" class="w-5 h-5"></i>
                     </button>
+                    <a href="/logout" class="p-2 rounded-lg text-gray-600 hover:text-red-700 hover:bg-red-50 transition-colors" title="Logout">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                    </a>
                 </div>
             </div>
         </div>
