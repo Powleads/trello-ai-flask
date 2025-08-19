@@ -1870,6 +1870,7 @@ def get_recent_activity():
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/scan-cards', methods=['POST'])
+@login_required
 def scan_cards():
     """Scan Trello cards for team tracker - EEInteractive board only, DOING/IN PROGRESS lists."""
     print("=== SCAN CARDS ROUTE CALLED ===")
@@ -2685,6 +2686,185 @@ def generate_feedback_message(participant, feedback_data):
     except Exception as e:
         print(f"Error generating feedback message for {participant}: {e}")
         return f"🎯 Meeting Feedback\\n\\nHi {participant}! Thank you for participating in today's meeting. Your engagement and contributions are valued. Keep up the great work!\\n\\n---\\n*AI-generated feedback*"
+
+@app.route('/api/send-updates', methods=['POST'])
+@login_required
+def send_updates():
+    """Send WhatsApp updates to selected team members about their assigned cards."""
+    try:
+        data = request.json or {}
+        selected_card_ids = data.get('selected_cards', [])
+        
+        if not selected_card_ids:
+            return jsonify({'success': False, 'error': 'No cards selected'})
+        
+        # Green API configuration
+        green_api_instance = os.environ.get('GREEN_API_INSTANCE')
+        green_api_token = os.environ.get('GREEN_API_TOKEN')
+        
+        if not green_api_instance or not green_api_token:
+            return jsonify({'success': False, 'error': 'WhatsApp API not configured'})
+        
+        # Get current cards data to find selected cards
+        if not trello_client:
+            return jsonify({'success': False, 'error': 'Trello client not available'})
+        
+        # Get EEInteractive board and current cards (reuse scan logic)
+        boards = trello_client.list_boards()
+        eeinteractive_board = None
+        
+        for board in boards:
+            if board.closed:
+                continue
+            if 'eeinteractive' in board.name.lower():
+                eeinteractive_board = board
+                break
+        
+        if not eeinteractive_board:
+            return jsonify({'success': False, 'error': 'EEInteractive board not found'})
+        
+        # Get board cards and find selected ones
+        board_cards = eeinteractive_board.list_cards()
+        selected_cards = [card for card in board_cards if card.id in selected_card_ids]
+        
+        if not selected_cards:
+            return jsonify({'success': False, 'error': 'Selected cards not found'})
+        
+        # Import team member mapping
+        TEAM_MEMBERS = {
+            'Levy': '237659250977@c.us',
+            'Lancey': '639264438378@c.us', 
+            'Wendy': '237677079267@c.us',
+            'Admin': '237659250977@c.us'
+        }
+        
+        sent_messages = []
+        failed_messages = []
+        
+        for card in selected_cards:
+            try:
+                # Find assigned user using advanced logic from scan_cards
+                assigned_user = None
+                assigned_whatsapp = None
+                
+                # Method 1: Check for direct assignment patterns in description
+                card_desc = card.description.lower() if card.description else ''
+                card_name = card.name.lower()
+                
+                # Look for assignment patterns like found in scan_cards
+                assignment_patterns = [
+                    (r'levy', 'Levy'),
+                    (r'lancey', 'Lancey'), 
+                    (r'wendy', 'Wendy'),
+                    (r'@levy', 'Levy'),
+                    (r'@lancey', 'Lancey'),
+                    (r'@wendy', 'Wendy'),
+                    (r'assigned.*levy', 'Levy'),
+                    (r'assigned.*lancey', 'Lancey'),
+                    (r'assigned.*wendy', 'Wendy')
+                ]
+                
+                import re
+                for pattern, member in assignment_patterns:
+                    if re.search(pattern, card_desc) or re.search(pattern, card_name):
+                        assigned_user = member
+                        assigned_whatsapp = TEAM_MEMBERS[member]
+                        break
+                
+                # Method 2: Check card comments for assignments (like scan_cards does)
+                if not assigned_user:
+                    try:
+                        comments_url = f"https://api.trello.com/1/cards/{card.id}/actions"
+                        params = {
+                            'key': trello_client.api_key,
+                            'token': trello_client.token,
+                            'filter': 'commentCard',
+                            'limit': 50
+                        }
+                        comments_response = requests.get(comments_url, params=params, timeout=10)
+                        
+                        if comments_response.status_code == 200:
+                            comments = comments_response.json()
+                            
+                            # Look for assignments in recent comments
+                            for comment in comments[:10]:  # Check last 10 comments
+                                comment_text = comment.get('data', {}).get('text', '').lower()
+                                
+                                for pattern, member in assignment_patterns:
+                                    if re.search(pattern, comment_text):
+                                        assigned_user = member
+                                        assigned_whatsapp = TEAM_MEMBERS[member]
+                                        break
+                                
+                                if assigned_user:
+                                    break
+                    except Exception as e:
+                        print(f"Error checking comments for card {card.name}: {e}")
+                
+                if not assigned_user:
+                    failed_messages.append({
+                        'card': card.name,
+                        'error': 'No assigned user found'
+                    })
+                    continue
+                
+                # Generate update message
+                message = f"""🔔 Task Update Reminder
+
+Hi {assigned_user}! 
+
+You have a task that needs an update:
+
+📋 Task: {card.name}
+🔗 Link: {card.url}
+
+Please provide a status update or comment on this card when you have a moment.
+
+Thanks! 🙏"""
+                
+                # Send WhatsApp message via Green API
+                api_url = f"https://api.green-api.com/waInstance{green_api_instance}/sendMessage/{green_api_token}"
+                
+                payload = {
+                    "chatId": assigned_whatsapp,
+                    "message": message
+                }
+                
+                response = requests.post(api_url, json=payload, timeout=10)
+                
+                if response.status_code == 200:
+                    sent_messages.append({
+                        'card': card.name,
+                        'user': assigned_user,
+                        'phone': assigned_whatsapp
+                    })
+                    print(f"Sent update reminder to {assigned_user} for card: {card.name}")
+                else:
+                    failed_messages.append({
+                        'card': card.name,
+                        'user': assigned_user,
+                        'error': f"WhatsApp API error: {response.status_code}"
+                    })
+                    print(f"Failed to send to {assigned_user}: {response.status_code} - {response.text}")
+                    
+            except Exception as e:
+                failed_messages.append({
+                    'card': card.name,
+                    'error': f"Error: {str(e)}"
+                })
+                print(f"Error processing card {card.name}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'messages_sent': len(sent_messages),
+            'messages_failed': len(failed_messages),
+            'sent_details': sent_messages,
+            'failed_details': failed_messages
+        })
+        
+    except Exception as e:
+        print(f"Error in send_updates: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 # ===== APPLICATION STARTUP =====
 
