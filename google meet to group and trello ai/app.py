@@ -236,7 +236,7 @@ def find_trello_cards_in_transcript(transcript_text):
             
             try:
                 ai_response = openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",
+                    model="gpt-4-turbo",
                     messages=[
                         {"role": "system", "content": "You are an expert at matching meeting discussions to specific Trello cards based on context and meaning, not just keywords."},
                         {"role": "user", "content": ai_extraction_prompt}
@@ -373,7 +373,7 @@ def process_transcript_simple(transcript_text, send_whatsapp_enabled=False, sour
         """
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4-turbo",
             messages=[
                 {"role": "system", "content": "You are an expert meeting analyst. Provide clear, structured summaries."},
                 {"role": "user", "content": summary_prompt}
@@ -778,7 +778,7 @@ def generate_summary():
         """
         
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4-turbo",
             messages=[
                 {"role": "system", "content": "You are an expert meeting analyst. Provide clear, structured summaries."},
                 {"role": "user", "content": summary_prompt}

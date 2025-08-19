@@ -70,7 +70,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-5 model for best results
+                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1000
@@ -128,7 +128,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-5 model for best results
+                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1200
@@ -191,7 +191,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-5 model for best results
+                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1000
@@ -387,7 +387,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-5 model for best results
+                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1500

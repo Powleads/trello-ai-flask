@@ -238,6 +238,41 @@ class GoogleDriveClient:
             logger.error(f"Error downloading file {file_id}: {e}")
             raise
     
+    def get_document_text(self, document_id: str) -> Optional[str]:
+        """Get text content from a Google Document."""
+        try:
+            if not self.service:
+                logger.error("Google Drive service not initialized")
+                return None
+                
+            # Export document as plain text
+            request = self.service.files().export_media(
+                fileId=document_id,
+                mimeType='text/plain'
+            )
+            
+            file_content = io.BytesIO()
+            downloader = MediaIoBaseDownload(file_content, request)
+            
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                
+            file_content.seek(0)
+            text = file_content.read().decode('utf-8')
+            
+            return text if text.strip() else None
+            
+        except HttpError as e:
+            logger.error(f"Failed to get document text for {document_id}: {e}")
+            # If it's a permission error, return None to allow fallback
+            if e.resp.status in [403, 404]:
+                return None
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting document text: {e}")
+            return None
+    
     async def watch_folder(self, 
                           folder_id: str,
                           webhook_url: Optional[str] = None) -> Dict[str, Any]:
