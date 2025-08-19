@@ -1,0 +1,117 @@
+{
+  "tasks": {},
+  "meetings": [
+    {
+      "id": "meeting_1",
+      "date": "2025-08-17T17:36:15.336541",
+      "tasks_found": 2,
+      "tasks": [
+        {
+          "line_number": 2,
+          "speaker": "John",
+          "content": "We still need to get approval for the logo design. This is the third week we're waiting.",
+          "full_line": "John: We still need to get approval for the logo design. This is the third week we're waiting.",
+          "signals": {
+            "is_likely_task": true,
+            "confidence": 0.7,
+            "indicators": [
+              "action_verb: need to",
+              "status: still",
+              "status: waiting",
+              "type: approval"
+            ],
+            "task_type": "approval",
+            "urgency": "normal",
+            "status": "incomplete"
+          },
+          "extracted_at": "2025-08-17T17:36:15.334185",
+          "confidence": 0.7,
+          "key_phrases": [
+            "This is the third",
+            "the logo design"
+          ],
+          "entities": {
+            "names": [
+              "This"
+            ],
+            "dates": [],
+            "projects": [],
+            "tools": []
+          }
+        },
+        {
+          "line_number": 4,
+          "speaker": "Mike",
+          "content": "The WordPress site is almost done, just need final review.",
+          "full_line": "Mike: The WordPress site is almost done, just need final review.",
+          "signals": {
+            "is_likely_task": true,
+            "confidence": 0.4,
+            "indicators": [
+              "status: almost done",
+              "type: approval"
+            ],
+            "task_type": "approval",
+            "urgency": "normal",
+            "status": "unknown"
+          },
+          "extracted_at": "2025-08-17T17:36:15.336541",
+          "confidence": 0.4,
+          "key_phrases": [
+            "The WordPress site is"
+          ],
+          "entities": {
+            "names": [
+              "The"
+            ],
+            "dates": [],
+            "projects": [],
+            "tools": [
+              "wordpress"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "meeting_2",
+      "date": "2025-08-17T17:36:15.337927",
+      "tasks_found": 1,
+      "tasks": [
+        {
+          "line_number": 2,
+          "speaker": "John",
+          "content": "Any update on the logo approval? We're still blocked on that.",
+          "full_line": "John: Any update on the logo approval? We're still blocked on that.",
+          "signals": {
+            "is_likely_task": true,
+            "confidence": 0.4,
+            "indicators": [
+              "status: still",
+              "status: blocked",
+              "type: approval"
+            ],
+            "task_type": "approval",
+            "urgency": "normal",
+            "status": "incomplete"
+          },
+          "extracted_at": "2025-08-17T17:36:15.337927",
+          "confidence": 0.4,
+          "key_phrases": [
+            "Any update on the"
+          ],
+          "entities": {
+            "names": [
+              "Any"
+            ],
+            "dates": [],
+            "projects": [],
+            "tools": []
+          }
+        }
+      ]
+    }
+  ],
+  "patterns": {},
+  "last_updated": "2025-08-17T17:36:15.337927"
+}

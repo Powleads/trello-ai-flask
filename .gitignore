@@ -1,55 +1,118 @@
-# Dependencies
-node_modules/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Environment variables
+# ============================================================================
+# 🔒 SECURITY: API Keys, Credentials & Sensitive Data
+# ============================================================================
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+credentials.json
+token.json
+service-account*.json
+client_secret*.json
+oauth-credentials.json
+*.key
+*.pem
+*.p12
+*.pfx
+config.local.json
+secrets.json
+api_keys.json
 
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
+# Google API & OAuth
+client_id.json
+client_secret.json
+google_credentials.json
+service_account.json
 
-# Build outputs
-dist/
-dist-electron/
+# Trello API
+trello_key.txt
+trello_token.txt
+trello_secret.txt
+
+# OpenAI & AI APIs
+openai_key.txt
+openai_api_key.txt
+anthropic_key.txt
+
+# WhatsApp & Green API
+green_api_credentials.json
+whatsapp_credentials.json
+
+# Database credentials
+db_password.txt
+database_url.txt
+
+# ============================================================================
+# Python & Flask
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Database files
+# Flask
+instance/
+.webassets-cache
+
+# Flask sessions
+flask_session/
+sessions/
+
+# ============================================================================
+# Database Files
+# ============================================================================
 *.db
 *.sqlite
 *.sqlite3
 meetingai.db
+database.db
+app.db
+data.db
 
-# Credentials and secrets
-credentials.json
-token.json
-.credentials/
-*.key
-*.pem
+# ============================================================================
+# Logs & Temporary Files  
+# ============================================================================
+logs/
+*.log
+pip-log.txt
+pip-delete-this-directory.txt
+temp/
+tmp/
+*.tmp
+*.bak
 
-# IDE files
+# ============================================================================
+# IDE & Editor Files
+# ============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.spyderproject
+.spyproject
 
-# OS generated files
+# ============================================================================
+# OS Generated Files
+# ============================================================================
 .DS_Store
 .DS_Store?
 ._*
@@ -57,60 +120,76 @@ token.json
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Electron builder output
-/dist_electron
-
-# Flask session files
-flask_session/
-
-# Temporary files
-temp/
-tmp/
-*.tmp
-
-# Downloaded files
-downloads/
-
-# Test files
-test_report_*.json
-test_*.json
-
-# Backup files
-*_backup.py
-*_working_backup.py
-
-# Log files
-*.log
-
-# Coverage reports
-htmlcov/
+# ============================================================================
+# Testing & Development
+# ============================================================================
+.pytest_cache/
 .coverage
-.coverage.*
+htmlcov/
+.tox/
+.nox/
 coverage.xml
 *.cover
+*.py,cover
 .hypothesis/
-.pytest_cache/
+.prof
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Test outputs
+test_report_*.json
+test_results/
+test_output/
 
-# pyenv
-.python-version
+# ============================================================================
+# Virtual Environments
+# ============================================================================
+venv/
+ENV/
+env/
+.env/
+.venv/
+.ENV/
+.env.bak/
 
-# Electron specific
-out/
-*.mas
-*.pkg
-*.dmg
-*.exe
-*.deb
-*.rpm
-*.AppImage
+# ============================================================================
+# Documentation & Notes
+# ============================================================================
+# Don't ignore these - keep documentation
+# docs/
+# README.md
+# *.md
 
-# Package manager lock files (optional - uncomment if needed)
-# package-lock.json
-# yarn.lock
+# But ignore private notes
+PRIVATE_NOTES.md
+TODO_PRIVATE.md
+notes_private.txt
 
-# Local configuration
-config.local.json
+# ============================================================================
+# Backup & Working Files
+# ============================================================================
+*_backup.*
+*_working_backup.*
+*_old.*
+*_copy.*
+backup/
+backups/
+
+# ============================================================================
+# Application Specific
+# ============================================================================
+# Trello AI specific
+reminder_tracking.json
+recurring_tasks.json
+user_data/
+transcripts/
+meeting_data/
+
+# Screenshot errors (keep examples but not actual screenshots)
+screenshot\ errors/
+screenshots/
+
+# Downloaded or generated content
+downloads/
+generated/
+output/

@@ -20,7 +20,13 @@
       "Bash(npm start)",
       "Bash(timeout:*)",
       "Bash(npx:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "mcp__JustGoingViral__create_repository",
+      "Bash(gh repo create:*)",
+      "Bash(git remote add:*)"
     ],
     "deny": [],
     "ask": []
