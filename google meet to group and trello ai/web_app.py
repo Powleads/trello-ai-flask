@@ -21,6 +21,8 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from dotenv import load_dotenv
 import requests
 from custom_trello import CustomTrelloClient
+from message_tracker import MessageTracker
+from google_meet_analytics import google_meet_analytics
 
 # Import AI modules
 try:
@@ -117,6 +119,12 @@ def mark_card_resolved(card_id, assigned_user):
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+
+# Register blueprints
+app.register_blueprint(google_meet_analytics)
+
+# Initialize message tracker
+message_tracker = MessageTracker("message_tracker.db")
 
 # Enhanced Security Authentication System
 from functools import wraps
@@ -297,7 +305,7 @@ def index():
 @app.route('/google-meet')
 @login_required
 def google_meet_app():
-    return render_template('google_meet_app.html')
+    return render_template('google_meet_analytics.html')
 
 @app.route('/team-tracker')
 @login_required
@@ -306,6 +314,244 @@ def team_tracker_app():
                          cards=app_data['cards_needing_updates'],
                          team_members=TEAM_MEMBERS,
                          settings=app_data['settings'])
+
+# ===== AUTOMATED SCHEDULER =====
+
+import threading
+import time
+from datetime import datetime, timedelta
+
+def reset_reminder_count(card_id, assigned_user):
+    """Reset reminder count when user comments on card."""
+    tracking_data = load_reminder_tracking()
+    key = f"{card_id}_{assigned_user}"
+    
+    if key in tracking_data:
+        tracking_data[key]['reminder_count'] = 0
+        tracking_data[key]['escalated'] = False
+        tracking_data[key]['status'] = 'active'
+        tracking_data[key]['last_comment_date'] = datetime.now().isoformat()
+        save_reminder_tracking(tracking_data)
+        print(f"Reset reminder count for {assigned_user} on card {card_id}")
+        return tracking_data[key]
+    
+    return None
+
+def automated_daily_scan():
+    """Automated daily scanner that runs in background thread."""
+    while True:
+        try:
+            # Wait for next scan time (check every 6 hours, scan at 9 AM)
+            now = datetime.now()
+            target_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            
+            # If it's past 9 AM today, schedule for tomorrow
+            if now.time() > target_time.time():
+                target_time += timedelta(days=1)
+            
+            sleep_seconds = (target_time - now).total_seconds()
+            print(f"[AUTO] Next automated scan scheduled for: {target_time}")
+            time.sleep(sleep_seconds)
+            
+            # Perform automated scan
+            print("[AUTO] AUTOMATED SCAN: Starting daily team tracker scan...")
+            perform_automated_scan()
+            
+        except Exception as e:
+            print(f"Error in automated scanner: {e}")
+            time.sleep(3600)  # Wait 1 hour before retrying
+
+def perform_automated_scan():
+    """Perform the actual automated scan and send reminders."""
+    try:
+        # Scan for overdue cards
+        scan_result = scan_trello_cards_for_updates()
+        if not scan_result.get('success'):
+            print(f"Automated scan failed: {scan_result.get('error')}")
+            return
+        
+        overdue_cards = scan_result.get('cards_needing_updates', [])
+        if not overdue_cards:
+            print("[AUTO] No overdue cards found in automated scan.")
+            return
+        
+        print(f"[AUTO] Found {len(overdue_cards)} overdue cards in automated scan.")
+        
+        # Group cards by user
+        user_cards = {}
+        for card in overdue_cards:
+            assigned_user = card.get('assigned_user')
+            assigned_whatsapp = card.get('assigned_whatsapp')
+            
+            if not assigned_user or not assigned_whatsapp:
+                continue
+            
+            if assigned_user not in user_cards:
+                user_cards[assigned_user] = []
+            user_cards[assigned_user].append(card)
+        
+        # Send reminders and check for escalations
+        group_escalations = []
+        
+        for assigned_user, cards in user_cards.items():
+            # Check if any cards need escalation
+            escalated_cards = []
+            regular_cards = []
+            
+            for card in cards:
+                reminder_status = get_reminder_status(card['id'], assigned_user)
+                if reminder_status['escalated'] or reminder_status['reminder_count'] >= 3:
+                    escalated_cards.append(card)
+                    group_escalations.append({
+                        'card_name': card['name'],
+                        'assigned_user': assigned_user,
+                        'reminder_count': reminder_status['reminder_count'],
+                        'card_url': card['url'],
+                        'hours_since_update': card.get('hours_since_assigned_update', 0)
+                    })
+                else:
+                    regular_cards.append(card)
+            
+            # Send regular reminders for non-escalated cards
+            if regular_cards:
+                send_automated_reminder(assigned_user, regular_cards)
+        
+        # Send group escalation if needed
+        if group_escalations:
+            send_group_escalation(group_escalations)
+        
+    except Exception as e:
+        print(f"Error in automated scan: {e}")
+
+def send_automated_reminder(assigned_user, cards):
+    """Send automated reminder to user."""
+    try:
+        whatsapp_number = TEAM_MEMBERS.get(assigned_user)
+        if not whatsapp_number:
+            print(f"[AUTO] No WhatsApp number for {assigned_user}")
+            return
+        
+        # Create message
+        message = f"""🤖 AUTOMATED REMINDER: Hey {assigned_user}, these cards need updates (over 24 hours). Please comment with your progress or these will escalate to the main group after 3 reminders.
+
+📋 Cards requiring updates ({len(cards)}):
+
+"""
+        
+        for i, card in enumerate(cards, 1):
+            hours = card.get('hours_since_assigned_update', 0)
+            reminder_status = get_reminder_status(card['id'], assigned_user)
+            reminder_count = reminder_status['reminder_count']
+            
+            if hours > 72:
+                urgency_icon = "🔴"
+            elif hours > 48:
+                urgency_icon = "🟡"
+            else:
+                urgency_icon = "🟢"
+            
+            days = int(hours / 24)
+            reminder_text = f" (Reminder #{reminder_count + 1})" if reminder_count > 0 else ""
+            
+            message += f"{urgency_icon} {i}. *{card['name']}*{reminder_text}\n"
+            message += f"   ⏰ {days} days without update\n"
+            message += f"   🔗 {card['url']}\n\n"
+        
+        message += "Please update these cards with your current progress. Thanks! 🚀\n\n- JGV EEsystems Auto-Tracker"
+        
+        # Send via Green API
+        green_api_instance = os.environ.get('GREEN_API_INSTANCE')
+        green_api_token = os.environ.get('GREEN_API_TOKEN')
+        
+        if not green_api_instance or not green_api_token:
+            print("[AUTO] Green API credentials not configured for automated reminders")
+            return
+        
+        green_api_url = f"https://api.green-api.com/waInstance{green_api_instance}/sendMessage/{green_api_token}"
+        
+        payload = {
+            "chatId": whatsapp_number,
+            "message": message
+        }
+        
+        response = requests.post(green_api_url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            # Increment reminder count for each card
+            for card in cards:
+                reminder_data = increment_reminder_count(card['id'], assigned_user)
+                print(f"[AUTO] Incremented reminder count for {assigned_user} on card {card['name']}: {reminder_data['reminder_count']}")
+            
+            print(f"[AUTO] Sent reminder to {assigned_user} for {len(cards)} cards")
+        else:
+            print(f"[AUTO] Failed to send reminder to {assigned_user}: {response.status_code}")
+        
+    except Exception as e:
+        print(f"Error sending automated reminder to {assigned_user}: {e}")
+
+def send_group_escalation(escalated_cards):
+    """Send escalation message to group chat."""
+    try:
+        group_chat_id = os.environ.get('WHATSAPP_GROUP_CHAT_ID', '120363401025025313@g.us')
+        
+        escalation_message = """🚨 AUTOMATED ESCALATION: Cards Requiring Immediate Attention 🚨
+
+The following team members have not responded to 3+ reminders about their assigned cards:
+
+"""
+        
+        # Group by user
+        escalated_by_user = {}
+        for card in escalated_cards:
+            user = card['assigned_user']
+            if user not in escalated_by_user:
+                escalated_by_user[user] = []
+            escalated_by_user[user].append(card)
+        
+        for user, user_cards in escalated_by_user.items():
+            escalation_message += f"\n👤 *{user}* ({len(user_cards)} cards):\n"
+            for card in user_cards:
+                days = int(card['hours_since_update'] / 24)
+                escalation_message += f"   🔴 {card['card_name']} ({days} days, {card['reminder_count']} reminders)\n"
+                escalation_message += f"       🔗 {card['card_url']}\n"
+        
+        escalation_message += "\n⚠️ Please follow up with these team members immediately or reassign these cards.\n\n- JGV EEsystems Auto-Tracker"
+        
+        # Send to group
+        green_api_instance = os.environ.get('GREEN_API_INSTANCE')
+        green_api_token = os.environ.get('GREEN_API_TOKEN')
+        
+        if not green_api_instance or not green_api_token:
+            print("[AUTO] Green API credentials not configured for group escalation")
+            return
+        
+        green_api_url = f"https://api.green-api.com/waInstance{green_api_instance}/sendMessage/{green_api_token}"
+        
+        payload = {
+            "chatId": group_chat_id,
+            "message": escalation_message
+        }
+        
+        response = requests.post(green_api_url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            print(f"[AUTO] Sent group escalation for {len(escalated_cards)} cards")
+        else:
+            print(f"[AUTO] Failed to send group escalation: {response.status_code}")
+        
+    except Exception as e:
+        print(f"Error sending group escalation: {e}")
+
+# Start automated scanner in background thread
+auto_scanner_thread = None
+
+def start_automated_scanner():
+    """Start the automated scanner thread."""
+    global auto_scanner_thread
+    if auto_scanner_thread is None or not auto_scanner_thread.is_alive():
+        auto_scanner_thread = threading.Thread(target=automated_daily_scan, daemon=True)
+        auto_scanner_thread.start()
+        print("[AUTO] Automated daily scanner started")
 
 # ===== UTILITY FUNCTIONS =====
 
@@ -368,8 +614,18 @@ def get_google_doc_text(doc_id):
                 print(f"Response status: {response.status_code}")
                 
                 if response.status_code == 200:
+                    # Handle encoding properly
+                    response.encoding = 'utf-8'  # Ensure proper UTF-8 encoding
                     text = response.text
                     print(f"Retrieved text length: {len(text)}")
+                    
+                    # Clean text of problematic characters for Windows console
+                    try:
+                        # Test if text can be printed safely
+                        safe_text_sample = text[:200].encode('ascii', errors='replace').decode('ascii')
+                        print(f"Sample content: {safe_text_sample}...")
+                    except:
+                        print("Content contains special characters (safe processing)")
                     
                     # Check if it's actual content
                     if len(text) > 50 and not text.startswith('<!DOCTYPE'):
@@ -732,6 +988,261 @@ def get_enhanced_card_assignment(card, transcript_text=None):
 
 # ===== OPTIMIZED TRANSCRIPT PROCESSING =====
 
+def extract_cards_from_notes(trello_review_text):
+    """Extract card names/tasks from Trello Board Review section in Notes."""
+    try:
+        if not trello_review_text:
+            return []
+        
+        cards_mentioned = []
+        lines = trello_review_text.split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Look for task-like patterns
+            line_lower = line.lower()
+            
+            # Skip headers and metadata
+            if any(skip in line_lower for skip in ['trello', 'board', 'review', 'task', 'assignment', '---', '===', 'section']):
+                continue
+                
+            # Look for bullet points, numbered items, or task descriptions
+            if (line.startswith('•') or line.startswith('-') or line.startswith('*') or 
+                any(char.isdigit() for char in line[:3]) or
+                any(keyword in line_lower for keyword in ['organize', 'create', 'update', 'fix', 'build', 'center', 'mobile', 'app', 'wordpress', 'court', 'document'])):
+                
+                # Clean up the line
+                clean_line = line
+                for prefix in ['•', '-', '*', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.']:
+                    if clean_line.startswith(prefix):
+                        clean_line = clean_line[len(prefix):].strip()
+                        break
+                
+                if len(clean_line) > 10:  # Meaningful task description
+                    cards_mentioned.append(clean_line)
+        
+        try:
+            safe_cards = [card.encode('ascii', errors='replace').decode('ascii') for card in cards_mentioned]
+            print(f"Extracted cards from Notes: {safe_cards}")
+        except:
+            print(f"Extracted {len(cards_mentioned)} cards from Notes")
+        return cards_mentioned
+        
+    except Exception as e:
+        print(f"Error extracting cards from notes: {e}")
+        return []
+
+def match_notes_cards_to_trello(notes_cards, transcript_text):
+    """Match cards from Notes against Trello board and find transcript discussions."""
+    try:
+        if not notes_cards or not trello_client:
+            return []
+        
+        # Get Trello cards
+        boards = trello_client.list_boards()
+        eeinteractive_board = None
+        for board in boards:
+            if 'eeinteractive' in board.name.lower():
+                eeinteractive_board = board
+                break
+        
+        if not eeinteractive_board:
+            print("EEInteractive board not found")
+            return []
+        
+        trello_cards = eeinteractive_board.list_cards()
+        matched_cards = []
+        
+        for notes_card in notes_cards:
+            notes_card_lower = notes_card.lower()
+            best_match = None
+            best_confidence = 0
+            
+            for trello_card in trello_cards:
+                if trello_card.closed:
+                    continue
+                
+                # Skip READ - RULES card
+                if 'READ - RULES WHEN ADDING TASK - DO NOT DELETE' in trello_card.name:
+                    continue
+                
+                # Calculate similarity
+                trello_name_lower = trello_card.name.lower()
+                confidence = 0
+                
+                # Word overlap scoring
+                notes_words = set(word for word in notes_card_lower.split() if len(word) > 2)
+                trello_words = set(word for word in trello_name_lower.split() if len(word) > 2)
+                
+                if notes_words and trello_words:
+                    overlap = len(notes_words.intersection(trello_words))
+                    confidence = (overlap / len(notes_words.union(trello_words))) * 100
+                
+                # Boost confidence for exact substring matches
+                if notes_card_lower in trello_name_lower or trello_name_lower in notes_card_lower:
+                    confidence += 50
+                
+                # Check for partial matches of key terms
+                key_terms = ['mobile', 'app', 'court', 'document', 'wordpress', 'center', 'organize']
+                for term in key_terms:
+                    if term in notes_card_lower and term in trello_name_lower:
+                        confidence += 20
+                
+                if confidence > best_confidence and confidence >= 40:
+                    best_confidence = confidence
+                    best_match = {
+                        'id': trello_card.id,
+                        'name': trello_card.name,
+                        'url': trello_card.url,
+                        'confidence': confidence,
+                        'description': trello_card.description[:200] if trello_card.description else '',
+                        'board_name': eeinteractive_board.name,
+                        'match_type': 'notes_to_trello',
+                        'notes_reference': notes_card
+                    }
+            
+            if best_match:
+                try:
+                    safe_notes = notes_card.encode('ascii', errors='replace').decode('ascii')
+                    safe_name = best_match['name'].encode('ascii', errors='replace').decode('ascii')
+                    print(f"NOTES MATCH: '{safe_notes}' → '{safe_name}' (confidence: {best_confidence:.1f}%)")
+                except:
+                    print(f"NOTES MATCH: [card with special chars] → [trello card] (confidence: {best_confidence:.1f}%)")
+                
+                # Now find transcript discussion for this card using meeting parser
+                try:
+                    from meeting_parser import MeetingStructureParser
+                    parser = MeetingStructureParser()
+                    mock_cards = [{'name': best_match['name']}]
+                    card_discussions = parser.extract_card_discussions(transcript_text, mock_cards)
+                    
+                    if card_discussions.get(best_match['name']):
+                        discussion_data = card_discussions[best_match['name']]
+                        best_match['transcript_discussion'] = discussion_data.get('discussion', '')
+                        best_match['discussion_summary'] = discussion_data.get('summary', '')
+                        best_match['discussion_confidence'] = discussion_data.get('confidence', 0)
+                        print(f"Found transcript discussion for '{best_match['name']}'")
+                    
+                except Exception as parser_error:
+                    print(f"Meeting parser error for {best_match['name']}: {parser_error}")
+                
+                matched_cards.append(best_match)
+        
+        return matched_cards
+        
+    except Exception as e:
+        print(f"Error matching notes cards to Trello: {e}")
+        return []
+
+def enhanced_card_matching_no_ai(transcript_text, doc_content=None):
+    """Enhanced card matching without OpenAI dependency using multiple strategies."""
+    try:
+        if not trello_client:
+            return []
+        
+        # Get Trello board
+        boards = trello_client.list_boards()
+        eeinteractive_board = None
+        for board in boards:
+            if 'eeinteractive' in board.name.lower():
+                eeinteractive_board = board
+                break
+        
+        if not eeinteractive_board:
+            return []
+        
+        cards = eeinteractive_board.list_cards()
+        matched_cards = []
+        
+        # Combine all available text sources
+        all_text = transcript_text.lower()
+        if doc_content:
+            if doc_content.get('notes_tab_content'):
+                all_text += " " + doc_content['notes_tab_content'].lower()
+            if doc_content.get('raw_text'):
+                all_text += " " + doc_content['raw_text'].lower()
+        
+        print(f"Enhanced matching using {len(all_text)} characters of content")
+        
+        # Enhanced keyword sets for better matching
+        keyword_groups = {
+            'mobile': ['mobile', 'app', 'ios', 'android', 'flutter', 'react native'],
+            'web': ['website', 'web', 'wordpress', 'landing', 'page', 'frontend', 'html', 'css'],
+            'court': ['court', 'legal', 'document', 'evidence', 'case', 'organize'],
+            'center': ['center', 'centre', 'vitality', 'quantum', 'healing', 'energy'],
+            'eesystem': ['eesystem', 'ee system', 'scalar', 'wellness'],
+            'design': ['design', 'logo', 'brand', 'graphics', 'visual'],
+            'funnel': ['funnel', 'landing', 'page', 'ghl', 'gohighlevel'],
+            'calendar': ['calendar', 'schedule', 'booking', 'appointment'],
+            'social': ['social', 'media', 'facebook', 'instagram', 'marketing']
+        }
+        
+        for card in cards:
+            if card.closed or 'READ - RULES WHEN ADDING TASK - DO NOT DELETE' in card.name:
+                continue
+            
+            card_name_lower = card.name.lower()
+            confidence = 0
+            
+            # Strategy 1: Direct name matching
+            if card_name_lower in all_text:
+                confidence += 80
+            
+            # Strategy 2: Word overlap with higher scoring
+            card_words = set(word for word in card_name_lower.split() if len(word) > 2)
+            text_words = set(all_text.split())
+            
+            if card_words and text_words:
+                overlap = len(card_words.intersection(text_words))
+                word_score = (overlap / len(card_words)) * 60
+                confidence += word_score
+            
+            # Strategy 3: Keyword group matching
+            for group_name, keywords in keyword_groups.items():
+                card_has_group = any(keyword in card_name_lower for keyword in keywords)
+                text_has_group = any(keyword in all_text for keyword in keywords)
+                
+                if card_has_group and text_has_group:
+                    confidence += 40
+                    print(f"Keyword group match '{group_name}': {card.name}")
+            
+            # Strategy 4: Partial substring matching
+            for word in card_name_lower.split():
+                if len(word) > 4:
+                    if word in all_text:
+                        confidence += 25
+            
+            # Strategy 5: Common task patterns
+            task_patterns = ['organize', 'create', 'update', 'fix', 'build', 'improve', 'add', 'upload']
+            card_has_task = any(pattern in card_name_lower for pattern in task_patterns)
+            text_has_task = any(pattern in all_text for pattern in task_patterns)
+            
+            if card_has_task and text_has_task:
+                confidence += 20
+            
+            if confidence >= 30:  # Lower threshold for enhanced matching
+                matched_cards.append({
+                    'id': card.id,
+                    'name': card.name,
+                    'url': card.url,
+                    'confidence': min(100, confidence),
+                    'description': card.description[:200] if card.description else '',
+                    'board_name': eeinteractive_board.name,
+                    'match_type': 'enhanced_no_ai'
+                })
+                print(f"ENHANCED MATCH: '{card.name}' (confidence: {confidence:.1f}%)")
+        
+        # Sort by confidence
+        matched_cards.sort(key=lambda x: x.get('confidence', 0), reverse=True)
+        return matched_cards[:15]  # Return top 15 matches
+        
+    except Exception as e:
+        print(f"Enhanced matching error: {e}")
+        return []
+
 def scan_trello_cards_fast(transcript_text):
     """Fast Trello card matching with timeout protection."""
     matched_cards = []
@@ -765,6 +1276,12 @@ def scan_trello_cards_fast(transcript_text):
         cards = eeinteractive_board.list_cards()
         print(f"Retrieved {len(cards)} cards in {time.time() - start_time:.2f}s")
         
+        # Debug: show first few card names
+        if cards:
+            print(f"Sample cards: {[card.name[:50] for card in cards[:5]]}")
+        else:
+            print("WARNING: No cards retrieved from board!")
+        
         # Use enhanced AI for intelligent matching if available
         try:
             from enhanced_ai import EnhancedAI
@@ -773,7 +1290,7 @@ def scan_trello_cards_fast(transcript_text):
             # Prepare simplified card data (no member/action calls that can hang)
             simple_cards = []
             for card in cards[:20]:  # Limit to 20 cards for speed
-                if not card.closed:
+                if not card.closed and 'READ - RULES WHEN ADDING TASK - DO NOT DELETE' not in card.name:
                     simple_cards.append({
                         'id': card.id,
                         'name': card.name,
@@ -797,12 +1314,16 @@ def scan_trello_cards_fast(transcript_text):
         
         # Fallback to basic keyword matching if needed
         if len(matched_cards) < 3:
-            print("Using fallback keyword matching...")
+            print(f"Using fallback keyword matching... (currently have {len(matched_cards)} matches)")
             
             transcript_lower = transcript_text.lower()
             
             for card in cards[:30]:  # Limit for speed
                 if card.closed:
+                    continue
+                
+                # Skip READ - RULES card
+                if 'READ - RULES WHEN ADDING TASK - DO NOT DELETE' in card.name:
                     continue
                 
                 # Skip if already matched by AI
@@ -816,13 +1337,21 @@ def scan_trello_cards_fast(transcript_text):
                 if card_name_lower in transcript_lower:
                     confidence += 70
                 
-                # Word-by-word matching
+                # Word-by-word matching with improved logic
                 card_words = card_name_lower.split()
                 for word in card_words:
-                    if len(word) > 3 and word in transcript_lower:
-                        confidence += 15
+                    if len(word) > 2:  # Reduced from 3 to 2 for better matching
+                        if word in transcript_lower:
+                            confidence += 15
+                        # Also check for partial matches in longer words
+                        elif len(word) > 4:
+                            for transcript_word in transcript_lower.split():
+                                if word in transcript_word or transcript_word in word:
+                                    confidence += 8
+                                    break
                 
-                if confidence >= 40:  # Lower threshold for fallback
+                if confidence >= 25:  # Even lower threshold for better matching
+                    print(f"MATCHED: '{card.name}' with confidence {confidence}")
                     matched_cards.append({
                         'id': card.id,
                         'name': card.name,
@@ -832,6 +1361,8 @@ def scan_trello_cards_fast(transcript_text):
                         'board_name': eeinteractive_board.name,
                         'match_type': 'keyword_fallback'
                     })
+                elif confidence > 0:
+                    print(f"LOW CONFIDENCE: '{card.name}' with confidence {confidence} (below threshold)")
         
         # Sort by confidence
         matched_cards.sort(key=lambda x: x.get('confidence', 0), reverse=True)
@@ -856,13 +1387,17 @@ def extract_google_doc_content(doc_url):
         if not doc_content:
             return None
             
-        # Parse structured content
+        # Parse structured content including Notes and Transcript tabs
         content = {
             'raw_text': doc_content,
             'key_points': [],
             'decisions': [],
             'action_items': [],
-            'objectives': []
+            'objectives': [],
+            'notes_tab_content': '',
+            'transcript_tab_content': '',
+            'trello_board_review': '',
+            'meeting_summary': ''
         }
         
         lines = doc_content.split('\n')
@@ -875,8 +1410,23 @@ def extract_google_doc_content(doc_url):
                 
             line_lower = line.lower()
             
-            # Detect sections
-            if any(keyword in line_lower for keyword in ['key points', 'main points', 'highlights']):
+            # Detect document tabs and sections
+            if 'notes:' in line_lower or line_lower.startswith('notes'):
+                current_section = 'notes_tab_content'
+                print("Found Notes tab section")
+                continue
+            elif 'transcript:' in line_lower or line_lower.startswith('transcript'):
+                current_section = 'transcript_tab_content'
+                print("Found Transcript tab section")
+                continue
+            elif 'trello board review' in line_lower and 'task assignments' in line_lower:
+                current_section = 'trello_board_review'
+                print("Found Trello Board Review section")
+                continue
+            elif any(keyword in line_lower for keyword in ['meeting summary', 'summary', 'overall summary']):
+                current_section = 'meeting_summary'
+                continue
+            elif any(keyword in line_lower for keyword in ['key points', 'main points', 'highlights']):
                 current_section = 'key_points'
                 continue
             elif any(keyword in line_lower for keyword in ['decisions', 'resolved', 'agreed']):
@@ -890,10 +1440,18 @@ def extract_google_doc_content(doc_url):
                 continue
                 
             # Extract content based on section
-            if line.startswith('•') or line.startswith('-') or line.startswith('*'):
-                content[current_section].append(line[1:].strip())
+            if current_section in ['notes_tab_content', 'meeting_summary', 'transcript_tab_content', 'trello_board_review']:
+                # For tabs and summaries, capture all content as continuous text
+                if content[current_section]:
+                    content[current_section] += f"\n{line}"
+                else:
+                    content[current_section] = line
+            elif line.startswith('•') or line.startswith('-') or line.startswith('*'):
+                if current_section in content and isinstance(content[current_section], list):
+                    content[current_section].append(line[1:].strip())
             elif any(char.isdigit() and char in line[:3] for char in line[:3]):
-                content[current_section].append(line.strip())
+                if current_section in content and isinstance(content[current_section], list):
+                    content[current_section].append(line.strip())
             elif current_section == 'general' and len(line) > 20:
                 content['key_points'].append(line)
                 
@@ -1104,120 +1662,62 @@ def generate_participant_feedback(speaker_data, transcript):
         return {}
 
 def create_comprehensive_summary(transcript, doc_content=None, assignments=None):
-    """Create detailed meeting summary with all context."""
+    """Create concise meeting summary with key points only."""
     try:
-        analysis = analyze_meeting_transcript(transcript, doc_content)
-        speaker_metrics = calculate_speaker_metrics(transcript)
-        
-        # Build comprehensive summary
-        summary_parts = []
-        
-        # Header with date
         today = datetime.now().strftime('%d/%m/%Y')
-        summary_parts.append(f"🎯 Meeting Summary - {today}")
-        summary_parts.append("")
         
-        # Attendees with participation stats
-        if speaker_metrics:
-            summary_parts.append("👥 Attendees:")
-            sorted_speakers = sorted(speaker_metrics.items(), key=lambda x: x[1]['participation_percentage'], reverse=True)
-            for speaker, metrics in sorted_speakers:
-                participation = metrics['participation_percentage']
-                engagement = metrics['engagement_score']
-                summary_parts.append(f"  • {speaker} ({participation}% participation, {engagement}/100 engagement)")
-            summary_parts.append("")
+        # Check if we have Notes tab content - prioritize this for group summary
+        if doc_content and doc_content.get('notes_tab_content'):
+            notes_content = doc_content['notes_tab_content'].strip()
+            if notes_content and len(notes_content) > 10:
+                print("Using Notes tab content for group summary")
+                
+                # Truncate long notes content
+                max_notes_length = 250
+                if len(notes_content) > max_notes_length:
+                    notes_content = notes_content[:max_notes_length] + "..."
+                
+                return f"""🎯 Meeting Summary - {today}
+
+{notes_content}
+
+✅ Team members updated on action items"""
         
-        # Meeting purpose and context
-        if analysis.get('meeting_purpose'):
-            summary_parts.append(f"🎯 Purpose: {analysis['meeting_purpose']}")
-            summary_parts.append("")
-        
-        # Key discussions
-        if analysis.get('key_discussions'):
-            summary_parts.append("📋 Key Discussion Points:")
-            for i, discussion in enumerate(analysis['key_discussions'][:5], 1):
-                # Truncate long discussions
-                display_discussion = discussion[:100] + "..." if len(discussion) > 100 else discussion
-                summary_parts.append(f"  {i}. {display_discussion}")
-            summary_parts.append("")
-        
-        # Decisions made
-        if analysis.get('decisions_made') or (doc_content and doc_content.get('decisions')):
-            summary_parts.append("✅ Decisions & Outcomes:")
-            
-            # From transcript
-            for decision in analysis.get('decisions_made', [])[:3]:
-                summary_parts.append(f"  • {decision}")
-            
-            # From Google Doc
-            if doc_content:
-                for decision in doc_content.get('decisions', [])[:2]:
-                    summary_parts.append(f"  • {decision}")
-            
-            if not analysis.get('decisions_made') and not (doc_content and doc_content.get('decisions')):
-                summary_parts.append("  • No specific decisions recorded")
-            
-            summary_parts.append("")
-        
-        # Assignments
-        if assignments and any(assignments.values()):
-            summary_parts.append("👤 Task Assignments:")
-            assigned_count = 0
-            for card_name, assignment_data in assignments.items():
-                if assignment_data and assignment_data.get('assigned_user'):
-                    summary_parts.append(f"  • {assignment_data['assigned_user']}: {card_name}")
-                    assigned_count += 1
-            
-            if assigned_count == 0:
-                summary_parts.append("  • No specific task assignments identified")
-            summary_parts.append("")
-        
-        # Platform and notes link
-        summary_parts.append("📝 Platform: Google Meet Transcript Analysis")
-        
-        if doc_content:
-            summary_parts.append("📄 Meeting Notes: [Google Doc with additional context]")
-        
-        summary_parts.append("")
-        
-        # Action items and follow-ups
-        follow_ups = []
-        if analysis.get('action_items'):
-            follow_ups.extend(analysis['action_items'][:3])
-        if analysis.get('follow_ups'):
-            follow_ups.extend(analysis['follow_ups'][:3])
-        if doc_content and doc_content.get('action_items'):
-            follow_ups.extend(doc_content['action_items'][:3])
-        
-        if follow_ups:
-            summary_parts.append("🔄 Next Steps & Follow-ups:")
-            for item in follow_ups[:5]:
-                summary_parts.append(f"  • {item}")
-            summary_parts.append("")
-        
-        # Footer
-        summary_parts.append("All team members have been updated on their respective action items. Please check your assigned Trello cards for detailed comments and next steps.")
-        
-        return "\n".join(summary_parts)
+        # Fallback to simple auto-generated summary
+        return f"""🎯 Meeting Summary - {today}
+
+📋 Key topics discussed and action items assigned
+👥 Team members updated on their tasks
+
+✅ Trello cards updated with meeting notes"""
         
     except Exception as e:
-        print(f"Error creating comprehensive summary: {e}")
-        # Fallback to basic summary
+        print(f"Error creating summary: {e}")
         today = datetime.now().strftime('%d/%m/%Y')
-        participants = extract_participants_fast(transcript)
-        
-        basic_summary = f"🎯 Meeting Summary - {today}\n\n"
-        basic_summary += f"👥 Attendees: {', '.join(participants) if participants else 'Team members'}\n"
-        basic_summary += "📋 Tasks Updated: Meeting analysis completed\n"
-        basic_summary += "📝 Platform: Google Meet Transcript Analysis\n\n"
-        basic_summary += "Key Outcomes:\n• Meeting transcript processed and analyzed\n• Task assignments updated in Trello\n\n"
-        basic_summary += "All team members have been updated on their respective action items. Please check your assigned Trello cards for detailed comments and next steps."
-        
-        return basic_summary
+        return f"""🎯 Meeting Summary - {today}
+
+📋 Meeting completed successfully
+✅ Team members notified of updates"""
 
 def generate_meeting_comment(transcript_text, card_name, match_context="", card_id=None, doc_content=None, meeting_analysis=None):
-    """Generate enhanced structured comment for Trello card with comprehensive context."""
+    """Generate enhanced structured comment for Trello card using meeting structure parsing."""
     try:
+        from meeting_parser import MeetingStructureParser
+        
+        # Use the new meeting parser to get card-specific discussion
+        parser = MeetingStructureParser()
+        
+        # Create a mock card list with just this card for parsing
+        mock_cards = [{'name': card_name}]
+        card_discussions = parser.extract_card_discussions(transcript_text, mock_cards)
+        
+        # Get the specific discussion for this card
+        card_discussion = card_discussions.get(card_name, {})
+        relevant_discussion = card_discussion.get('discussion', '')
+        discussion_summary = card_discussion.get('summary', '')
+        discussion_speakers = card_discussion.get('speakers', [])
+        parser_confidence = card_discussion.get('confidence', 0)
+        
         # Get enhanced assignment information
         assignment_info = []
         if card_id:
@@ -1255,41 +1755,6 @@ def generate_meeting_comment(transcript_text, card_name, match_context="", card_
                 context_info.append(f"**📋 Meeting Context:** {meeting_analysis['meeting_purpose']}")
                 context_info.append("")
         
-        # Find relevant quotes and discussions
-        relevant_quotes = []
-        discussion_context = []
-        lines = transcript_text.split('\n')
-        card_name_lower = card_name.lower()
-        card_keywords = [word for word in card_name_lower.split() if len(word) > 3]
-        
-        for line in lines:
-            line = line.strip()
-            if not line or '[' in line:  # Skip timestamps
-                continue
-            
-            line_lower = line.lower()
-            
-            # Check if line mentions this card directly or indirectly
-            card_mentioned = any(keyword in line_lower for keyword in card_keywords)
-            
-            # Check for assignment or task language
-            assignment_mentioned = any(phrase in line_lower for phrase in [
-                'assigned', 'task', 'responsible', 'handle', 'work on', 'take care', 'will do'
-            ])
-            
-            if card_mentioned or (assignment_mentioned and any(keyword in line_lower for keyword in card_keywords[:2])):
-                # Clean up the line for display
-                display_line = line
-                if ':' in line:
-                    speaker, message = line.split(':', 1)
-                    if len(speaker.strip()) < 50:  # Valid speaker format
-                        display_line = f"**{speaker.strip()}:** {message.strip()}"
-                
-                relevant_quotes.append(display_line)
-                
-                if len(relevant_quotes) >= 5:  # Limit quotes
-                    break
-        
         # Build the comment
         comment_parts = []
         
@@ -1306,15 +1771,33 @@ def generate_meeting_comment(transcript_text, card_name, match_context="", card_
         if context_info:
             comment_parts.extend(context_info)
         
-        # Relevant discussion
-        if relevant_quotes:
-            comment_parts.append("**💬 Relevant Discussion:**")
-            for quote in relevant_quotes[:3]:  # Top 3 most relevant
-                comment_parts.append(f"> {quote}")
+        # Card-specific discussion from meeting parser
+        if relevant_discussion and parser_confidence > 50:
+            comment_parts.append("**💬 Card-Specific Discussion:**")
+            if discussion_speakers:
+                comment_parts.append(f"*Participants: {', '.join(discussion_speakers)}*")
+            comment_parts.append("")
+            
+            # Use the structured summary if available
+            if discussion_summary:
+                comment_parts.append(discussion_summary)
+            else:
+                # Fallback to raw discussion with formatting
+                discussion_lines = relevant_discussion.split('\n')
+                for line in discussion_lines[:4]:  # Limit to first 4 lines
+                    if line.strip():
+                        comment_parts.append(f"> {line}")
+            comment_parts.append("")
+        elif not relevant_discussion and parser_confidence < 30:
+            # No specific discussion found for this card
+            comment_parts.append("**💬 Discussion Status:**")
+            comment_parts.append("> This card was mentioned in the meeting but no specific discussion was captured.")
+            comment_parts.append("> Please check with the team for any updates or decisions made.")
             comment_parts.append("")
         
-        # Google Doc insights
+        # Google Doc insights (Notes tab content should be used here in future)
         if doc_content:
+            card_keywords = [word for word in card_name.lower().split() if len(word) > 3]
             doc_insights = []
             # Check if any doc content relates to this card
             for key_point in doc_content.get('key_points', [])[:2]:
@@ -1368,10 +1851,24 @@ def process_transcript():
             if not doc_id:
                 return jsonify({'success': False, 'error': 'Invalid Google Docs URL'})
             
-            # Get document text
-            transcript_text = get_google_doc_text(doc_id)
-            if not transcript_text:
+            # Get document content with tab parsing
+            doc_content = extract_google_doc_content(url)
+            if not doc_content:
                 return jsonify({'success': False, 'error': 'Could not fetch document or document is empty'})
+            
+            # ENHANCED: Use best available content source
+            if doc_content.get('transcript_tab_content') and len(doc_content['transcript_tab_content']) > 500:
+                transcript_text = doc_content['transcript_tab_content']
+                print("Using Transcript tab content for analysis")
+            elif doc_content.get('raw_text'):
+                transcript_text = doc_content['raw_text']
+                print("Using full document content for analysis (transcript tab too short)")
+            else:
+                transcript_text = ""
+                print("No usable content found in document")
+                
+            if not transcript_text:
+                return jsonify({'success': False, 'error': 'No transcript content found in document'})
             
             source_type = "google_docs"
             source_url = url
@@ -1387,6 +1884,20 @@ def process_transcript():
         
         print(f"Transcript received: {len(transcript_text)} characters from {source_type}")
         
+        # Safe preview of transcript content  
+        try:
+            safe_preview = transcript_text[:200].encode('ascii', errors='replace').decode('ascii')
+            print(f"First 200 characters: {safe_preview}...")
+        except Exception as e:
+            print(f"First 200 characters: [contains special characters] - {e}")
+            
+        # Safe word detection
+        try:
+            text_lower = transcript_text.lower() if transcript_text else ""
+            print(f"Contains common words: Mobile={('mobile' in text_lower)}, App={('app' in text_lower)}, Center={('center' in text_lower)}, Court={('court' in text_lower)}")
+        except Exception as e:
+            print(f"Word detection failed: {e}")
+        
         # Initialize comprehensive analysis results
         analysis_results = {}
         doc_content = None
@@ -1394,20 +1905,32 @@ def process_transcript():
         speaker_metrics = {}
         participant_feedback = {}
         
-        # NEW: Extract Google Doc content if available
-        if source_type == "google_docs" and source_url:
-            try:
-                print("Extracting Google Doc content...")
-                doc_content = extract_google_doc_content(source_url)
-                if doc_content:
-                    analysis_results['doc_content'] = {
-                        'key_points': len(doc_content.get('key_points', [])),
-                        'decisions': len(doc_content.get('decisions', [])),
-                        'action_items': len(doc_content.get('action_items', []))
-                    }
-                    print(f"Google Doc content extracted successfully")
-            except Exception as e:
-                print(f"Google Doc content extraction failed: {e}")
+        # Add doc_content to analysis if available from Google Docs
+        if doc_content:
+            analysis_results['doc_content'] = {
+                'key_points': len(doc_content.get('key_points', [])),
+                'decisions': len(doc_content.get('decisions', [])),
+                'action_items': len(doc_content.get('action_items', [])),
+                'notes_tab_available': bool(doc_content.get('notes_tab_content')),
+                'transcript_tab_available': bool(doc_content.get('transcript_tab_content')),
+                'trello_review_available': bool(doc_content.get('trello_board_review'))
+            }
+            print(f"Google Doc tabs: Notes={bool(doc_content.get('notes_tab_content'))}, Transcript={bool(doc_content.get('transcript_tab_content'))}, Trello Review={bool(doc_content.get('trello_board_review'))}")
+            
+            # DEBUG: Show content lengths
+            print(f"DEBUG Content lengths:")
+            print(f"  - notes_tab_content: {len(doc_content.get('notes_tab_content', ''))}")
+            print(f"  - transcript_tab_content: {len(doc_content.get('transcript_tab_content', ''))}")
+            print(f"  - trello_board_review: {len(doc_content.get('trello_board_review', ''))}")
+            print(f"  - raw_text: {len(doc_content.get('raw_text', ''))}")
+            
+            # DEBUG: Show sample content
+            if doc_content.get('trello_board_review'):
+                try:
+                    sample = doc_content['trello_board_review'][:300].encode('ascii', errors='replace').decode('ascii')
+                    print(f"DEBUG Trello Review sample: {sample}...")
+                except:
+                    print(f"DEBUG Trello Review length: {len(doc_content['trello_board_review'])}")
         
         # NEW: Comprehensive meeting analysis
         try:
@@ -1481,13 +2004,36 @@ def process_transcript():
             print(f"AI analysis failed: {e}")
             analysis_results['enhanced_ai_error'] = str(e)
         
-        # Fast card matching
+        # Enhanced card matching: Notes → Transcript workflow with non-OpenAI backup
         matched_cards = []
         try:
-            matched_cards = scan_trello_cards_fast(transcript_text)
+            if doc_content and doc_content.get('trello_board_review'):
+                print("Using Notes-first card matching workflow")
+                # Step 1: Extract card names from Notes (Trello Board Review section)
+                notes_cards = extract_cards_from_notes(doc_content['trello_board_review'])
+                print(f"Found {len(notes_cards)} cards mentioned in Notes")
+                
+                # Step 2: Match against Trello board
+                matched_cards = match_notes_cards_to_trello(notes_cards, transcript_text)
+                print(f"Matched {len(matched_cards)} cards from Notes to Trello")
+            else:
+                print("No Trello Board Review found, using enhanced fallback matching")
+                # Enhanced fallback without OpenAI dependency
+                matched_cards = enhanced_card_matching_no_ai(transcript_text, doc_content)
+            
+            # If still no matches, use basic fallback
+            if len(matched_cards) == 0:
+                print("Using basic keyword matching as final fallback")
+                matched_cards = scan_trello_cards_fast(transcript_text)
+            
             print(f"Card matching completed: {len(matched_cards)} matches")
         except Exception as e:
             print(f"Card matching failed: {e}")
+            # Ultimate fallback
+            try:
+                matched_cards = scan_trello_cards_fast(transcript_text)
+            except:
+                matched_cards = []
         
         # Add comments to matched cards (NEW FEATURE)
         comments_posted = 0
@@ -1555,6 +2101,7 @@ def process_transcript():
                         def __init__(self, card_id, name):
                             self.id = card_id
                             self.name = name
+                            self.description = ""
                     
                     mock_card = MockCard(card_id, card_name)
                     assigned_user, assigned_whatsapp, all_assignments = get_enhanced_card_assignment(mock_card, transcript_text)
@@ -1711,6 +2258,54 @@ def estimate_duration_fast(transcript_text):
     }
 
 # Add demo route
+@app.route('/api/test-models', methods=['GET'])
+def test_openai_models():
+    """Test what OpenAI models are available with current API key."""
+    try:
+        from openai import OpenAI
+        import os
+        
+        # Initialize OpenAI client
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            return jsonify({'error': 'No OpenAI API key found'})
+        
+        client = OpenAI(api_key=api_key)
+        
+        # List available models
+        models = client.models.list()
+        
+        # Filter for GPT models
+        gpt_models = []
+        for model in models.data:
+            if 'gpt' in model.id.lower():
+                gpt_models.append({
+                    'id': model.id,
+                    'created': model.created,
+                    'owned_by': model.owned_by
+                })
+        
+        # Sort by creation date (newest first)
+        gpt_models.sort(key=lambda x: x['created'], reverse=True)
+        
+        # Check if GPT-5 exists
+        gpt5_available = any('gpt-5' in model['id'] for model in gpt_models)
+        
+        return jsonify({
+            'success': True,
+            'api_key_valid': True,
+            'gpt5_available': gpt5_available,
+            'available_gpt_models': gpt_models[:10],  # Top 10 newest
+            'total_gpt_models': len(gpt_models)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'api_key_valid': False
+        })
+
 @app.route('/api/demo-analyze', methods=['POST'])
 def demo_analyze():
     """Demo analysis endpoint."""
@@ -2880,6 +3475,290 @@ Thanks! 🙏"""
         print(f"Error in send_updates: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+# ===== MESSAGE TRACKING API ENDPOINTS =====
+
+@app.route('/api/message-stats', methods=['GET'])
+@login_required
+def get_message_stats():
+    """Get daily message statistics and analytics."""
+    try:
+        # Get today's analytics
+        today_stats = message_tracker.get_daily_analytics()
+        
+        # Get week analytics
+        week_stats = message_tracker.get_week_analytics()
+        
+        return jsonify({
+            'success': True,
+            'today': today_stats,
+            'week': week_stats
+        })
+        
+    except Exception as e:
+        print(f"Error in message stats: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/card-message-status', methods=['POST'])
+@login_required
+def get_card_message_status():
+    """Get message status for specific cards and assignees."""
+    try:
+        data = request.get_json()
+        requests_list = data.get('requests', [])  # [{'card_id': 'x', 'assignee': 'y'}, ...]
+        
+        statuses = {}
+        for req in requests_list:
+            card_id = req.get('card_id')
+            assignee = req.get('assignee')
+            
+            if card_id and assignee:
+                status = message_tracker.get_card_message_status(card_id, assignee)
+                statuses[f"{card_id}_{assignee}"] = status
+        
+        return jsonify({
+            'success': True,
+            'statuses': statuses
+        })
+        
+    except Exception as e:
+        print(f"Error in card message status: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/check-card-comments', methods=['POST'])
+@login_required
+def check_card_comments():
+    """Check for new comments on cards and reset reminder counts."""
+    try:
+        data = request.json or {}
+        card_id = data.get('card_id')
+        
+        if not card_id:
+            return jsonify({'success': False, 'error': 'Card ID required'})
+        
+        # Get card comments from Trello API
+        api_key = os.environ.get('TRELLO_API_KEY')
+        token = os.environ.get('TRELLO_TOKEN')
+        
+        if not api_key or not token:
+            return jsonify({'success': False, 'error': 'Trello API credentials not configured'})
+        
+        # Get card actions (comments)
+        url = f"https://api.trello.com/1/cards/{card_id}/actions"
+        params = {
+            'key': api_key,
+            'token': token,
+            'filter': 'commentCard',
+            'limit': 50
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code != 200:
+            return jsonify({'success': False, 'error': f'Trello API error: {response.status_code}'})
+        
+        comments = response.json()
+        
+        # Check for recent comments (within last 24 hours)
+        now = datetime.now()
+        recent_comments = []
+        
+        for comment in comments:
+            comment_date = datetime.fromisoformat(comment['date'].replace('Z', '+00:00'))
+            hours_since_comment = (now - comment_date.replace(tzinfo=None)).total_seconds() / 3600
+            
+            if hours_since_comment <= 24:  # Comment within last 24 hours
+                member_id = comment['memberCreator']['id']
+                recent_comments.append({
+                    'member_id': member_id,
+                    'member_name': comment['memberCreator']['fullName'],
+                    'comment_text': comment['data']['text'],
+                    'comment_date': comment['date']
+                })
+        
+        # Reset reminder counts for users who commented recently
+        resets_performed = []
+        if recent_comments:
+            for comment in recent_comments:
+                member_name = comment['member_name']
+                # Try to match with team members
+                for team_member in TEAM_MEMBERS.keys():
+                    if team_member.lower() in member_name.lower() or member_name.lower() in team_member.lower():
+                        reset_result = reset_reminder_count(card_id, team_member)
+                        if reset_result:
+                            resets_performed.append({
+                                'team_member': team_member,
+                                'comment_by': member_name,
+                                'comment_date': comment['comment_date']
+                            })
+                        break
+        
+        return jsonify({
+            'success': True,
+            'recent_comments': len(recent_comments),
+            'resets_performed': resets_performed
+        })
+        
+    except Exception as e:
+        print(f"Error checking card comments: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/manual-scan', methods=['POST'])
+@login_required
+def manual_scan():
+    """Manually trigger automated scan for testing."""
+    try:
+        print("[MANUAL] Starting manual team tracker scan...")
+        perform_automated_scan()
+        return jsonify({'success': True, 'message': 'Manual scan completed'})
+    except Exception as e:
+        print(f"Error in manual scan: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/send-tracked-updates', methods=['POST'])
+@login_required
+def send_tracked_updates():
+    """Send WhatsApp updates with proper message tracking."""
+    try:
+        data = request.get_json()
+        selected_cards = data.get('selected_cards', [])
+        
+        if not selected_cards:
+            return jsonify({'success': False, 'error': 'No cards selected'})
+        
+        # Initialize Trello client
+        try:
+            trello_client = CustomTrelloClient()
+            boards = trello_client.list_boards()
+            board = None
+            
+            for b in boards:
+                if 'eeinteractive' in b.name.lower():
+                    board = b
+                    break
+            
+            if not board:
+                return jsonify({'success': False, 'error': 'EEInteractive board not found'})
+                
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Trello connection failed: {str(e)}'})
+        
+        sent_messages = []
+        failed_messages = []
+        blocked_messages = []
+        
+        # Process each selected card
+        for card_id in selected_cards:
+            try:
+                # Find the card
+                card = None
+                cards = board.get_cards()
+                for c in cards:
+                    if c.id == card_id:
+                        card = c
+                        break
+                
+                if not card:
+                    failed_messages.append({
+                        'card_id': card_id,
+                        'error': 'Card not found'
+                    })
+                    continue
+                
+                # Get enhanced assignment
+                assigned_user, assigned_whatsapp, all_assignments = get_enhanced_card_assignment(card, "")
+                
+                if not assigned_user or not assigned_whatsapp:
+                    failed_messages.append({
+                        'card': card.name,
+                        'error': 'No assignee or WhatsApp number found'
+                    })
+                    continue
+                
+                # Check if message can be sent (cooldown/limits)
+                can_send, reason = message_tracker.can_send_message(card.id, assigned_user)
+                
+                if not can_send:
+                    blocked_messages.append({
+                        'card': card.name,
+                        'user': assigned_user,
+                        'reason': reason
+                    })
+                    continue
+                
+                # Prepare WhatsApp message
+                message_text = f"""🔔 Task Reminder
+
+📋 **Card:** {card.name}
+
+⏰ **Due Date:** Please provide update
+
+📍 **Status:** Needs update from you
+
+Please check your Trello card and provide a status update on your progress.
+
+🔗 **View Card:** https://trello.com/c/{card.id}
+
+Reply with your current status or any blockers you're facing.
+
+---
+📱 Auto-reminder from Team Management System"""
+                
+                # Send WhatsApp message
+                api_url = f"https://api.green-api.com/waInstance{os.getenv('GREEN_API_INSTANCE')}/sendMessage/{os.getenv('GREEN_API_TOKEN')}"
+                
+                payload = {
+                    "chatId": assigned_whatsapp,
+                    "message": message_text
+                }
+                
+                response = requests.post(api_url, json=payload, timeout=10)
+                
+                if response.status_code == 200:
+                    # Log the message in tracker
+                    message_tracker.log_message(
+                        card_id=card.id,
+                        card_name=card.name,
+                        assignee_name=assigned_user,
+                        assignee_phone=assigned_whatsapp,
+                        message_content=message_text,
+                        delivery_status='sent'
+                    )
+                    
+                    sent_messages.append({
+                        'card': card.name,
+                        'user': assigned_user,
+                        'phone': assigned_whatsapp
+                    })
+                    print(f"Sent tracked update to {assigned_user} for card: {card.name}")
+                    
+                else:
+                    failed_messages.append({
+                        'card': card.name,
+                        'user': assigned_user,
+                        'error': f"WhatsApp API error: {response.status_code}"
+                    })
+                    print(f"Failed to send to {assigned_user}: {response.status_code}")
+                    
+            except Exception as e:
+                failed_messages.append({
+                    'card': getattr(card, 'name', card_id),
+                    'error': f"Error: {str(e)}"
+                })
+                print(f"Error processing card {card_id}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'messages_sent': len(sent_messages),
+            'messages_failed': len(failed_messages),
+            'messages_blocked': len(blocked_messages),
+            'sent_details': sent_messages,
+            'failed_details': failed_messages,
+            'blocked_details': blocked_messages
+        })
+        
+    except Exception as e:
+        print(f"Error in send_tracked_updates: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 # ===== APPLICATION STARTUP =====
 
 if __name__ == '__main__':
@@ -2887,6 +3766,9 @@ if __name__ == '__main__':
     print(f"AI modules available: SpeakerAnalyzer={SpeakerAnalyzer is not None}")
     print("Features: Google Docs reading, Trello card matching, and automatic commenting")
     print(f"Registered routes: {[rule.rule for rule in app.url_map.iter_rules()]}")
+    
+    # Start automated scanner
+    start_automated_scanner()
     
     # Use Render's PORT environment variable or default to 5000
     port = int(os.environ.get('PORT', 5000))

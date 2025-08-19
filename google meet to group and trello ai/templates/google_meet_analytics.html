@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting Analytics - JGV AI Hub{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">📊 Meeting Analytics</h1>
+                    <p class="text-gray-600 mt-1">Transform meeting transcripts into actionable insights</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        GPT-5 Powered
+                    </span>
+                    <a href="/team-tracker" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        Team Tracker →
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Input Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">📄 Google Doc URL</h2>
+            <div class="flex space-x-4">
+                <input type="text" 
+                       id="docUrl" 
+                       placeholder="https://docs.google.com/document/d/..." 
+                       class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                <button onclick="analyzeMeeting()" 
+                        id="analyzeBtn"
+                        class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all">
+                    Analyze Meeting
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden">
+            <div class="bg-white rounded-xl shadow-lg p-12 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 mb-4">
+                    <svg class="animate-spin h-12 w-12 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <p class="text-gray-600 text-lg">Analyzing meeting transcript...</p>
+                <p class="text-gray-500 text-sm mt-2">This may take a few moments</p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden space-y-6">
+            <!-- Overview Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Speakers</p>
+                            <p class="text-2xl font-bold text-gray-900" id="totalSpeakers">0</p>
+                        </div>
+                        <span class="text-3xl">👥</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Words Spoken</p>
+                            <p class="text-2xl font-bold text-gray-900" id="totalWords">0</p>
+                        </div>
+                        <span class="text-3xl">💬</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Effectiveness</p>
+                            <p class="text-2xl font-bold" id="effectivenessScore">-</p>
+                        </div>
+                        <span class="text-3xl">📈</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Energy Level</p>
+                            <p class="text-2xl font-bold capitalize" id="energyLevel">-</p>
+                        </div>
+                        <span class="text-3xl">⚡</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Silent Participants Alert -->
+            <div id="silentAlert" class="hidden bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <span class="text-2xl">🔇</span>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">Silent Participants Detected</h3>
+                        <div class="mt-2 text-sm text-red-700">
+                            <p>The following participants did not speak during the meeting:</p>
+                            <p class="font-semibold mt-1" id="silentNames"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WhatsApp Summary -->
+            <div class="bg-gradient-to-r from-green-50 to-green-100 rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-lg font-semibold">📱 WhatsApp Group Summary</h3>
+                    <button onclick="sendToWhatsApp()" 
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                        Send to Group
+                    </button>
+                </div>
+                <div class="bg-white rounded-lg p-4 font-mono text-sm whitespace-pre-wrap" id="whatsappSummary">
+                    <!-- WhatsApp summary will be inserted here -->
+                </div>
+                <button onclick="copyToClipboard()" 
+                        class="mt-4 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                    📋 Copy to Clipboard
+                </button>
+            </div>
+
+            <!-- Participation Analysis -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">🎯 Participation Analysis</h3>
+                <div id="participationChart" class="space-y-3">
+                    <!-- Participation bars will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Key Insights -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">📋 Actions</h3>
+                    <div id="decisionsActions" class="space-y-3">
+                        <!-- Actions will be inserted here -->
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">📄 Details</h3>
+                    <div id="recommendations" class="space-y-2">
+                        <!-- Details will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentAnalysis = null;
+
+async function analyzeMeeting() {
+    const docUrl = document.getElementById('docUrl').value.trim();
+    
+    if (!docUrl) {
+        alert('Please enter a Google Doc URL');
+        return;
+    }
+    
+    // Show loading state
+    document.getElementById('loadingState').classList.remove('hidden');
+    document.getElementById('resultsSection').classList.add('hidden');
+    document.getElementById('analyzeBtn').disabled = true;
+    
+    try {
+        const response = await fetch('/api/analyze-meeting', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ doc_url: docUrl })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentAnalysis = data.analysis;
+            displayResults(data.analysis);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to analyze meeting'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to analyze meeting. Please try again.');
+    } finally {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('analyzeBtn').disabled = false;
+    }
+}
+
+function displayResults(analysis) {
+    // Show results section
+    document.getElementById('resultsSection').classList.remove('hidden');
+    
+    // Update overview cards
+    document.getElementById('totalSpeakers').textContent = analysis.overview.total_speakers;
+    document.getElementById('totalWords').textContent = analysis.overview.total_words.toLocaleString();
+    document.getElementById('effectivenessScore').textContent = analysis.overview.overall_score + '%';
+    document.getElementById('effectivenessScore').className = 'text-2xl font-bold ' + 
+        (analysis.overview.overall_score >= 70 ? 'text-green-600' : 
+         analysis.overview.overall_score >= 50 ? 'text-yellow-600' : 'text-red-600');
+    document.getElementById('energyLevel').textContent = analysis.engagement.energy;
+    
+    // Silent participants alert
+    if (analysis.participation.silent_participants && analysis.participation.silent_participants.length > 0) {
+        document.getElementById('silentAlert').classList.remove('hidden');
+        document.getElementById('silentNames').textContent = analysis.participation.silent_participants.join(', ');
+    } else {
+        document.getElementById('silentAlert').classList.add('hidden');
+    }
+    
+    // Participation chart
+    displayParticipationChart(analysis.participation.speakers);
+    
+    // Actions only
+    displayActions(analysis.insights);
+    
+    // Details from document
+    displayDetails(analysis.details || []);
+    
+    // WhatsApp summary
+    document.getElementById('whatsappSummary').textContent = analysis.whatsapp_summary;
+}
+
+function displayParticipationChart(speakers) {
+    const chartContainer = document.getElementById('participationChart');
+    chartContainer.innerHTML = '';
+    
+    // Sort speakers by participation
+    const sortedSpeakers = Object.entries(speakers).sort((a, b) => 
+        b[1].participation_percentage - a[1].participation_percentage
+    );
+    
+    // Display top 10 speakers
+    sortedSpeakers.slice(0, 10).forEach(([name, data]) => {
+        const percentage = data.participation_percentage;
+        const barColor = percentage > 30 ? 'bg-red-500' : 
+                        percentage > 20 ? 'bg-yellow-500' : 
+                        percentage > 10 ? 'bg-green-500' : 'bg-gray-400';
+        
+        const speakerDiv = document.createElement('div');
+        speakerDiv.className = 'flex items-center space-x-3';
+        speakerDiv.innerHTML = `
+            <div class="w-32 text-sm font-medium text-gray-700">${name}</div>
+            <div class="flex-1 bg-gray-200 rounded-full h-6">
+                <div class="${barColor} h-6 rounded-full flex items-center justify-end pr-2" 
+                     style="width: ${Math.max(percentage, 5)}%">
+                    <span class="text-xs text-white font-semibold">${percentage}%</span>
+                </div>
+            </div>
+            <div class="text-sm text-gray-500">${data.word_count} words</div>
+        `;
+        chartContainer.appendChild(speakerDiv);
+    });
+}
+
+function displayActions(insights) {
+    const container = document.getElementById('decisionsActions');
+    container.innerHTML = '';
+    
+    // Action items only
+    if (insights.action_items && insights.action_items.length > 0) {
+        insights.action_items.forEach(action => {
+            container.innerHTML += `<p class="text-sm text-gray-600 pl-4">• ${action}</p>`;
+        });
+    } else {
+        container.innerHTML = '<p class="text-gray-500 italic">No specific actions recorded</p>';
+    }
+}
+
+function displayDetails(details) {
+    const container = document.getElementById('recommendations');
+    container.innerHTML = '';
+    
+    if (details && details.length > 0) {
+        details.forEach(detail => {
+            container.innerHTML += `
+                <div class="flex items-start space-x-2">
+                    <span class="text-blue-500">📄</span>
+                    <p class="text-sm text-gray-600">${detail}</p>
+                </div>
+            `;
+        });
+    } else {
+        container.innerHTML = '<p class="text-gray-500 italic">Additional meeting details from Google Doc</p>';
+    }
+}
+
+async function sendToWhatsApp() {
+    if (!currentAnalysis) return;
+    
+    if (!confirm('Send this summary to the WhatsApp group?')) return;
+    
+    try {
+        const response = await fetch('/api/send-whatsapp-summary', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                summary: currentAnalysis.whatsapp_summary 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Summary sent to WhatsApp group!');
+        } else {
+            alert('Failed to send: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to send WhatsApp message');
+    }
+}
+
+function copyToClipboard() {
+    if (!currentAnalysis) return;
+    
+    navigator.clipboard.writeText(currentAnalysis.whatsapp_summary).then(() => {
+        alert('Summary copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+</script>
+{% endblock %}
