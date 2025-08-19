@@ -26,7 +26,9 @@
       "Bash(git config:*)",
       "mcp__JustGoingViral__create_repository",
       "Bash(gh repo create:*)",
-      "Bash(git remote add:*)"
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)"
     ],
     "deny": [],
     "ask": []
