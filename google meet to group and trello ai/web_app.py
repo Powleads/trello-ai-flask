@@ -320,29 +320,39 @@ def get_google_doc_text(doc_id):
     try:
         print(f"Attempting to fetch Google Doc: {doc_id}")
         
-        # Try to use the Google Drive integration first
-        try:
-            from src.integrations.google_drive import GoogleDriveClient
-            
-            # Initialize Google Drive client with proper authentication
-            drive_client = GoogleDriveClient(
-                credentials_file=os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json'),
-                token_file=os.getenv('GOOGLE_TOKEN_FILE', 'token.pickle')
-            )
-            
-            # Use the Google Drive API to get document content
-            text = drive_client.get_document_text(doc_id)
-            if text and text.strip():
-                print(f"✅ Retrieved text from Google Drive API: {len(text)} chars")
-                return text
-            else:
-                print("❌ Google Drive API returned empty content")
+        # Try to use the Google Drive integration first (only if properly configured)
+        google_client_id = os.getenv('GOOGLE_CLIENT_ID')
+        if google_client_id and google_client_id != 'your_google_client_id_here':
+            try:
+                from src.integrations.google_drive import GoogleDriveClient
                 
-        except Exception as e:
-            print(f"❌ Google Drive API failed: {e}")
+                # Initialize Google Drive client with proper authentication
+                drive_client = GoogleDriveClient(
+                    credentials_file=os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json'),
+                    token_file=os.getenv('GOOGLE_TOKEN_FILE', 'token.pickle')
+                )
+                
+                # Use the Google Drive API to get document content
+                text = drive_client.get_document_text(doc_id)
+                if text and text.strip():
+                    try:
+                        print(f"✅ Retrieved text from Google Drive API: {len(text)} chars")
+                    except UnicodeEncodeError:
+                        print(f"Retrieved text from Google Drive API: {len(text)} chars")
+                    return text
+                else:
+                    print("Google Drive API returned empty content")
+                    
+            except Exception as e:
+                try:
+                    print(f"❌ Google Drive API failed: {e}")
+                except UnicodeEncodeError:
+                    print(f"Google Drive API failed: [Unicode Error]")
+        else:
+            print("Google API credentials not configured, using fallback method only")
         
         # Fallback to public URL method (for publicly shared docs)
-        print("🔄 Trying fallback public URL method...")
+        print("Trying fallback public URL method...")
         export_urls = [
             f"https://docs.google.com/document/d/{doc_id}/export?format=txt",
             f"https://docs.google.com/document/u/0/d/{doc_id}/export?format=txt"
@@ -366,27 +376,31 @@ def get_google_doc_text(doc_id):
                         content_indicators = ['transcript', ':', 'said', 'meeting', 'discussion']
                         
                         if any(indicator.lower() in text.lower() for indicator in content_indicators) or len(text) > 200:
-                            print("✅ Valid transcript content detected via fallback")
+                            print("Valid transcript content detected via fallback")
                             return text
                         else:
-                            print("❌ Text found but doesn't appear to be transcript content")
+                            print("Text found but doesn't appear to be transcript content")
                     else:
-                        print("❌ Response appears to be HTML error page or too short")
+                        print("Response appears to be HTML error page or too short")
                 else:
-                    print(f"❌ Failed with status code: {response.status_code}")
+                    print(f"Failed with status code: {response.status_code}")
                     
             except requests.exceptions.Timeout:
-                print(f"⏱️ Timeout on method {i+1}")
+                print(f"Timeout on method {i+1}")
                 continue
             except Exception as e:
-                print(f"❌ Error on method {i+1}: {e}")
+                print(f"Error on method {i+1}: {e}")
                 continue
         
         print("All methods failed")
         return None
         
     except Exception as e:
-        print(f"Critical error fetching Google Doc: {e}")
+        # Safe print to handle Unicode characters in error messages
+        try:
+            print(f"Critical error fetching Google Doc: {e}")
+        except UnicodeEncodeError:
+            print(f"Critical error fetching Google Doc: [Unicode Error - Document may contain special characters]")
         return None
 
 # ===== ENHANCED ASSIGNMENT DETECTION SYSTEM =====
