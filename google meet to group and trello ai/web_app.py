@@ -118,19 +118,67 @@ def mark_card_resolved(card_id, assigned_user):
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
-# Simple authentication system
+# Enhanced Security Authentication System
 from functools import wraps
+import bcrypt
+import hashlib
+from collections import defaultdict
 
-# Login credentials from environment variables
+# Secure session configuration
+app.config.update(
+    SESSION_COOKIE_SECURE=True,  # HTTPS only
+    SESSION_COOKIE_HTTPONLY=True,  # No JS access
+    SESSION_COOKIE_SAMESITE='Lax',  # CSRF protection
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=4),  # Auto logout
+)
+
+# Login credentials with hashed password storage
 LOGIN_USERNAME = os.environ.get('LOGIN_USERNAME', 'admin@justgoingviral.com')
-LOGIN_PASSWORD = os.environ.get('LOGIN_PASSWORD', 'A!Wellness2!')
+LOGIN_PASSWORD_RAW = os.environ.get('LOGIN_PASSWORD', 'A!Wellness2!')
+
+# Generate secure password hash (do this once)
+LOGIN_PASSWORD_HASH = bcrypt.hashpw(LOGIN_PASSWORD_RAW.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+# Rate limiting for brute force protection
+login_attempts = defaultdict(list)
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION = 300  # 5 minutes
+
+def is_rate_limited(ip_address):
+    """Check if IP is rate limited."""
+    now = time.time()
+    attempts = login_attempts[ip_address]
+    
+    # Remove old attempts
+    login_attempts[ip_address] = [attempt for attempt in attempts if now - attempt < LOCKOUT_DURATION]
+    
+    return len(login_attempts[ip_address]) >= MAX_LOGIN_ATTEMPTS
+
+def record_failed_attempt(ip_address):
+    """Record failed login attempt."""
+    login_attempts[ip_address].append(time.time())
+
+def verify_password(provided_password, stored_hash):
+    """Securely verify password using bcrypt with timing attack protection."""
+    try:
+        # Always perform hashing to prevent timing attacks
+        return bcrypt.checkpw(provided_password.encode('utf-8'), stored_hash.encode('utf-8'))
+    except Exception:
+        # Timing attack protection - still do some work
+        bcrypt.hashpw(b'dummy', bcrypt.gensalt())
+        return False
 
 def login_required(f):
-    """Decorator to require login for routes."""
+    """Enhanced decorator with session security."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
+        if not session.get('logged_in') or not session.get('username'):
+            session.clear()  # Clear potentially corrupted session
             return redirect(url_for('login'))
+        
+        # Refresh session for active users
+        session.permanent = True
+        
         return f(*args, **kwargs)
     return decorated_function
 
@@ -178,20 +226,59 @@ except Exception as e:
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Get client IP for rate limiting
+    client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if client_ip:
+        client_ip = client_ip.split(',')[0].strip()
+    
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        # Check rate limiting first
+        if is_rate_limited(client_ip):
+            return render_template('login.html', 
+                error='Too many failed attempts. Please try again in 5 minutes.'), 429
         
-        if username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        
+        # Input validation
+        if not username or not password:
+            record_failed_attempt(client_ip)
+            return render_template('login.html', error='Please enter both username and password.')
+        
+        # Secure credential verification
+        username_valid = username.lower() == LOGIN_USERNAME.lower()
+        password_valid = verify_password(password, LOGIN_PASSWORD_HASH)
+        
+        if username_valid and password_valid:
+            # Clear any previous failed attempts
+            if client_ip in login_attempts:
+                del login_attempts[client_ip]
+            
+            # Create secure session
+            session.permanent = True
             session['logged_in'] = True
             session['username'] = username
+            session['login_time'] = time.time()
+            session['client_ip'] = client_ip  # Session hijacking protection
+            
+            print(f"Successful login: {username} from {client_ip}")
             return redirect(url_for('index'))
         else:
+            # Record failed attempt
+            record_failed_attempt(client_ip)
+            print(f"Failed login attempt: {username} from {client_ip}")
+            
+            # Generic error message to prevent username enumeration
             return render_template('login.html', error='Invalid credentials. Please try again.')
     
     # If already logged in, redirect to dashboard
     if session.get('logged_in'):
-        return redirect(url_for('index'))
+        # Verify session integrity
+        if session.get('client_ip') == client_ip:
+            return redirect(url_for('index'))
+        else:
+            # Potential session hijacking - clear session
+            session.clear()
     
     return render_template('login.html')
 
