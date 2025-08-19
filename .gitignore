@@ -1,0 +1,116 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+dist-electron/
+build/
+*.egg-info/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+meetingai.db
+
+# Credentials and secrets
+credentials.json
+token.json
+.credentials/
+*.key
+*.pem
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Electron builder output
+/dist_electron
+
+# Flask session files
+flask_session/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Downloaded files
+downloads/
+
+# Test files
+test_report_*.json
+test_*.json
+
+# Backup files
+*_backup.py
+*_working_backup.py
+
+# Log files
+*.log
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Electron specific
+out/
+*.mas
+*.pkg
+*.dmg
+*.exe
+*.deb
+*.rpm
+*.AppImage
+
+# Package manager lock files (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock
+
+# Local configuration
+config.local.json

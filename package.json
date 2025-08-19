@@ -1,0 +1,71 @@
+{
+  "name": "trello-ai-desktop",
+  "version": "1.0.0",
+  "description": "Trello AI Desktop Application with Google Meet Integration",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": [
+    "trello",
+    "ai",
+    "google-meet",
+    "productivity",
+    "desktop-app"
+  ],
+  "author": "Trello AI Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "node-fetch": "^3.3.2"
+  },
+  "build": {
+    "appId": "com.trelloai.desktop",
+    "productName": "Trello AI Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "google meet to group and trello ai/**/*",
+      "!google meet to group and trello ai/node_modules",
+      "!google meet to group and trello ai/__pycache__",
+      "!google meet to group and trello ai/*.pyc"
+    ],
+    "extraResources": [
+      {
+        "from": "google meet to group and trello ai",
+        "to": "app",
+        "filter": [
+          "**/*",
+          "!node_modules/**/*",
+          "!__pycache__/**/*",
+          "!*.pyc"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "electron/icons/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "electron/icons/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "electron/icons/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

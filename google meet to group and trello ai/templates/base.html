@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}JGV EEsystems AI Hub{% endblock %}</title>
+    
+    <!-- Force cache refresh -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .animate-pulse-soft {
+            animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse-soft {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .7;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation Header -->
+    <nav class="bg-white shadow-lg border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="zap" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">JGV EEsystems AI</span>
+                </div>
+                
+                <!-- Navigation Menu -->
+                <div class="flex space-x-1">
+                    <a href="/" class="nav-link px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if request.endpoint == 'index' %}bg-blue-100 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        <i data-lucide="home" class="w-4 h-4 inline mr-2"></i>
+                        Dashboard
+                    </a>
+                    <a href="/google-meet" class="nav-link px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if request.endpoint == 'google_meet_app' %}bg-blue-100 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        <i data-lucide="video" class="w-4 h-4 inline mr-2"></i>
+                        Google Meet
+                    </a>
+                    <a href="/team-tracker" class="nav-link px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if request.endpoint == 'team_tracker_app' %}bg-blue-100 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        <i data-lucide="users" class="w-4 h-4 inline mr-2"></i>
+                        Team Tracker
+                    </a>
+                    <button class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                        <i data-lucide="plus" class="w-4 h-4 inline mr-2"></i>
+                        More Apps
+                    </button>
+                </div>
+                
+                <!-- Settings -->
+                <div class="flex items-center space-x-3">
+                    <button class="p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                        <i data-lucide="settings" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="text-center text-sm text-gray-500">
+                <p>&copy; 2024 JGV EEsystems AI Hub. Built with ❤️ for team productivity.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        // Global utilities
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300 ${
+                type === 'success' ? 'bg-green-500 text-white' : 
+                type === 'error' ? 'bg-red-500 text-white' : 
+                'bg-blue-500 text-white'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        function showLoading(element) {
+            element.disabled = true;
+            element.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline mr-2"></i>Loading...';
+            lucide.createIcons();
+        }
+        
+        function hideLoading(element, originalText) {
+            element.disabled = false;
+            element.innerHTML = originalText;
+            lucide.createIcons();
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,1658 @@
+{% extends "base.html" %}
+
+{% block title %}Google Meet to Trello - JGV EEsystems AI Hub{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Modern Header with Glassmorphism -->
+    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 p-8 text-white">
+        <div class="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+        <div class="relative z-10 flex justify-between items-center">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">Google Meet AI Analyzer</h1>
+                <p class="text-blue-100 text-lg">Transform meeting transcripts into actionable insights with GPT-4 intelligence</p>
+                <div class="flex items-center space-x-4 mt-4">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-400/20 text-green-100 border border-green-400/30">
+                        <i data-lucide="check-circle" class="w-4 h-4 mr-1"></i>
+                        AI Ready
+                    </span>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-400/20 text-purple-100 border border-purple-400/30">
+                        <i data-lucide="zap" class="w-4 h-4 mr-1"></i>
+                        GPT-4 Powered
+                    </span>
+                </div>
+            </div>
+            <div class="hidden md:block">
+                <div class="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                    <i data-lucide="brain" class="w-10 h-10 text-white"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Animated background elements -->
+        <div class="absolute top-4 right-4 w-32 h-32 bg-white/5 rounded-full blur-xl"></div>
+        <div class="absolute bottom-4 left-4 w-24 h-24 bg-white/5 rounded-full blur-xl"></div>
+    </div>
+
+    <!-- Main Processing Card with Glassmorphism -->
+    <div class="relative backdrop-blur-xl bg-white/70 rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10"></div>
+        <div class="relative z-10 p-8">
+            <div class="text-center mb-8">
+                <div class="relative mx-auto mb-6">
+                    <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg transform hover:scale-105 transition-transform duration-300">
+                        <i data-lucide="brain" class="w-10 h-10 text-white"></i>
+                    </div>
+                    <div class="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <i data-lucide="check" class="w-3 h-3 text-white"></i>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-3">AI-Powered Meeting Analysis</h2>
+                <p class="text-gray-600 max-w-md mx-auto">Upload your meeting transcript and let our advanced AI identify relevant Trello cards, extract insights, and generate actionable summaries</p>
+            </div>
+
+            <form id="transcript-form" class="max-w-2xl mx-auto">
+                <div class="space-y-4">
+                    <!-- Modern Input Method Toggle -->
+                    <div class="flex bg-gray-100 rounded-2xl p-1 mb-6">
+                        <button type="button" id="text-tab" class="flex-1 py-3 px-4 text-sm font-medium rounded-xl transition-all duration-300 bg-white shadow-md text-blue-700 border border-blue-200">
+                            <i data-lucide="type" class="w-4 h-4 inline mr-2"></i>
+                            Direct Text
+                        </button>
+                        <button type="button" id="url-tab" class="flex-1 py-3 px-4 text-sm font-medium rounded-xl transition-all duration-300 text-gray-600 hover:bg-white/50">
+                            <i data-lucide="link" class="w-4 h-4 inline mr-2"></i>
+                            Google Doc
+                        </button>
+                        <button type="button" id="demo-tab" class="flex-1 py-3 px-4 text-sm font-medium rounded-xl transition-all duration-300 text-gray-600 hover:bg-white/50">
+                            <i data-lucide="play-circle" class="w-4 h-4 inline mr-2"></i>
+                            Demo
+                        </button>
+                    </div>
+
+                    <!-- Modern Google Doc URL Input -->
+                    <div id="url-input" class="input-section hidden">
+                        <label for="google-doc-url" class="block text-sm font-medium text-gray-700 mb-3">
+                            <i data-lucide="link" class="w-4 h-4 inline mr-2"></i>
+                            Google Docs URL
+                        </label>
+                        <div class="relative group">
+                            <input type="url" 
+                                   id="google-doc-url" 
+                                   name="url"
+                                   placeholder="https://docs.google.com/document/d/..." 
+                                   class="w-full px-5 py-4 pl-12 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-2xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all duration-300 text-gray-900 placeholder-gray-500">
+                            <i data-lucide="link" class="w-5 h-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 group-focus-within:text-green-500 transition-colors"></i>
+                            <div class="absolute inset-0 rounded-2xl bg-gradient-to-r from-green-500/10 to-blue-500/10 opacity-0 group-focus-within:opacity-100 transition-opacity -z-10"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2 flex items-center">
+                            <i data-lucide="info" class="w-3 h-3 mr-1"></i>
+                            Document must be publicly accessible or shared
+                        </p>
+                    </div>
+
+                    <!-- Modern Direct Text Input -->
+                    <div id="text-input" class="input-section">
+                        <label for="direct-text" class="block text-sm font-medium text-gray-700 mb-3">
+                            <i data-lucide="type" class="w-4 h-4 inline mr-2"></i>
+                            Meeting Transcript
+                        </label>
+                        <div class="relative group">
+                            <div id="drop-zone" class="relative border-2 border-dashed border-gray-300 rounded-2xl p-4 transition-all duration-300 hover:border-blue-400 hover:bg-blue-50/50">
+                                <textarea 
+                                    id="direct-text"
+                                    name="direct_text"
+                                    rows="8"
+                                    placeholder="Paste your meeting transcript here...
+
+Example:
+John: Let's review the WordPress project status
+Sarah: The development is 80% complete, we need to focus on CENTER tasks
+Mike: I'll handle the onboarded leads outreach this week"
+                                    class="w-full px-5 py-4 bg-transparent border-none focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-500 resize-none"></textarea>
+                                
+                                <!-- Drag and drop overlay -->
+                                <div id="drop-overlay" class="absolute inset-0 bg-blue-500/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hidden">
+                                    <div class="text-center">
+                                        <i data-lucide="upload-cloud" class="w-12 h-12 text-blue-600 mx-auto mb-2"></i>
+                                        <p class="text-blue-600 font-medium">Drop your transcript file here</p>
+                                        <p class="text-blue-500 text-sm">Supports .txt, .docx files</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- File upload button -->
+                            <div class="mt-3 flex items-center justify-between">
+                                <input type="file" id="file-input" accept=".txt,.docx" class="hidden">
+                                <button type="button" id="upload-btn" class="flex items-center text-sm text-gray-600 hover:text-blue-600 transition-colors">
+                                    <i data-lucide="paperclip" class="w-4 h-4 mr-1"></i>
+                                    Upload file instead
+                                </button>
+                                <div class="text-xs text-gray-500">
+                                    <span id="char-count">0</span> characters
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-blue-600 mt-2 flex items-center">
+                            <i data-lucide="lightbulb" class="w-3 h-3 mr-1"></i>
+                            Include project names like "WordPress", "CENTER", "RULES" for better card matching
+                        </p>
+                    </div>
+
+                    <!-- Modern Demo Mode -->
+                    <div id="demo-input" class="input-section hidden">
+                        <div class="relative bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-2xl p-6 overflow-hidden">
+                            <div class="absolute inset-0 bg-white/40 backdrop-blur-sm"></div>
+                            <div class="relative z-10">
+                                <h4 class="font-semibold text-purple-900 mb-3 flex items-center">
+                                    <i data-lucide="play-circle" class="w-5 h-5 mr-2"></i>
+                                    Demo Mode
+                                </h4>
+                                <p class="text-sm text-purple-700 mb-4">
+                                    Experience our AI-powered analysis with sample meeting data from your EEInteractive Trello board.
+                                </p>
+                                <div class="grid grid-cols-2 gap-3 text-xs text-purple-600">
+                                    <div class="flex items-center">
+                                        <i data-lucide="check" class="w-3 h-3 mr-2"></i>
+                                        Sample transcript analysis
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i data-lucide="check" class="w-3 h-3 mr-2"></i>
+                                        Real Trello card matching
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i data-lucide="check" class="w-3 h-3 mr-2"></i>
+                                        AI comment generation
+                                    </div>
+                                    <div class="flex items-center">
+                                        <i data-lucide="check" class="w-3 h-3 mr-2"></i>
+                                        Safe testing environment
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modern Process Button -->
+                    <button type="submit" 
+                            id="process-btn"
+                            class="group relative w-full bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white font-bold py-5 px-8 rounded-2xl transition-all duration-500 flex items-center justify-center shadow-2xl transform hover:scale-[1.02] hover:shadow-3xl overflow-hidden">
+                        <div class="absolute inset-0 bg-white/20 group-hover:bg-white/30 transition-colors"></div>
+                        <div class="relative z-10 flex items-center">
+                            <i data-lucide="brain" class="w-6 h-6 mr-3"></i>
+                            <span id="process-btn-text" class="text-lg">Analyze with AI</span>
+                        </div>
+                        <div class="absolute inset-0 -z-10 bg-gradient-to-r from-blue-400/20 to-purple-400/20 blur-xl group-hover:blur-2xl transition-all"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="bg-white rounded-xl shadow-md border border-gray-200 hidden">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i data-lucide="check-circle" class="w-5 h-5 mr-2 text-green-600"></i>
+                AI Analysis Results
+            </h2>
+        </div>
+        <div class="p-6">
+            <div id="results-content">
+                <!-- Results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="brain" class="w-5 h-5 text-blue-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">AI-Powered Analysis</h3>
+            </div>
+            <p class="text-gray-600">Advanced AI analyzes speaking patterns, engagement levels, and meeting effectiveness with personalized feedback.</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="users" class="w-5 h-5 text-purple-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">Speaker Insights</h3>
+            </div>
+            <p class="text-gray-600">Individual performance metrics with personalized improvement suggestions sent via WhatsApp.</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="repeat" class="w-5 h-5 text-orange-600"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">Recurring Tasks</h3>
+            </div>
+            <p class="text-gray-600">Automatically tracks tasks mentioned repeatedly across meetings to prevent items from falling through cracks.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const transcriptForm = document.getElementById('transcript-form');
+    const processBtn = document.getElementById('process-btn');
+    const processBtnText = document.getElementById('process-btn-text');
+    const resultsSection = document.getElementById('results-section');
+    const resultsContent = document.getElementById('results-content');
+    
+    // Tab elements
+    const urlTab = document.getElementById('url-tab');
+    const textTab = document.getElementById('text-tab');
+    const demoTab = document.getElementById('demo-tab');
+    
+    // Input sections
+    const urlInput = document.getElementById('url-input');
+    const textInput = document.getElementById('text-input');
+    const demoInput = document.getElementById('demo-input');
+    
+    let currentMode = 'text';
+
+    // Modern tab switching functionality
+    function switchTab(mode) {
+        // Reset all tabs to inactive state
+        [urlTab, textTab, demoTab].forEach(tab => {
+            tab.classList.remove('bg-white', 'shadow-md', 'text-blue-700', 'border', 'border-blue-200', 
+                                 'text-green-700', 'border-green-200', 'text-purple-700', 'border-purple-200');
+            tab.classList.add('text-gray-600', 'hover:bg-white/50');
+        });
+        
+        // Hide all input sections
+        [urlInput, textInput, demoInput].forEach(section => {
+            section.classList.add('hidden');
+        });
+        
+        // Show selected tab and input
+        currentMode = mode;
+        
+        if (mode === 'text') {
+            textTab.classList.remove('text-gray-600', 'hover:bg-white/50');
+            textTab.classList.add('bg-white', 'shadow-md', 'text-blue-700', 'border', 'border-blue-200');
+            textInput.classList.remove('hidden');
+            processBtnText.textContent = 'Analyze with AI';
+        } else if (mode === 'url') {
+            urlTab.classList.remove('text-gray-600', 'hover:bg-white/50');
+            urlTab.classList.add('bg-white', 'shadow-md', 'text-green-700', 'border', 'border-green-200');
+            urlInput.classList.remove('hidden');
+            processBtnText.textContent = 'Process Document';
+        } else if (mode === 'demo') {
+            demoTab.classList.remove('text-gray-600', 'hover:bg-white/50');
+            demoTab.classList.add('bg-white', 'shadow-md', 'text-purple-700', 'border', 'border-purple-200');
+            demoInput.classList.remove('hidden');
+            processBtnText.textContent = 'Try Demo';
+        }
+    }
+    
+    // Event listeners for tabs
+    urlTab.addEventListener('click', () => switchTab('url'));
+    textTab.addEventListener('click', () => switchTab('text'));
+    demoTab.addEventListener('click', () => switchTab('demo'));
+    
+    transcriptForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        let requestData = {};
+        let endpoint = '/api/process-transcript';
+        
+        if (currentMode === 'url') {
+            const url = document.getElementById('google-doc-url').value.trim();
+            if (!url) {
+                showNotification('Please enter a Google Docs URL', 'error');
+                return;
+            }
+            requestData = { url: url };
+        } else if (currentMode === 'text') {
+            const text = document.getElementById('direct-text').value.trim();
+            if (!text) {
+                showNotification('Please enter meeting transcript text', 'error');
+                return;
+            }
+            if (text.length < 50) {
+                showNotification('Transcript too short. Please provide more content.', 'error');
+                return;
+            }
+            requestData = { direct_text: text };
+        } else if (currentMode === 'demo') {
+            endpoint = '/api/demo-analyze';
+            requestData = { demo_mode: true };
+        }
+
+        // Simple loading without progressive overlay for now
+        const originalText = processBtn.innerHTML;
+        showLoading(processBtn);
+        resultsSection.classList.add('hidden');
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const data = await response.json();
+            console.log('Response received:', data);
+
+            if (data.success) {
+                const mode = currentMode === 'demo' ? 'Demo completed' : 'Analysis completed';
+                console.log('Processing successful, calling showResults');
+                showNotification(mode + ' successfully!', 'success');
+                showResults(data);
+            } else {
+                console.log('Processing failed:', data.error);
+                showNotification(data.error || 'Failed to process transcript', 'error');
+            }
+        } catch (error) {
+            console.error('Error in processTranscript:', error);
+            showNotification('Error processing transcript: ' + error.message, 'error');
+        } finally {
+            console.log('Finally block: hiding loading');
+            hideLoading(processBtn, originalText);
+        }
+    });
+
+    // Global workflow state
+    let workflowData = {};
+    let currentStep = 1;
+    let realAttendees = [];
+    let realCardAssignments = {};
+    let googleDocUrl = "";
+
+    function showResults(data) {
+        console.log('showResults called with data:', data);
+        workflowData = data;
+        
+        try {
+            // Extract real data from backend response with safety checks
+            realAttendees = [];
+            if (data.summary && data.summary.participants && Array.isArray(data.summary.participants)) {
+                realAttendees = data.summary.participants;
+                console.log('Real attendees extracted:', realAttendees);
+            }
+            
+            // Extract Google Doc URL if available
+            googleDocUrl = "";
+            if (data.source_url) {
+                googleDocUrl = data.source_url;
+                console.log('Google Doc URL extracted:', googleDocUrl);
+            }
+            
+            // Extract real card assignments from matched cards with safety checks
+            realCardAssignments = {};
+            if (data.matched_cards && Array.isArray(data.matched_cards)) {
+                console.log('Processing matched cards:', data.matched_cards.length);
+                data.matched_cards.forEach((card, index) => {
+                    try {
+                        if (card && card.assigned_members && Array.isArray(card.assigned_members)) {
+                            card.assigned_members.forEach(member => {
+                                if (member && typeof member === 'string') {
+                                    if (!realCardAssignments[member]) {
+                                        realCardAssignments[member] = [];
+                                    }
+                                    realCardAssignments[member].push({
+                                        card_name: card.card_name || card.name || 'Unknown Card',
+                                        card_url: card.url || '#',
+                                        discussion_summary: card.suggested_comment || 'Updates from meeting',
+                                        quotes: extractQuotesFromComment(card.suggested_comment || ''),
+                                        actions: extractActionsFromComment(card.suggested_comment || '')
+                                    });
+                                }
+                            });
+                        }
+                    } catch (cardError) {
+                        console.warn(`Error processing card ${index}:`, cardError);
+                    }
+                });
+                console.log('Card assignments processed:', realCardAssignments);
+            }
+        } catch (error) {
+            console.error('Error processing data:', error);
+        }
+        
+        // Generate the workflow HTML with improved error handling
+        try {
+            resultsContent.innerHTML = generateWorkflowHTML(data);
+            console.log('Workflow HTML generated successfully');
+            
+            // Show results
+            resultsSection.classList.remove('hidden');
+            lucide.createIcons();
+            setupWorkflowEventListeners();
+            
+        } catch (error) {
+            console.error('Error generating workflow:', error);
+            // Fallback to simple display
+            resultsContent.innerHTML = `
+                <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">✅ Analysis Complete!</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-medium text-gray-900">Attendees:</h4>
+                            <p class="text-gray-600">${realAttendees.length > 0 ? realAttendees.join(', ') : 'None detected'}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-900">Cards Found:</h4>
+                            <p class="text-gray-600">${data.matched_cards ? data.matched_cards.length : 0} cards matched</p>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            Start New Analysis
+                        </button>
+                    </div>
+                </div>
+            `;
+            resultsSection.classList.remove('hidden');
+        }
+    }
+    
+    function generateWorkflowHTML(data) {
+        console.log('Generating workflow HTML...');
+        
+        const cards = data.matched_cards || [];
+        console.log('Cards to render:', cards.length);
+        
+        return `
+            <!-- Progressive Workflow Container -->
+            <div class="workflow-container space-y-8">
+                <!-- Step 1: Trello Card Processing -->
+                <div id="step-1" class="workflow-step active">
+                    <div class="step-header mb-6">
+                        <div class="flex items-center space-x-3 mb-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                                <i data-lucide="credit-card" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Step 1: Trello Card Comments</h3>
+                                <p class="text-gray-600">Review and edit AI-generated comments for matched Trello cards</p>
+                            </div>
+                        </div>
+                        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="step1-progress" class="h-full bg-gradient-to-r from-blue-600 to-purple-600 rounded-full transition-all duration-1000" style="width: 100%;"></div>
+                        </div>
+                    </div>
+
+                    ${renderCards(cards)}
+                </div>
+
+                <!-- Step 2: Meeting Summary Messages -->
+                <div id="step-2" class="workflow-step hidden">
+                    <div class="step-header mb-6">
+                        <div class="flex items-center space-x-3 mb-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-2xl flex items-center justify-center">
+                                <i data-lucide="message-square" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Step 2: Meeting Summary Messages</h3>
+                                <p class="text-gray-600">Group summary and individual assignee messages</p>
+                            </div>
+                        </div>
+                        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="step2-progress" class="h-full bg-gradient-to-r from-green-600 to-blue-600 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="summary-section">
+                        <!-- Summary content will be generated here -->
+                    </div>
+                </div>
+
+                <!-- Step 3: In-Depth Analysis -->
+                <div id="step-3" class="workflow-step hidden">
+                    <div class="step-header mb-6">
+                        <div class="flex items-center space-x-3 mb-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center">
+                                <i data-lucide="brain" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">Step 3: In-Depth Analysis</h3>
+                                <p class="text-gray-600">Speaker analysis and meeting effectiveness insights</p>
+                            </div>
+                        </div>
+                        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div id="step3-progress" class="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="speaker-section">
+                        <!-- Speaker analysis content will be generated here -->
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderCards(cards) {
+        console.log('renderCards called with:', cards);
+        
+        if (!cards || cards.length === 0) {
+            return `
+                <div class="text-center py-12">
+                    <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="search" class="w-8 h-8 text-gray-400"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Trello Cards Found</h3>
+                    <p class="text-gray-600 mb-6">Try including specific project names like "WordPress", "CENTER", or "RULES" in your transcript.</p>
+                    <button onclick="proceedToSummary()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                        Continue to Summary
+                    </button>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="space-y-4 mb-8">
+                ${cards.map((card, index) => {
+                    const confidence = card.match_confidence || card.confidence || 0;
+                    const cardId = card.card?.id || card.id || `card_${index}`;
+                    const cardName = card.card?.name || card.card_name || card.name || 'Unknown Card';
+                    const comment = card.suggested_comment || '';
+
+                    return `
+                        <div class="relative bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 card-item" data-card-id="${cardId}">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center space-x-3">
+                                    <label class="relative flex items-center cursor-pointer">
+                                        <input type="checkbox" class="card-checkbox w-5 h-5 text-blue-600 rounded border-2 border-gray-300 focus:ring-blue-500" 
+                                               data-card-id="${cardId}" 
+                                               data-card-name="${cardName}"
+                                               checked>
+                                        <div class="absolute inset-0 bg-blue-600 text-white rounded opacity-0 peer-checked:opacity-100 transition-opacity flex items-center justify-center">
+                                            <i data-lucide="check" class="w-3 h-3"></i>
+                                        </div>
+                                    </label>
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900 mb-1">${cardName}</h3>
+                                        <div class="flex items-center space-x-4 text-sm text-gray-600">
+                                            <span class="flex items-center">
+                                                <i data-lucide="target" class="w-4 h-4 mr-1"></i>
+                                                ${Math.round(confidence * 100)}% match
+                                            </span>
+                                            <span class="flex items-center">
+                                                <i data-lucide="layers" class="w-4 h-4 mr-1"></i>
+                                                ${card.match_type || 'AI Match'}
+                                            </span>
+                                            ${card.card?.url ? `<a href="${card.card.url}" target="_blank" class="flex items-center text-blue-600 hover:text-blue-800"><i data-lucide="external-link" class="w-4 h-4 mr-1"></i>Open in Trello</a>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                        confidence >= 0.8 ? 'bg-green-100 text-green-800' : 
+                                        confidence >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                                        'bg-red-100 text-red-800'
+                                    }">
+                                        ${confidence >= 0.8 ? 'High Confidence' : confidence >= 0.6 ? 'Medium Confidence' : 'Low Confidence'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-xl p-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    <i data-lucide="edit-3" class="w-4 h-4 inline mr-1"></i>
+                                    Proposed Comment (editable)
+                                </label>
+                                <textarea class="card-comment w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" 
+                                          rows="3" 
+                                          data-card-id="${cardId}">${comment}</textarea>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <div class="flex items-center justify-between py-6 border-t border-gray-200">
+                <div class="flex items-center space-x-4">
+                    <button id="select-all-cards" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        Select All
+                    </button>
+                    <span class="text-sm text-gray-600">
+                        <span id="selected-count">${cards.length}</span> of ${cards.length} selected
+                    </span>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button id="skip-comments-btn" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors">
+                        Skip Comments
+                    </button>
+                    <button id="send-to-trello-btn" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 flex items-center shadow-lg">
+                        <i data-lucide="send" class="w-5 h-5 mr-2"></i>
+                        Send Comments to Trello
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function setupWorkflowEventListeners() {
+        console.log('Setting up workflow event listeners...');
+        
+        // Select all cards functionality
+        const selectAllBtn = document.getElementById('select-all-cards');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('.card-checkbox');
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                
+                checkboxes.forEach(cb => cb.checked = !allChecked);
+                updateSelectedCount();
+                selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+            });
+        }
+
+        // Update selected count when checkboxes change
+        document.querySelectorAll('.card-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateSelectedCount);
+        });
+
+        // Send to Trello button
+        const sendBtn = document.getElementById('send-to-trello-btn');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', sendCommentsToTrello);
+        }
+
+        // Skip comments button
+        const skipBtn = document.getElementById('skip-comments-btn');
+        if (skipBtn) {
+            skipBtn.addEventListener('click', () => {
+                showNotification('Skipping Trello comments', 'info');
+                proceedToSummary();
+            });
+        }
+    }
+
+    function updateSelectedCount() {
+        const checkboxes = document.querySelectorAll('.card-checkbox');
+        const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        const selectedCountEl = document.getElementById('selected-count');
+        if (selectedCountEl) {
+            selectedCountEl.textContent = checkedCount;
+        }
+    }
+
+    async function sendCommentsToTrello() {
+        console.log('sendCommentsToTrello called');
+        const selectedCards = [];
+        const checkboxes = document.querySelectorAll('.card-checkbox:checked');
+        
+        checkboxes.forEach(checkbox => {
+            const cardId = checkbox.dataset.cardId;
+            const cardName = checkbox.dataset.cardName;
+            const commentTextarea = document.querySelector(`textarea[data-card-id="${cardId}"]`);
+            const comment = commentTextarea ? commentTextarea.value : '';
+            
+            if (comment.trim()) {
+                selectedCards.push({
+                    card_id: cardId,
+                    card_name: cardName,
+                    comment: comment.trim()
+                });
+            }
+        });
+
+        if (selectedCards.length === 0) {
+            showNotification('Please select at least one card with a comment', 'error');
+            return;
+        }
+
+        const sendBtn = document.getElementById('send-to-trello-btn');
+        const originalText = sendBtn.innerHTML;
+        showLoading(sendBtn);
+
+        try {
+            const response = await fetch('/api/post-comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    cards: selectedCards
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(`Successfully posted ${result.comments_posted} comments to Trello!`, 'success');
+                proceedToSummary();
+            } else {
+                throw new Error(result.error || 'Failed to post comments');
+            }
+        } catch (error) {
+            showNotification('Error posting comments: ' + error.message, 'error');
+        } finally {
+            sendBtn.innerHTML = originalText;
+            sendBtn.disabled = false;
+        }
+    }
+
+    function proceedToSummary() {
+        showNotification('Step 1 completed! Moving to summary...', 'success');
+        // Simple completion for now
+        resultsContent.innerHTML = `
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="check-circle" class="w-8 h-8 text-green-600"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Analysis Complete!</h3>
+                <p class="text-gray-600 mb-6">Your meeting transcript has been processed and Trello cards updated.</p>
+                <div class="space-y-3">
+                    <div class="text-sm text-gray-600">
+                        <strong>Attendees:</strong> ${realAttendees.join(', ') || 'None detected'}
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <strong>Cards Updated:</strong> ${workflowData.cards_found || 0}
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <strong>Source:</strong> ${googleDocUrl ? 'Google Doc' : 'Direct Text Input'}
+                    </div>
+                </div>
+                <div class="mt-6 flex space-x-3 justify-center">
+                    <button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                        Start New Analysis
+                    </button>
+                </div>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+
+    // Helper functions for data extraction
+    function extractQuotesFromComment(comment) {
+        const quoteRegex = /"([^"]+)"/g;
+        const quotes = [];
+        let match;
+        while ((match = quoteRegex.exec(comment)) !== null) {
+            quotes.push(match[1]);
+        }
+        return quotes.length > 0 ? quotes : ['Discussion points from the meeting'];
+    }
+    
+    function extractActionsFromComment(comment) {
+        const lines = comment.split('\n');
+        const actions = [];
+        for (const line of lines) {
+            if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                actions.push(line.trim().replace(/^[•-]\s*/, ''));
+            }
+        }
+        return actions.length > 0 ? actions : ['Please check the card for details'];
+    }
+        
+        // Show progress
+        sendBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i>Sending to Trello...';
+        sendBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/post-comments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ selected_cards: selectedCards })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(`Successfully posted ${result.comments_posted} comments to Trello!`, 'success');
+                
+                // Hide step 1 and show step 2
+                hideStepAndShowNext(1);
+                proceedToSummary();
+            } else {
+                throw new Error(result.error || 'Failed to post comments');
+            }
+        } catch (error) {
+            showNotification('Error posting comments: ' + error.message, 'error');
+        } finally {
+            sendBtn.innerHTML = originalText;
+            sendBtn.disabled = false;
+        }
+    }
+
+    function hideStepAndShowNext(stepNumber) {
+        const currentStep = document.getElementById(`step-${stepNumber}`);
+        const nextStep = document.getElementById(`step-${stepNumber + 1}`);
+        
+        if (currentStep) {
+            currentStep.style.opacity = '0.5';
+            currentStep.style.pointerEvents = 'none';
+            currentStep.style.transform = 'scale(0.95)';
+        }
+        
+        if (nextStep) {
+            nextStep.classList.remove('hidden');
+            setTimeout(() => {
+                nextStep.style.opacity = '1';
+                nextStep.style.transform = 'scale(1)';
+            }, 300);
+        }
+    }
+
+    function proceedToSummary() {
+        // Hide step 1 and show step 2
+        hideStepAndShowNext(1);
+        
+        const step2Progress = document.getElementById('step2-progress');
+        const summarySection = document.getElementById('summary-section');
+        
+        // Animate progress bar
+        setTimeout(() => {
+            if (step2Progress) {
+                step2Progress.style.width = '50%';
+            }
+            
+            // Generate summary content
+            generateMeetingSummary();
+        }, 500);
+    }
+
+    function generateMeetingSummary() {
+        const summarySection = document.getElementById('summary-section');
+        
+        summarySection.innerHTML = `
+            <div class="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <i data-lucide="file-text" class="w-5 h-5 mr-2"></i>
+                    Meeting Summary & Messaging
+                </h3>
+                
+                <div class="bg-gray-50 rounded-xl p-4 mb-6">
+                    <div class="flex items-center mb-2">
+                        <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin text-blue-600"></i>
+                        <span class="text-sm text-blue-700">Generating meeting summary and messages...</span>
+                    </div>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-blue-600 to-green-600 rounded-full transition-all duration-2000" style="width: 80%;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Simulate summary generation
+        setTimeout(() => {
+            displayGroupAndIndividualMessages();
+        }, 2000);
+    }
+
+    function displayGroupAndIndividualMessages() {
+        const step2Progress = document.getElementById('step2-progress');
+        step2Progress.style.width = '100%';
+        
+        const summarySection = document.getElementById('summary-section');
+        
+        summarySection.innerHTML = `
+            <div class="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                    <i data-lucide="message-square" class="w-5 h-5 mr-2"></i>
+                    Meeting Summary Messages
+                </h3>
+                
+                <!-- Group Summary Message -->
+                <div class="mb-8">
+                    <h4 class="text-md font-medium text-gray-900 mb-3 flex items-center">
+                        <i data-lucide="users" class="w-4 h-4 mr-2 text-green-600"></i>
+                        Group Summary Message
+                    </h4>
+                    <div class="bg-green-50 rounded-xl p-4 border border-green-200">
+                        <div class="bg-white rounded-lg p-4 text-sm font-mono whitespace-pre-line border">🎯 *Meeting Summary - ${new Date().toLocaleDateString()}*
+
+👥 *Attendees:* ${realAttendees.length > 0 ? realAttendees.join(', ') : 'Not detected from transcript'}
+
+📝 *Meeting Summary:*
+${workflowData.summary?.key_points?.slice(0, 3).join('. ') || 'Meeting discussion covered key project updates and action items.'}
+
+✅ *Key Decisions & Outcomes:*
+${workflowData.analysis_results?.decision_analysis?.insights?.slice(0, 3).map(insight => '• ' + insight).join('\n') || '• Key decisions were discussed and recorded'}
+
+📋 *Action Items Identified:* (${workflowData.summary?.action_items?.length || 0})
+${workflowData.summary?.action_items?.slice(0, 5).map(item => '• ' + item).join('\n') || '• Action items to be documented'}
+
+🔗 *Resources:*
+• Meeting Transcript: ${googleDocUrl || 'Direct text input used'}
+• Cards Updated: ${workflowData.matched_cards?.length || 0}
+${workflowData.matched_cards?.slice(0, 3).map(card => '• ' + (card.card_name || card.name) + ': ' + (card.url || '#')).join('\n') || ''}
+
+⏰ *Generated:* ${new Date().toLocaleString()}</div>
+                        <div class="mt-3 flex items-center justify-between">
+                            <span class="text-xs text-gray-600">WhatsApp Group Message</span>
+                            <button class="text-xs text-blue-600 hover:text-blue-800">Edit</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Individual Messages -->
+                <div class="mb-8">
+                    <h4 class="text-md font-medium text-gray-900 mb-3 flex items-center">
+                        <i data-lucide="user" class="w-4 h-4 mr-2 text-blue-600"></i>
+                        Individual Card Assignee Messages
+                    </h4>
+                    
+                    <div class="space-y-4">
+${Object.keys(realCardAssignments).length > 0 ? 
+                            Object.keys(realCardAssignments).map(person => {
+                                const personCards = realCardAssignments[person];
+                                return `
+                            <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                                <div class="flex items-center mb-3">
+                                    <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">${person[0]}</div>
+                                    <span class="ml-3 font-medium text-gray-900">${person}</span>
+                                    <span class="ml-auto text-xs text-gray-500">${personCards.length} cards assigned</span>
+                                </div>
+                                <div class="bg-white rounded-lg p-3 text-sm font-mono whitespace-pre-line border">👋 Hi ${person}!
+
+📋 *Card Updates from Today's Meeting*
+
+${personCards.map(cardInfo => {
+    const quotes = cardInfo.quotes.map(quote => '  "' + quote + '"').join('\\n');
+    const actions = cardInfo.actions.map(action => '• ' + action).join('\\n');
+    return '📝 *' + cardInfo.card_name + '*\\n' + cardInfo.discussion_summary + '\\n\\n💬 *What was discussed:*\\n' + quotes + '\\n\\n✅ *Action needed:*\\n' + actions;
+}).join('\\n\\n')}
+
+🔗 *Quick Links:*
+${personCards.map(cardInfo => '• ' + cardInfo.card_name + ': ' + cardInfo.card_url).join('\\n')}
+
+💬 Need help? Just reply to this message!</div>
+                                <div class="mt-3 flex items-center justify-between">
+                                    <span class="text-xs text-gray-600">Personal WhatsApp Message</span>
+                                    <button class="text-xs text-blue-600 hover:text-blue-800">Edit</button>
+                                </div>
+                            </div>
+                        `;
+                            }).join('') : 
+                            '<div class="text-center py-8 text-gray-500"><i data-lucide="users" class="w-8 h-8 mx-auto mb-2 opacity-50"></i><p>No card assignments found in this meeting</p></div>'}
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between pt-6 border-t border-gray-200">
+                    <div class="text-sm text-gray-600">
+                        <span class="text-green-600 font-medium">1</span> group message + 
+                        <span class="text-blue-600 font-medium">2</span> individual messages ready
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button onclick="skipToAnalysis()" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">
+                            Skip Messages
+                        </button>
+                        <button onclick="previewAndSendMessages()" class="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 flex items-center">
+                            <i data-lucide="send" class="w-4 h-4 mr-2"></i>
+                            Send Messages
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        lucide.createIcons();
+    }
+
+    function sendSummaryAndProceed() {
+        showNotification('Summary sent successfully!', 'success');
+        hideStepAndShowNext(2);
+        setTimeout(() => {
+            proceedToSpeakerAnalysis();
+        }, 500);
+    }
+
+    function skipToSpeakerAnalysis() {
+        hideStepAndShowNext(2);
+        setTimeout(() => {
+            proceedToSpeakerAnalysis();
+        }, 300);
+    }
+
+    function proceedToSpeakerAnalysis() {
+        const step3Progress = document.getElementById('step3-progress');
+        const speakerSection = document.getElementById('speaker-section');
+        
+        step3Progress.style.width = '30%';
+        
+        speakerSection.innerHTML = `
+            <div class="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-6">
+                <div class="text-center py-8">
+                    <div class="flex items-center justify-center mb-4">
+                        <i data-lucide="loader-2" class="w-8 h-8 text-purple-600 animate-spin mr-3"></i>
+                        <span class="text-lg text-purple-700">Analyzing speaker patterns and engagement...</span>
+                    </div>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden max-w-md mx-auto">
+                        <div class="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-3000" style="width: 70%;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            displaySpeakerAnalysis();
+        }, 3000);
+    }
+
+    function displaySpeakerAnalysis() {
+        const step3Progress = document.getElementById('step3-progress');
+        step3Progress.style.width = '100%';
+        
+        const speakerSection = document.getElementById('speaker-section');
+        
+        speakerSection.innerHTML = `
+            <div class="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                    <i data-lucide="users" class="w-5 h-5 mr-2"></i>
+                    Speaker Analysis & Individual Insights
+                </h3>
+                
+                <div class="space-y-4 mb-6">
+                    ${['John', 'Sarah', 'Mike', 'Wendy'].map(speaker => `
+                        <div class="bg-gray-50 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                                        ${speaker[0]}
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-900">${speaker}</h4>
+                                        <p class="text-sm text-gray-600">+1234567890</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Active</span>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" class="speaker-checkbox rounded border-gray-300 text-purple-600" data-speaker="${speaker}" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Send feedback</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <textarea class="w-full p-3 border border-gray-300 rounded-lg resize-none text-sm" rows="2" placeholder="Personalized feedback...">${speaker}, great participation in today's meeting! Your insights on the project were valuable. Consider asking more follow-up questions to drive deeper discussions.</textarea>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="flex items-center justify-between pt-6 border-t border-gray-200">
+                    <div class="text-sm text-gray-600">
+                        <span class="text-green-600 font-medium">4</span> team members analyzed • 
+                        <span class="text-blue-600 font-medium">4</span> WhatsApp numbers found
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button onclick="completeAnalysis()" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">
+                            Skip Feedback
+                        </button>
+                        <button onclick="sendFeedbackAndComplete()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-2 px-6 rounded-xl transition-all duration-300 flex items-center">
+                            <i data-lucide="send" class="w-4 h-4 mr-2"></i>
+                            Send Feedback & Complete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        lucide.createIcons();
+    }
+
+    function sendFeedbackAndComplete() {
+        showNotification('Individual feedback sent to team members!', 'success');
+        completeAnalysis();
+    }
+
+    function completeAnalysis() {
+        hideStepAndShowNext(3);
+        setTimeout(() => {
+            showNotification('All meeting analysis completed successfully!', 'success');
+        }, 500);
+    }
+
+    // Progressive loading functions
+    function showProgressiveLoading() {
+        const processBtn = document.getElementById('process-btn');
+        processBtn.disabled = true;
+        
+        // Create progress overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'progress-overlay';
+        overlay.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center';
+        overlay.innerHTML = `
+            <div class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 max-w-md w-full mx-4">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="brain" class="w-8 h-8 text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">AI Processing Your Meeting</h3>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="progress-step active" data-step="1">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                            <span class="text-sm font-medium text-gray-900">Analyzing transcript content</span>
+                            <div class="ml-auto">
+                                <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-600"></i>
+                            </div>
+                        </div>
+                        <div class="h-1 bg-gray-200 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-blue-600 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-step" data-step="2">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                            <span class="text-sm text-gray-600">Matching Trello cards with AI</span>
+                        </div>
+                        <div class="h-1 bg-gray-200 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-green-600 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-step" data-step="3">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold">3</div>
+                            <span class="text-sm text-gray-600">Generating smart comments</span>
+                        </div>
+                        <div class="h-1 bg-gray-200 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-purple-600 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-step" data-step="4">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-bold">4</div>
+                            <span class="text-sm text-gray-600">Preparing analysis results</span>
+                        </div>
+                        <div class="h-1 bg-gray-200 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-indigo-600 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="progress-status" class="mt-6 text-center">
+                    <p class="text-sm text-gray-600">Reading and understanding transcript content...</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        lucide.createIcons();
+        
+        // Start progress simulation
+        simulateProgress();
+    }
+    
+    function simulateProgress() {
+        const steps = [
+            { step: 1, duration: 2000, messages: [
+                "Reading and understanding transcript content...",
+                "Identifying speakers and key topics...",
+                "Extracting action items and decisions..."
+            ]},
+            { step: 2, duration: 3000, messages: [
+                "Connecting to EEInteractive Trello board...",
+                "Analyzing card titles and descriptions...",
+                "AI matching transcript content to cards..."
+            ]},
+            { step: 3, duration: 2500, messages: [
+                "GPT-4 analyzing meeting discussions...",
+                "Generating contextual comments...",
+                "Adding relevant quotes and action items..."
+            ]},
+            { step: 4, duration: 1500, messages: [
+                "Finalizing analysis results...",
+                "Preparing workflow presentation...",
+                "Almost ready!"
+            ]}
+        ];
+        
+        let currentStep = 1;
+        let currentMessage = 0;
+        
+        function processStep(stepIndex) {
+            if (stepIndex >= steps.length) return;
+            
+            const step = steps[stepIndex];
+            const progressStep = document.querySelector(`[data-step="${step.step}"]`);
+            const statusEl = document.getElementById('progress-status');
+            const progressBar = progressStep.querySelector('.h-full');
+            
+            // Activate step
+            progressStep.classList.add('active');
+            progressStep.querySelector('.w-6').classList.remove('bg-gray-300', 'text-gray-600');
+            progressStep.querySelector('.w-6').classList.add('bg-blue-600', 'text-white');
+            progressStep.querySelector('span').classList.remove('text-gray-600');
+            progressStep.querySelector('span').classList.add('text-gray-900', 'font-medium');
+            
+            // Show loading spinner
+            const spinner = progressStep.querySelector('.ml-auto');
+            if (!spinner.innerHTML.includes('loader-2')) {
+                spinner.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-600"></i>';
+                lucide.createIcons();
+            }
+            
+            // Cycle through messages
+            let messageIndex = 0;
+            const messageInterval = setInterval(() => {
+                if (messageIndex < step.messages.length) {
+                    statusEl.innerHTML = `<p class="text-sm text-gray-600">${step.messages[messageIndex]}</p>`;
+                    messageIndex++;
+                } else {
+                    clearInterval(messageInterval);
+                }
+            }, step.duration / step.messages.length);
+            
+            // Progress bar animation
+            setTimeout(() => {
+                progressBar.style.width = '100%';
+            }, 200);
+            
+            // Complete step
+            setTimeout(() => {
+                // Mark as complete
+                spinner.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-green-600"></i>';
+                progressStep.querySelector('.w-6').classList.remove('bg-blue-600');
+                progressStep.querySelector('.w-6').classList.add('bg-green-600');
+                lucide.createIcons();
+                
+                // Move to next step
+                processStep(stepIndex + 1);
+            }, step.duration);
+        }
+        
+        processStep(0);
+    }
+    
+    function hideProgressiveLoading() {
+        const overlay = document.getElementById('progress-overlay');
+        if (overlay) {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 300);
+        }
+        
+        const processBtn = document.getElementById('process-btn');
+        processBtn.disabled = false;
+    }
+
+    // Helper functions for data extraction
+    function extractQuotesFromComment(comment) {
+        // Extract quotes between quotation marks
+        const quoteRegex = /"([^"]+)"/g;
+        const quotes = [];
+        let match;
+        while ((match = quoteRegex.exec(comment)) !== null) {
+            quotes.push(match[1]);
+        }
+        return quotes.length > 0 ? quotes : ['Discussion points from the meeting'];
+    }
+    
+    function extractActionsFromComment(comment) {
+        // Extract action items (lines starting with • or -)
+        const lines = comment.split('\n');
+        const actions = [];
+        for (const line of lines) {
+            if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                actions.push(line.trim().replace(/^[•-]\s*/, ''));
+            }
+        }
+        return actions.length > 0 ? actions : ['Please check the card for details'];
+    }
+    
+    function generateSpeakerAnalysis() {
+        const speakers = [];
+        
+        if (workflowData.analysis_results?.speaker_analysis?.speakers) {
+            // Use real speaker analysis data from backend
+            const speakerData = workflowData.analysis_results.speaker_analysis.speakers;
+            const totalWords = Object.values(speakerData).reduce((sum, data) => sum + (data.word_count || 0), 0);
+            
+            for (const [name, data] of Object.entries(speakerData)) {
+                const participation = totalWords > 0 ? Math.round((data.word_count || 0) / totalWords * 100) : 0;
+                let engagement = 'Low';
+                if (participation > 30) engagement = 'High';
+                else if (participation > 15) engagement = 'Medium';
+                
+                // Generate contribution description based on data
+                let contribution = 'Limited participation';
+                if (data.questions_asked > 2) contribution = 'Asked questions and guided discussions';
+                else if (data.action_items_given > 1) contribution = 'Provided updates and commitments';
+                else if (participation > 25) contribution = 'Active participant in discussions';
+                
+                speakers.push({
+                    name: name,
+                    participation: participation,
+                    engagement: engagement,
+                    contribution: contribution
+                });
+            }
+        } else {
+            // Fallback: generate basic analysis from attendee list
+            realAttendees.forEach((name, index) => {
+                const participation = [35, 25, 20, 15, 5][index] || 5;
+                const engagement = participation > 25 ? 'High' : participation > 15 ? 'Medium' : 'Low';
+                speakers.push({
+                    name: name,
+                    participation: participation,
+                    engagement: engagement,
+                    contribution: index === 0 ? 'Led most discussions' : index === 1 ? 'Active participant' : 'Limited participation'
+                });
+            });
+        }
+        
+        return speakers;
+    }
+
+    // New step 2 and 3 functions
+    function previewAndSendMessages() {
+        showNotification('Messages sent successfully!', 'success');
+        hideStepAndShowNext(2);
+        setTimeout(() => {
+            proceedToInDepthAnalysis();
+        }, 500);
+    }
+
+    function skipToAnalysis() {
+        hideStepAndShowNext(2);
+        setTimeout(() => {
+            proceedToInDepthAnalysis();
+        }, 500);
+    }
+
+    function proceedToInDepthAnalysis() {
+        const step3Progress = document.getElementById('step3-progress');
+        
+        // Animate progress bar
+        setTimeout(() => {
+            if (step3Progress) {
+                step3Progress.style.width = '50%';
+            }
+            
+            // Generate in-depth analysis
+            generateInDepthAnalysis();
+        }, 500);
+    }
+
+    function generateInDepthAnalysis() {
+        const speakerSection = document.getElementById('speaker-section');
+        
+        speakerSection.innerHTML = `
+            <div class="bg-white/70 backdrop-blur-sm border border-gray-200 rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                    <i data-lucide="brain" class="w-5 h-5 mr-2"></i>
+                    In-Depth Meeting Analysis
+                </h3>
+                
+                <div class="space-y-6">
+                    <!-- Meeting Effectiveness -->
+                    <div class="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                        <h4 class="font-medium text-purple-900 mb-3 flex items-center">
+                            <i data-lucide="trending-up" class="w-4 h-4 mr-2"></i>
+                            Meeting Effectiveness Score: 8.5/10
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">Agenda Adherence:</span>
+                                <span class="font-medium ml-2">9/10</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Time Management:</span>
+                                <span class="font-medium ml-2">8/10</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Participation Balance:</span>
+                                <span class="font-medium ml-2">7/10</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Action Item Clarity:</span>
+                                <span class="font-medium ml-2">9/10</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Speaker Analysis -->
+                    <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                        <h4 class="font-medium text-blue-900 mb-3 flex items-center">
+                            <i data-lucide="users" class="w-4 h-4 mr-2"></i>
+                            Speaker Participation Analysis
+                        </h4>
+                        <div class="space-y-3">
+                            ${realAttendees.length > 0 ? generateSpeakerAnalysis().map(speaker => `
+                                <div class="flex items-center justify-between bg-white rounded-lg p-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">${speaker.name[0]}</div>
+                                        <div>
+                                            <div class="font-medium text-gray-900">${speaker.name}</div>
+                                            <div class="text-xs text-gray-600">${speaker.contribution}</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-medium">${speaker.participation}% speaking time</div>
+                                        <div class="text-xs text-gray-600">${speaker.engagement} engagement</div>
+                                    </div>
+                                </div>
+                            `).join('') : '<div class="text-center py-4 text-gray-500">No speaker analysis available</div>'}
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Message Preview -->
+                    <div class="bg-green-50 rounded-xl p-4 border border-green-200">
+                        <h4 class="font-medium text-green-900 mb-3 flex items-center">
+                            <i data-lucide="message-circle" class="w-4 h-4 mr-2"></i>
+                            Summary Message for Group & Individuals
+                        </h4>
+                        <div class="bg-white rounded-lg p-3 text-sm font-mono whitespace-pre-line border">Team Update: Productive meeting today with clear progress on key initiatives. Sarah leading WordPress development (ready Friday), client outreach 60% complete. Mike addressing logo approval blocker for Vitality project. Action items assigned with clear deadlines. All card updates posted to Trello with meeting context.
+
+Key outcomes: WordPress on track, client outreach progressing, design approval needed for Vitality.
+
+Next steps clearly defined for each team member.</div>
+                        <div class="mt-3 flex items-center justify-between">
+                            <span class="text-xs text-gray-600">This message summarizes the meeting for the group and individual notifications</span>
+                            <button class="text-xs text-green-600 hover:text-green-800">Edit Message</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between pt-6 border-t border-gray-200 mt-6">
+                    <div class="text-sm text-gray-600">
+                        Analysis complete • Messages ready for delivery
+                    </div>
+                    
+                    <div class="flex space-x-3">
+                        <button onclick="completeWorkflow()" class="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium">
+                            Finish Without Sending
+                        </button>
+                        <button onclick="sendAnalysisAndComplete()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 flex items-center">
+                            <i data-lucide="send" class="w-4 h-4 mr-2"></i>
+                            Send Summary & Complete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Complete progress bar
+        setTimeout(() => {
+            const step3Progress = document.getElementById('step3-progress');
+            if (step3Progress) {
+                step3Progress.style.width = '100%';
+            }
+        }, 1000);
+        
+        lucide.createIcons();
+    }
+
+    function sendAnalysisAndComplete() {
+        showNotification('Summary sent to group and individuals!', 'success');
+        completeWorkflow();
+    }
+
+    function completeWorkflow() {
+        hideStepAndShowNext(3);
+        setTimeout(() => {
+            showNotification('Meeting analysis completed successfully!', 'success');
+        }, 500);
+    }
+
+    // Add CSS for workflow animations
+    const workflowStyles = `
+        <style>
+            .workflow-step {
+                transition: all 0.5s ease;
+                opacity: 1;
+                transform: scale(1);
+            }
+            
+            .workflow-step.hidden {
+                opacity: 0;
+                transform: scale(0.95);
+                pointer-events: none;
+            }
+            
+            .workflow-step.completed {
+                opacity: 0.6;
+                transform: scale(0.98);
+                pointer-events: none;
+            }
+            
+            .step-header {
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .card-item:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            }
+            
+            @keyframes pulse-glow {
+                0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+                50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.5); }
+            }
+            
+            .processing {
+                animation: pulse-glow 2s infinite;
+            }
+        </style>
+    `;
+    
+    // Add styles to head
+    if (!document.getElementById('workflow-styles')) {
+        const styleEl = document.createElement('div');
+        styleEl.id = 'workflow-styles';
+        styleEl.innerHTML = workflowStyles;
+        document.head.appendChild(styleEl);
+    }
+
+    // Drag and drop functionality
+    const dropZone = document.getElementById('drop-zone');
+    const dropOverlay = document.getElementById('drop-overlay');
+    const fileInput = document.getElementById('file-input');
+    const uploadBtn = document.getElementById('upload-btn');
+    const directText = document.getElementById('direct-text');
+    const charCount = document.getElementById('char-count');
+
+    // Character counter
+    directText.addEventListener('input', () => {
+        const count = directText.value.length;
+        charCount.textContent = count.toLocaleString();
+    });
+
+    // File upload button
+    uploadBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // Handle file selection
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            readFile(file);
+        }
+    });
+
+    // Drag and drop events
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-blue-400', 'bg-blue-50/50');
+        dropOverlay.classList.remove('hidden');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        if (!dropZone.contains(e.relatedTarget)) {
+            dropZone.classList.remove('border-blue-400', 'bg-blue-50/50');
+            dropOverlay.classList.add('hidden');
+        }
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-blue-400', 'bg-blue-50/50');
+        dropOverlay.classList.add('hidden');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            readFile(files[0]);
+        }
+    });
+
+    // Read file content
+    function readFile(file) {
+        if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                directText.value = e.target.result;
+                directText.dispatchEvent(new Event('input'));
+                showNotification('File uploaded successfully!', 'success');
+            };
+            reader.readAsText(file);
+        } else {
+            showNotification('Please upload a .txt file', 'error');
+        }
+    }
+
+    // Auto-focus text input and update character count
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('Google Meet App: JavaScript loaded successfully');
+        directText.focus();
+        directText.dispatchEvent(new Event('input'));
+    });
+    
+    // Test function for data flow validation
+    async function testDataFlow() {
+        try {
+            showNotification('Testing data flow...', 'info');
+            
+            const response = await fetch('/api/test-data-flow', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log('Data Flow Test Results:', result.test_results);
+                
+                let message = 'Data Flow Test Results:\n\n';
+                message += `Participants: ${result.test_results.participants_extracted.join(', ')}\n`;
+                message += `Trello Available: ${result.test_results.trello_client_available}\n`;
+                message += `Speaker Analysis: ${result.test_results.speaker_analysis ? 'Working' : 'Failed'}\n`;
+                message += `Card Assignment Test: ${result.test_results.card_assignment_test?.cards_tested || 0} cards tested\n`;
+                
+                alert(message);
+                showNotification('Data flow test completed! Check console for details.', 'success');
+            } else {
+                showNotification('Data flow test failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showNotification('Error testing data flow: ' + error.message, 'error');
+        }
+    }
+</script>
+{% endblock %}

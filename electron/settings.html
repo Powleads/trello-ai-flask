@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Trello AI Desktop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .settings-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #764ba2;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .setting-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-save {
+            background: #764ba2;
+            color: white;
+        }
+        
+        .btn-save:hover {
+            background: #5a3785;
+        }
+        
+        .btn-cancel {
+            background: #ccc;
+            color: #333;
+        }
+        
+        .btn-cancel:hover {
+            background: #aaa;
+        }
+        
+        .success-message {
+            background: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+        
+        .error-message {
+            background: #f44336;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <h1>Settings</h1>
+        
+        <div class="success-message" id="successMessage">Settings saved successfully!</div>
+        <div class="error-message" id="errorMessage">Error saving settings!</div>
+        
+        <div class="setting-group">
+            <label for="flaskPort">Flask Server Port:</label>
+            <input type="number" id="flaskPort" min="1000" max="65535" value="5000">
+        </div>
+        
+        <div class="setting-group">
+            <label for="theme">Theme:</label>
+            <select id="theme">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="auto">Auto (System)</option>
+            </select>
+        </div>
+        
+        <div class="setting-group">
+            <label for="autoStart">Startup Options:</label>
+            <div class="checkbox-label">
+                <input type="checkbox" id="autoStart">
+                <span>Start with Windows</span>
+            </div>
+            <div class="checkbox-label">
+                <input type="checkbox" id="startMinimized">
+                <span>Start minimized to tray</span>
+            </div>
+        </div>
+        
+        <div class="setting-group">
+            <label for="notifications">Notifications:</label>
+            <div class="checkbox-label">
+                <input type="checkbox" id="enableNotifications" checked>
+                <span>Enable desktop notifications</span>
+            </div>
+            <div class="checkbox-label">
+                <input type="checkbox" id="soundNotifications">
+                <span>Play sound for notifications</span>
+            </div>
+        </div>
+        
+        <div class="setting-group">
+            <label for="autoRefresh">Auto Refresh Interval (minutes):</label>
+            <input type="number" id="autoRefresh" min="0" max="60" value="5">
+            <small style="color: #777;">Set to 0 to disable auto-refresh</small>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
+            <button class="btn-save" onclick="saveSettings()">Save Settings</button>
+        </div>
+    </div>
+    
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        // Load current settings
+        async function loadSettings() {
+            try {
+                const settings = await ipcRenderer.invoke('get-settings');
+                
+                document.getElementById('flaskPort').value = settings.flaskPort || 5000;
+                document.getElementById('theme').value = settings.theme || 'light';
+                document.getElementById('autoStart').checked = settings.autoStart || false;
+                document.getElementById('startMinimized').checked = settings.startMinimized || false;
+                document.getElementById('enableNotifications').checked = settings.enableNotifications !== false;
+                document.getElementById('soundNotifications').checked = settings.soundNotifications || false;
+                document.getElementById('autoRefresh').value = settings.autoRefresh || 5;
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+        
+        // Save settings
+        async function saveSettings() {
+            const settings = {
+                flaskPort: parseInt(document.getElementById('flaskPort').value),
+                theme: document.getElementById('theme').value,
+                autoStart: document.getElementById('autoStart').checked,
+                startMinimized: document.getElementById('startMinimized').checked,
+                enableNotifications: document.getElementById('enableNotifications').checked,
+                soundNotifications: document.getElementById('soundNotifications').checked,
+                autoRefresh: parseInt(document.getElementById('autoRefresh').value)
+            };
+            
+            try {
+                await ipcRenderer.invoke('save-settings', settings);
+                
+                // Show success message
+                document.getElementById('successMessage').style.display = 'block';
+                document.getElementById('errorMessage').style.display = 'none';
+                
+                // Close window after delay
+                setTimeout(() => {
+                    window.close();
+                }, 1500);
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                document.getElementById('errorMessage').style.display = 'block';
+                document.getElementById('successMessage').style.display = 'none';
+            }
+        }
+        
+        // Close settings window
+        function closeSettings() {
+            window.close();
+        }
+        
+        // Load settings on window load
+        window.addEventListener('DOMContentLoaded', loadSettings);
+        
+        // Handle Enter key to save
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                saveSettings();
+            } else if (e.key === 'Escape') {
+                closeSettings();
+            }
+        });
+    </script>
+</body>
+</html>

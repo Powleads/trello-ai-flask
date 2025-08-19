@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__JustGoingViral__eesystem",
+      "Bash(dir:*)",
+      "Bash(cmd /c:*)",
+      "Bash(curl:*)",
+      "Bash(copy web_app.py web_app_working_backup.py)",
+      "mcp__JustGoingViral__write_file",
+      "mcp__JustGoingViral__edit_file",
+      "mcp__JustGoingViral__read_file",
+      "mcp__JustGoingViral__sequentialthinking",
+      "Bash(copy web_app.py web_app_reminder_system_complete.py)",
+      "Bash(copy web_app.py web_app_pre_meeting_enhancement.py)",
+      "Bash(git clone:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(del \"C:\\Users\\james\\Desktop\\TRELLO AI\\JustGoingViral-Mcpo\\electron-package.json\")",
+      "Bash(pip install:*)",
+      "Bash(npm start)",
+      "Bash(timeout:*)",
+      "Bash(npx:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

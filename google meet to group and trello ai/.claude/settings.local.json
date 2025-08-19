@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c \"C:\\Users\\james\\Desktop\\TRELLO AI\\google meet to group and trello ai\\setup.bat\")",
+      "WebSearch",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp:*)",
+      "mcp__justgoingviral__read_file",
+      "mcp__justgoingviral__write_file",
+      "mcp__justgoingviral__list_directory",
+      "mcp__justgoingviral__create_directory",
+      "mcp__justgoingviral__edit_file",
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(rg:*)",
+      "mcp__justgoingviral__move_file",
+      "mcp__justgoingviral__sequentialthinking",
+      "mcp__justgoingviral__takeScreenshot",
+      "mcp__justgoingviral__eesystem",
+      "Bash(dir \"C:\\Users\\james\\Desktop\\TRELLO AI\\google meet to group and trello ai\\screenshot errors\")",
+      "Bash(start http://localhost:5000/team-tracker)",
+      "Bash(powershell:*)",
+      "Bash(taskkill:*)",
+      "mcp__justgoingviral__search_files",
+      "Bash(copy enhanced_ai.py enhanced_ai_backup.py)",
+      "Bash(copy enhanced_ai_fixed.py enhanced_ai.py)",
+      "Bash(copy web_app_complete.py web_app.py)",
+      "Bash(start http://localhost:5000/google-meet)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

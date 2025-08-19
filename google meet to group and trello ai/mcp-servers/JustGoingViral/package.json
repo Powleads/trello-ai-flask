@@ -1,0 +1,62 @@
+{
+  "name": "JustGoingViral",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "🚀 The ULTIMATE 68-in-1 MCP Server! Universal AI automation powerhouse consolidating Apple MCP, GitHub, filesystem, browser tools, AI thinking systems & more. Compatible with ANY MCP client: Claude Desktop, Cline, ChatGPT connectors, custom AI systems. One server to rule them ALL!",
+  "keywords": [
+    "mcp-server",
+    "ai-automation",
+    "claude-desktop",
+    "developer-tools",
+    "model-context-protocol",
+    "ai-assistant",
+    "productivity-suite",
+    "consolidated-tools",
+    "github-integration",
+    "apple-mcp",
+    "developer-productivity",
+    "ai-tools",
+    "automation-platform",
+    "web-development-tools",
+    "knowledge-graph",
+    "sequential-thinking",
+    "evolutionary-intelligence",
+    "cline",
+    "filesystem-tools",
+    "browser-automation",
+    "monday-integration",
+    "typescript",
+    "nodejs",
+    "javascript"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "add-mcp-server": "ts-node scripts/add-mcp-server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentdeskai/browser-tools-mcp": "latest",
+    "@modelcontextprotocol/sdk": "^1.16.0",
+    "@modelcontextprotocol/server-filesystem": "latest",
+    "@modelcontextprotocol/server-github": "latest",
+    "@modelcontextprotocol/server-memory": "latest",
+    "@modelcontextprotocol/server-postgres": "latest",
+    "@modelcontextprotocol/server-sequential-thinking": "latest",
+    "@mondaydotcomorg/monday-api-mcp": "latest",
+    "@supabase/supabase-js": "^2.0.0",
+    "@upstash/context7-mcp": "latest",
+    "apple-mcp": "latest",
+    "axios": "^1.0.0",
+    "fs-extra": "^11.0.0",
+    "run-applescript": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.14.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
+  }
+}

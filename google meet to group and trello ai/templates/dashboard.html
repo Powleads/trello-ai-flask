@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - JGV EEsystems AI Hub{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero Section -->
+    <div class="gradient-bg rounded-2xl p-8 text-white">
+        <div class="max-w-3xl">
+            <h1 class="text-4xl font-bold mb-4">Welcome to JGV EEsystems AI Hub</h1>
+            <p class="text-xl opacity-90 mb-6">Your unified platform for team productivity and automation</p>
+            <div class="flex space-x-4">
+                <span class="bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-medium">
+                    <i data-lucide="zap" class="w-4 h-4 inline mr-2"></i>
+                    AI-Powered
+                </span>
+                <span class="bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-medium">
+                    <i data-lucide="shield-check" class="w-4 h-4 inline mr-2"></i>
+                    Secure
+                </span>
+                <span class="bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-medium">
+                    <i data-lucide="clock" class="w-4 h-4 inline mr-2"></i>
+                    Real-time
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Google Meet App -->
+        <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div class="p-6">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="video" class="w-6 h-6 text-green-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Google Meet to Trello</h3>
+                        <p class="text-sm text-gray-500">Process meeting transcripts</p>
+                    </div>
+                </div>
+                
+                <p class="text-gray-600 mb-6">Convert Google Meet transcripts into actionable Trello cards automatically.</p>
+                
+                <div class="space-y-3 mb-6">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="check" class="w-4 h-4 text-green-500 mr-2"></i>
+                        Automatic transcript processing
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="check" class="w-4 h-4 text-green-500 mr-2"></i>
+                        Smart task extraction
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="check" class="w-4 h-4 text-green-500 mr-2"></i>
+                        Trello integration
+                    </div>
+                </div>
+                
+                <a href="/google-meet" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                    <i data-lucide="arrow-right" class="w-4 h-4 mr-2"></i>
+                    Open App
+                </a>
+            </div>
+        </div>
+
+        <!-- Team Update Tracker -->
+        <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div class="p-6">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="users" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">Team Update Tracker</h3>
+                        <p class="text-sm text-gray-500">Monitor team progress</p>
+                    </div>
+                </div>
+                
+                <p class="text-gray-600 mb-6">Track team member updates and send automated WhatsApp reminders.</p>
+                
+                <div class="space-y-3 mb-6">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="check" class="w-4 h-4 text-blue-500 mr-2"></i>
+                        24-hour comment monitoring
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="check" class="w-4 h-4 text-blue-500 mr-2"></i>
+                        WhatsApp automation
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="check" class="w-4 h-4 text-blue-500 mr-2"></i>
+                        Performance analytics
+                    </div>
+                </div>
+                
+                <a href="/team-tracker" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                    <i data-lucide="arrow-right" class="w-4 h-4 mr-2"></i>
+                    Open App
+                </a>
+            </div>
+        </div>
+
+        <!-- Coming Soon App -->
+        <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden opacity-75">
+            <div class="p-6">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <i data-lucide="plus" class="w-6 h-6 text-purple-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">More Apps</h3>
+                        <p class="text-sm text-gray-500">Coming soon...</p>
+                    </div>
+                </div>
+                
+                <p class="text-gray-600 mb-6">Additional productivity tools and integrations are in development.</p>
+                
+                <div class="space-y-3 mb-6">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="clock" class="w-4 h-4 text-purple-500 mr-2"></i>
+                        Advanced analytics
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="clock" class="w-4 h-4 text-purple-500 mr-2"></i>
+                        Custom workflows
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i data-lucide="clock" class="w-4 h-4 text-purple-500 mr-2"></i>
+                        More integrations
+                    </div>
+                </div>
+                
+                <button disabled class="w-full bg-gray-300 text-gray-500 font-medium py-2 px-4 rounded-lg cursor-not-allowed flex items-center justify-center">
+                    <i data-lucide="lock" class="w-4 h-4 mr-2"></i>
+                    Coming Soon
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="file-text" class="w-5 h-5 text-green-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Transcripts Processed</p>
+                    <p class="text-2xl font-bold text-gray-900" id="transcripts-count">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="trello" class="w-5 h-5 text-blue-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Cards Tracked</p>
+                    <p class="text-2xl font-bold text-gray-900" id="cards-count">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="message-circle" class="w-5 h-5 text-purple-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Messages Sent</p>
+                    <p class="text-2xl font-bold text-gray-900" id="messages-count">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="users" class="w-5 h-5 text-orange-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Active Users</p>
+                    <p class="text-2xl font-bold text-gray-900" id="users-count">8</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i data-lucide="activity" class="w-5 h-5 mr-2"></i>
+                Recent Activity
+            </h2>
+        </div>
+        <div class="p-6">
+            <div id="activity-feed" class="space-y-4">
+                <div class="text-center text-gray-500 py-8">
+                    <i data-lucide="clock" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    <p>No recent activity</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load dashboard statistics
+    function loadDashboardStats() {
+        // This would normally fetch from APIs
+        // For now, using placeholder values
+        
+        // Animate counter
+        function animateCounter(element, target) {
+            let current = 0;
+            const increment = target / 30;
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= target) {
+                    current = target;
+                    clearInterval(timer);
+                }
+                element.textContent = Math.floor(current);
+            }, 50);
+        }
+        
+        // Update counters (these would come from real data)
+        setTimeout(() => {
+            animateCounter(document.getElementById('transcripts-count'), 42);
+            animateCounter(document.getElementById('cards-count'), 156);
+            animateCounter(document.getElementById('messages-count'), 89);
+        }, 500);
+    }
+    
+    // Load recent activity
+    function loadRecentActivity() {
+        const activities = [
+            { time: '5 minutes ago', action: 'Transcript processed', app: 'Google Meet' },
+            { time: '12 minutes ago', action: 'Update reminder sent', app: 'Team Tracker' },
+            { time: '1 hour ago', action: 'New card created', app: 'Trello' },
+            { time: '2 hours ago', action: 'Team member responded', app: 'Team Tracker' }
+        ];
+        
+        const feed = document.getElementById('activity-feed');
+        feed.innerHTML = activities.map(activity => `
+            <div class="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse-soft"></div>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900">${activity.action}</p>
+                    <p class="text-xs text-gray-500">${activity.app} • ${activity.time}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDashboardStats();
+        loadRecentActivity();
+    });
+</script>
+{% endblock %}

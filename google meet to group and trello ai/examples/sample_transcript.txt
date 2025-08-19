@@ -1,0 +1,33 @@
+John Smith: Good morning everyone, thanks for joining our weekly project review meeting. Let's start with updates from each team.
+
+Sarah Johnson: Hi John, thanks for organizing this. I wanted to update everyone on the budget status. We're currently tracking about 15% over our initial budget due to the additional requirements that came in last week.
+
+Mike Chen: That's concerning. I think we need to prioritize the core features and maybe push some of the nice-to-have items to phase 2 of the project.
+
+John Smith: I agree with Mike. Sarah, can you prepare a revised budget breakdown showing the must-have versus nice-to-have features? We need to make some decisions by Friday.
+
+Sarah Johnson: Absolutely. I'll have a detailed analysis ready by Thursday end of day, and we can review it in Friday's meeting.
+
+Mike Chen: I also wanted to mention that the client called yesterday. They're asking about the timeline for the mobile app integration. Should I schedule a follow-up call with them?
+
+John Smith: Yes, definitely. Mike, can you set up a client call for early next week? And please prepare a timeline document showing our current progress.
+
+Sarah Johnson: I can help with the timeline document. I have all the milestone data from our project management system.
+
+Mike Chen: Perfect. I'll coordinate with Sarah and get the client meeting scheduled. Is Monday afternoon good for everyone?
+
+John Smith: Monday works for me. Sarah, are you available Monday around 2 PM?
+
+Sarah Johnson: Yes, that works. I'll make sure to have the budget analysis and timeline ready by then.
+
+John Smith: Great. So to summarize our action items: Sarah will prepare the budget analysis by Thursday, Mike will schedule the client call for Monday, and Sarah will also help with the timeline document. Does everyone agree with these next steps?
+
+Mike Chen: Sounds good to me.
+
+Sarah Johnson: Agreed. I'll start working on the budget analysis this afternoon.
+
+John Smith: Perfect. Thanks everyone for a productive meeting. Let's touch base again on Friday to review Sarah's analysis before the client meeting on Monday.
+
+Mike Chen: Thanks John. I'll send out the calendar invites for both meetings.
+
+John Smith: Excellent. Have a great rest of your week, everyone!

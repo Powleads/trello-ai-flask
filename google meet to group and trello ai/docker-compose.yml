@@ -1,0 +1,184 @@
+version: '3.8'
+
+services:
+  # Redis for caching and message queuing
+  redis:
+    image: redis:7-alpine
+    container_name: meeting-automation-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: meeting-automation-postgres
+    environment:
+      POSTGRES_DB: meetingdb
+      POSTGRES_USER: meetinguser
+      POSTGRES_PASSWORD: meetingpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meetinguser -d meetingdb"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Meeting Automation API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meeting-automation-api
+    environment:
+      - DATABASE_URL=postgresql://meetinguser:meetingpass@postgres:5432/meetingdb
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+
+  # Celery worker for background tasks
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meeting-automation-worker
+    environment:
+      - DATABASE_URL=postgresql://meetinguser:meetingpass@postgres:5432/meetingdb
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: celery -A src.tasks worker --loglevel=info
+
+  # Celery beat scheduler
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meeting-automation-scheduler
+    environment:
+      - DATABASE_URL=postgresql://meetinguser:meetingpass@postgres:5432/meetingdb
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: celery -A src.tasks beat --loglevel=info
+
+  # Flower for monitoring Celery tasks
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meeting-automation-flower
+    environment:
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    command: celery -A src.tasks flower --host=0.0.0.0 --port=5555
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: meeting-automation-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Prometheus for metrics (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: meeting-automation-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Grafana for dashboards (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: meeting-automation-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  default:
+    name: meeting-automation-network
