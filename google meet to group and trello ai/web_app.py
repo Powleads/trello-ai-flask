@@ -134,7 +134,7 @@ app.config.update(
 
 # Login credentials with hashed password storage
 LOGIN_USERNAME = os.environ.get('LOGIN_USERNAME', 'admin@justgoingviral.com')
-LOGIN_PASSWORD_RAW = os.environ.get('LOGIN_PASSWORD', 'A!Wellness2!')
+LOGIN_PASSWORD_RAW = os.environ.get('LOGIN_PASSWORD', '2Talon3Gemm4')
 
 # Generate secure password hash (do this once)
 LOGIN_PASSWORD_HASH = bcrypt.hashpw(LOGIN_PASSWORD_RAW.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
