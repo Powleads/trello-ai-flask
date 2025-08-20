@@ -81,6 +81,14 @@
                         <i data-lucide="users" class="w-4 h-4 inline mr-2"></i>
                         Team Tracker
                     </a>
+                    <a href="/gmail-tracker" class="nav-link px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if request.endpoint == 'gmail_tracker_app' %}bg-blue-100 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        <i data-lucide="mail" class="w-4 h-4 inline mr-2"></i>
+                        Gmail Tracker
+                    </a>
+                    <a href="/onboarding-analysis" class="nav-link px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if request.endpoint == 'onboarding_analysis_app' %}bg-blue-100 text-blue-700{% else %}text-gray-600 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 inline mr-2"></i>
+                        Onboarding Analysis
+                    </a>
                     <button class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">
                         <i data-lucide="plus" class="w-4 h-4 inline mr-2"></i>
                         More Apps

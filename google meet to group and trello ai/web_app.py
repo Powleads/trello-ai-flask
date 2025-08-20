@@ -323,6 +323,11 @@ def team_tracker_app():
 def gmail_tracker_app():
     return render_template('gmail_tracker.html')
 
+@app.route('/onboarding-analysis')
+@login_required
+def onboarding_analysis_app():
+    return render_template('onboarding_analysis.html')
+
 # ===== AUTOMATED SCHEDULER =====
 
 import threading
