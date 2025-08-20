@@ -6,7 +6,7 @@ requests==2.31.0
 werkzeug==3.0.1
 
 # AI and API integrations  
-openai==1.6.1
+openai==1.100.2
 py-trello==0.19.0
 
 # Google APIs
