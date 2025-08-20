@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Automation Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        .input-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+        }
+        
+        input[type="url"], textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="url"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        .result-item {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .result-item.error {
+            border-left-color: #dc3545;
+        }
+        
+        .result-item.warning {
+            border-left-color: #ffc107;
+        }
+        
+        .result-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .summary-text {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .status-icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        
+        .example-links {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .example-links h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .example-link {
+            color: #1976d2;
+            text-decoration: none;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        
+        .example-link:hover {
+            text-decoration: underline;
+        }
+        
+        .or-divider {
+            text-align: center;
+            margin: 25px 0;
+            position: relative;
+            color: #666;
+        }
+        
+        .or-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e0e0e0;
+        }
+        
+        .or-divider span {
+            background: white;
+            padding: 0 15px;
+        }
+        
+        .toggle-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .toggle-container input[type="checkbox"] {
+            display: none;
+        }
+        
+        .toggle-slider {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background-color: #ccc;
+            border-radius: 24px;
+            transition: 0.3s;
+            margin-right: 10px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        .toggle-container input:checked + .toggle-slider {
+            background-color: #667eea;
+        }
+        
+        .toggle-container input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .toggle-label {
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Meeting Automation</h1>
+            <p>Process meeting transcripts with AI and send summaries to WhatsApp</p>
+        </div>
+        
+        <div class="content">
+            <div class="example-links">
+                <h3>📋 Example Google Doc</h3>
+                <a href="#" class="example-link" onclick="fillGoogleDocUrl('https://docs.google.com/document/d/1HUzXD-za55RhxdZoARYaDRM-4n95EpR5tZfi5wllAQs/edit?usp=sharing')">
+                    https://docs.google.com/document/d/1HUzXD-za55RhxdZoARYaDRM-4n95EpR5tZfi5wllAQs/edit?usp=sharing
+                </a>
+            </div>
+            
+            <form id="processForm">
+                <div class="input-section">
+                    <div class="input-group">
+                        <label for="google_doc_url">📄 Google Docs URL</label>
+                        <input 
+                            type="url" 
+                            id="google_doc_url" 
+                            name="google_doc_url" 
+                            placeholder="https://docs.google.com/document/d/your-document-id/edit"
+                        >
+                        <div style="margin-top: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                            <label class="toggle-container">
+                                <input type="checkbox" id="demo_mode" name="demo_mode" value="1">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label">🎭 Demo Mode</span>
+                            </label>
+                        </div>
+                        <small style="color: #666; margin-top: 5px; display: block;">
+                            Make sure the document is publicly viewable (Anyone with the link can view)
+                        </small>
+                    </div>
+                    
+                    <div class="or-divider">
+                        <span>OR</span>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="direct_text">📝 Paste Transcript Text</label>
+                        <textarea 
+                            id="direct_text" 
+                            name="direct_text" 
+                            placeholder="Paste your meeting transcript here..."
+                        ></textarea>
+                    </div>
+                </div>
+                
+                <button type="submit" class="button" id="processBtn">
+                    🔍 Find and Match Trello Cards
+                </button>
+            </form>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Searching transcript for Trello card references...</p>
+            </div>
+            
+            <div class="results" id="results">
+                <!-- Results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function fillGoogleDocUrl(url) {
+            document.getElementById('google_doc_url').value = url;
+        }
+        
+        document.getElementById('processForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = document.getElementById('processBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const demoMode = document.getElementById('demo_mode').checked;
+            
+            // Show loading
+            button.disabled = true;
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            
+            try {
+                const formData = new FormData(this);
+                
+                // If demo mode, use demo endpoint
+                const endpoint = demoMode ? '/demo-analyze' : '/analyze';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading
+                loading.style.display = 'none';
+                button.disabled = false;
+                
+                // Show results
+                displayResults(data);
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                button.disabled = false;
+                displayResults({error: 'Network error: ' + error.message});
+            }
+        });
+        
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            
+            if (data.error) {
+                results.innerHTML = `
+                    <div class="result-item error">
+                        <div class="result-title">❌ Error</div>
+                        <p>${data.error}</p>
+                    </div>
+                `;
+            } else {
+                let trelloCardsHtml = '';
+                if (data.matched_cards && data.matched_cards.length > 0) {
+                    // Sort cards by match score (highest first)
+                    const sortedCards = data.matched_cards.sort((a, b) => b.match_score - a.match_score);
+                    
+                    trelloCardsHtml = `
+                        <div class="result-item">
+                            <div class="result-title">📋 Trello Cards Found (${data.matched_cards.length}) - AI Enhanced Matching</div>
+                            <div style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                                🤖 Using GPT-4 Turbo for intelligent note extraction | ✅ Card understanding + Meeting notes | 📊 40% minimum confidence
+                            </div>
+                            <div id="trello-cards-container">
+                                ${sortedCards.map((match, index) => {
+                                    const confidence = Math.round(match.match_score * 100);
+                                    const confidenceColor = confidence >= 80 ? '#28a745' : confidence >= 70 ? '#ffc107' : '#fd7e14';
+                                    const matchType = match.match_type || 'fuzzy';
+                                    
+                                    return `
+                                    <div class="trello-card-match" style="background: #f8f9fa; border: 2px solid ${confidenceColor}; border-radius: 8px; padding: 15px; margin: 10px 0;">
+                                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                                            <div style="flex: 1; display: flex; align-items: start; gap: 10px;">
+                                                <label style="display: flex; align-items: center; cursor: pointer;">
+                                                    <input type="checkbox" id="select-${index}" checked style="margin-right: 8px; transform: scale(1.2);">
+                                                    <span style="font-weight: 500; color: #333;">Select</span>
+                                                </label>
+                                                <div>
+                                                    <strong>🎯 ${match.card.name}</strong>
+                                                    <div style="font-size: 12px; margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap;">
+                                                        <span style="background: ${confidenceColor}; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">
+                                                            ${confidence}% match
+                                                        </span>
+                                                        <span style="background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px;">
+                                                            ${matchType} match
+                                                        </span>
+                                                        <span style="color: #666;">
+                                                            List: ${match.card.list ? match.card.list.name : 'Unknown'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <a href="${match.card.url}" target="_blank" style="color: #0079bf; text-decoration: none; font-size: 12px; white-space: nowrap;">View Card →</a>
+                                        </div>
+                                        <div style="margin-bottom: 10px;">
+                                            <label style="font-size: 14px; font-weight: 500; margin-bottom: 5px; display: block;">💬 Comment to add:</label>
+                                            <textarea 
+                                                id="comment-${index}" 
+                                                style="width: 100%; min-height: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; resize: vertical;"
+                                                placeholder="Edit the comment that will be posted to this Trello card..."
+                                            >${match.suggested_comment}</textarea>
+                                        </div>
+                                        <div style="font-size: 12px; color: #666; background: #fff; padding: 8px; border-radius: 4px;">
+                                            <strong>Meeting Context:</strong> "${match.reference.context.substring(0, 200)}${match.reference.context.length > 200 ? '...' : ''}"
+                                        </div>
+                                    </div>
+                                `}).join('')}
+                            </div>`;
+                            
+                    // Add suggested new tasks section if available
+                    if (data.suggested_new_tasks && data.suggested_new_tasks.length > 0) {
+                        trelloCardsHtml += `
+                            <div style="margin-top: 20px; padding: 15px; background: #e8f5e8; border: 1px solid #c3e6c3; border-radius: 8px;">
+                                <div style="font-weight: 600; color: #155724; margin-bottom: 10px;">
+                                    💡 Suggested New Tasks (${data.suggested_new_tasks.length}) - Consider Creating
+                                </div>
+                                ${data.suggested_new_tasks.map((task, index) => `
+                                    <div style="background: #fff; border: 1px solid #c3e6c3; border-radius: 5px; padding: 10px; margin: 5px 0;">
+                                        <strong>📝 ${task.title}</strong>
+                                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                                            Context: ${task.context}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                                <div style="font-size: 12px; color: #666; margin-top: 10px; font-style: italic;">
+                                    These tasks were identified by AI as potential new work items mentioned in the meeting.
+                                </div>
+                            </div>`;
+                    }
+                    
+                    trelloCardsHtml += `
+                            <div style="margin-top: 20px; text-align: center;">
+                                <button 
+                                    onclick="postTrelloComments()" 
+                                    class="button" 
+                                    style="width: auto; padding: 12px 24px; margin-right: 10px;"
+                                >
+                                    📝 Post Comments to Selected Cards
+                                </button>
+                                <button 
+                                    onclick="skipTrelloAndGenerateWhatsapp()" 
+                                    class="button" 
+                                    style="width: auto; padding: 12px 24px; background: #6c757d;"
+                                >
+                                    ⏭️ Skip & Generate WhatsApp
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    trelloCardsHtml = `
+                        <div class="result-item warning">
+                            <div class="result-title">📋 Trello Cards</div>
+                            <p>No Trello cards were found matching this transcript (minimum 50% confidence threshold).</p>
+                            ${data.suggested_new_tasks && data.suggested_new_tasks.length > 0 ? `
+                                <div style="margin-top: 15px; padding: 15px; background: #e8f5e8; border: 1px solid #c3e6c3; border-radius: 8px;">
+                                    <div style="font-weight: 600; color: #155724; margin-bottom: 10px;">
+                                        💡 Suggested New Tasks (${data.suggested_new_tasks.length})
+                                    </div>
+                                    ${data.suggested_new_tasks.map((task) => `
+                                        <div style="background: #fff; border: 1px solid #c3e6c3; border-radius: 5px; padding: 10px; margin: 5px 0;">
+                                            <strong>📝 ${task.title}</strong>
+                                            <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                                                ${task.context}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            <div style="margin-top: 15px; text-align: center;">
+                                <button 
+                                    onclick="skipTrelloAndGenerateWhatsapp()" 
+                                    class="button" 
+                                    style="width: auto; padding: 12px 24px;"
+                                >
+                                    📱 Generate WhatsApp Message
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                results.innerHTML = `
+                    <div class="result-item">
+                        <div class="result-title">📄 Source</div>
+                        <p>${data.source}</p>
+                        ${data.demo_mode ? '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin-top: 10px; color: #856404;"><strong>🎭 DEMO MODE:</strong> Using sample data to demonstrate Trello card matching</div>' : ''}
+                    </div>
+                    
+                    ${trelloCardsHtml}
+                    
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <div class="status-icon success">📊</div>
+                            <strong>Processing</strong>
+                            <p>Transcript: ${data.transcript_length} chars</p>
+                        </div>
+                        
+                        <div class="status-card">
+                            <div class="status-icon ${data.matched_cards && data.matched_cards.length > 0 ? 'success' : 'warning'}">
+                                📋
+                            </div>
+                            <strong>Trello Cards</strong>
+                            <p>${data.matched_cards ? data.matched_cards.length : 0} found</p>
+                        </div>
+                        
+                        <div class="status-card">
+                            <div class="status-icon warning">📱</div>
+                            <strong>WhatsApp</strong>
+                            <p>Pending Trello</p>
+                            <small>Will include card links</small>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            results.style.display = 'block';
+            results.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Store global data for workflow
+        let globalData = null;
+        
+        // Post comments to Trello cards
+        async function postTrelloComments() {
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '⏳ Posting Comments...';
+            
+            try {
+                // Collect only selected cards with edited comments
+                const matchedCards = globalData.matched_cards;
+                const updatedComments = [];
+                
+                for (let i = 0; i < matchedCards.length; i++) {
+                    const checkbox = document.getElementById(`select-${i}`);
+                    if (checkbox && checkbox.checked) {
+                        const commentText = document.getElementById(`comment-${i}`).value;
+                        updatedComments.push({
+                            card_id: matchedCards[i].card.id,
+                            card_name: matchedCards[i].card.name,
+                            card_url: matchedCards[i].card.url,
+                            comment: commentText
+                        });
+                    }
+                }
+                
+                if (updatedComments.length === 0) {
+                    button.innerHTML = '⚠️ No Cards Selected';
+                    button.disabled = false;
+                    return;
+                }
+                
+                // Send to backend
+                const response = await fetch('/post-trello-comments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        comments: updatedComments,
+                        source_data: globalData
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    button.innerHTML = '✅ Comments Posted!';
+                    button.style.background = '#28a745';
+                    
+                    // Show WhatsApp generation section
+                    setTimeout(() => {
+                        generateWhatsAppMessage(result.posted_cards);
+                    }, 1500);
+                } else {
+                    button.innerHTML = '❌ Failed to Post';
+                    button.style.background = '#dc3545';
+                    alert('Error posting comments: ' + result.error);
+                }
+                
+            } catch (error) {
+                button.innerHTML = '❌ Error';
+                button.style.background = '#dc3545';
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        // Skip Trello and generate WhatsApp message
+        function skipTrelloAndGenerateWhatsapp() {
+            generateWhatsAppMessage([]);
+        }
+        
+        // Generate WhatsApp message with Trello card links
+        async function generateWhatsAppMessage(postedCards = []) {
+            const results = document.getElementById('results');
+            
+            // First generate AI summary
+            const summaryResponse = await fetch('/generate-summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transcript_text: globalData.transcript_text,
+                    source_url: globalData.source_url
+                })
+            });
+            
+            const summaryData = await summaryResponse.json();
+            
+            let trelloSection = '';
+            if (postedCards.length > 0) {
+                trelloSection = `📋 **Trello Cards Updated:**\n${postedCards.map(card => `• [${card.card_name}](${card.card_url}) - Meeting notes added`).join('\n')}`;
+            } else if (globalData.demo_mode) {
+                trelloSection = '📋 **Trello Cards Updated:**\n• Demo mode - no actual cards updated';
+            } else {
+                trelloSection = '📋 **Trello Cards Updated:**\n• No cards were updated in this session';
+            }
+            
+            const baseMessage = summaryData.summary || 'Meeting summary could not be generated';
+            const sourceUrl = globalData.source_url;
+            
+            let finalMessage = baseMessage + '\n\n' + trelloSection;
+            
+            if (sourceUrl) {
+                finalMessage += `\n\n📄 **Full Meeting Details:**\nFor a more detailed summary, visit the original document:\n${sourceUrl}`;
+            }
+            
+            // Add WhatsApp message preview and send section
+            const whatsappSection = `
+                <div class="result-item" style="border-left-color: #25d366;">
+                    <div class="result-title">📱 WhatsApp Message Ready</div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 14px; font-weight: 500; margin-bottom: 5px; display: block;">✏️ Edit message before sending:</label>
+                        <textarea 
+                            id="whatsapp-message" 
+                            style="width: 100%; min-height: 150px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; font-family: monospace; font-size: 14px; resize: vertical;"
+                        >🤖 **Meeting Summary**
+
+${finalMessage}
+
+*Generated by Meeting Automation Tool*</textarea>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button 
+                            onclick="sendWhatsAppMessage()" 
+                            class="button" 
+                            style="width: auto; padding: 12px 24px; background: #25d366;"
+                        >
+                            📤 Send to WhatsApp
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            results.innerHTML = results.innerHTML + whatsappSection;
+            results.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Send WhatsApp message
+        async function sendWhatsAppMessage() {
+            const button = event.target;
+            const messageText = document.getElementById('whatsapp-message').value;
+            
+            button.disabled = true;
+            button.innerHTML = '📤 Sending...';
+            
+            try {
+                const response = await fetch('/send-whatsapp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: messageText,
+                        chat_id: globalData.whatsapp_chat_id || null
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    button.innerHTML = '✅ Message Sent!';
+                    button.style.background = '#28a745';
+                } else {
+                    button.innerHTML = '❌ Send Failed';
+                    button.style.background = '#dc3545';
+                    alert('Error sending message: ' + result.error);
+                }
+                
+            } catch (error) {
+                button.innerHTML = '❌ Error';
+                button.style.background = '#dc3545';
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        // Update displayResults to store global data
+        const originalDisplayResults = displayResults;
+        displayResults = function(data) {
+            globalData = data;
+            originalDisplayResults(data);
+        };
+        
+        // Check system status on load
+        window.addEventListener('load', async function() {
+            try {
+                const response = await fetch('/status');
+                const status = await response.json();
+                console.log('System Status:', status);
+            } catch (error) {
+                console.error('Could not check system status:', error);
+            }
+        });
+    </script>
+</body>
+</html>

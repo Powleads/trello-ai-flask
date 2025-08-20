@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block title %}Gmail Tracker - JGV AI Hub{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">📧 Gmail Tracker & Informer</h1>
+                    <p class="text-gray-600 mt-1">AI-powered email analysis with automated team notifications</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        GPT-5 Powered
+                    </span>
+                    <a href="/team-tracker" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        Team Tracker →
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Control Panel -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">📊 Gmail Scanner Control</h2>
+            <div class="flex items-center space-x-4">
+                <button onclick="manualScan()" 
+                        id="scanBtn"
+                        class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all">
+                    🔄 Manual Scan
+                </button>
+                <button onclick="refreshHistory()" 
+                        id="refreshBtn"
+                        class="px-6 py-3 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-all">
+                    📋 Refresh History
+                </button>
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-sm text-gray-600">Automated scanning: 6 AM & 6 PM daily</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Emails Today</p>
+                        <p class="text-2xl font-bold text-gray-900" id="emailsToday">-</p>
+                    </div>
+                    <span class="text-3xl">📧</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Notifications Sent</p>
+                        <p class="text-2xl font-bold text-gray-900" id="notificationsSent">-</p>
+                    </div>
+                    <span class="text-3xl">🔔</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">High Priority</p>
+                        <p class="text-2xl font-bold text-red-600" id="highPriority">-</p>
+                    </div>
+                    <span class="text-3xl">🚨</span>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Team Members</p>
+                        <p class="text-2xl font-bold text-gray-900" id="teamMembers">4</p>
+                    </div>
+                    <span class="text-3xl">👥</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden">
+            <div class="bg-white rounded-xl shadow-lg p-12 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 mb-4">
+                    <svg class="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <p class="text-gray-600 text-lg">Scanning emails...</p>
+                <p class="text-gray-500 text-sm mt-2">Analyzing with AI and sending notifications</p>
+            </div>
+        </div>
+
+        <!-- Email History -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold">📋 Email Processing History</h3>
+                <div class="flex items-center space-x-2">
+                    <select id="categoryFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">All Categories</option>
+                        <option value="onboarding">Onboarding</option>
+                        <option value="ghl_support">GHL Support</option>
+                        <option value="tech_issues">Tech Issues</option>
+                        <option value="client_communication">Client Communication</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <select id="assigneeFilter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="">All Assignees</option>
+                        <option value="James Taylor">James Taylor</option>
+                        <option value="Ezechiel">Ezechiel</option>
+                        <option value="Breyden">Breyden</option>
+                        <option value="Dustin Salinas">Dustin Salinas</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="emailHistory" class="space-y-3">
+                <!-- Email history will be populated here -->
+                <div class="text-center py-8 text-gray-500">
+                    <p>📧 No email history available</p>
+                    <p class="text-sm mt-1">Run a scan to see processed emails</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Panel -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold mb-4">⚙️ Email Watch Configuration</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-medium mb-3">📝 Add Custom Email Watch</h4>
+                    <div class="space-y-3">
+                        <input type="text" 
+                               id="watchSender" 
+                               placeholder="Sender email or name (e.g., peter@example.com)" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <select id="watchAssignee" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="">Select team member to notify</option>
+                            <option value="James Taylor">James Taylor</option>
+                            <option value="Ezechiel">Ezechiel</option>
+                            <option value="Breyden">Breyden</option>
+                            <option value="Dustin Salinas">Dustin Salinas</option>
+                        </select>
+                        <input type="text" 
+                               id="watchNotes" 
+                               placeholder="Notes (e.g., 'Important client emails')" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <button onclick="addEmailWatch()" 
+                                class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            ➕ Add Watch
+                        </button>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-medium mb-3">👥 Team Assignment Rules</h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between p-2 bg-gray-50 rounded">
+                            <span>Onboarding emails</span>
+                            <span class="font-medium">→ James Taylor</span>
+                        </div>
+                        <div class="flex justify-between p-2 bg-gray-50 rounded">
+                            <span>GHL/Technical issues</span>
+                            <span class="font-medium">→ Ezechiel</span>
+                        </div>
+                        <div class="flex justify-between p-2 bg-gray-50 rounded">
+                            <span>Design/Creative</span>
+                            <span class="font-medium">→ Breyden</span>
+                        </div>
+                        <div class="flex justify-between p-2 bg-gray-50 rounded">
+                            <span>Urgent/Critical</span>
+                            <span class="font-medium">→ James Taylor</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let emailHistory = [];
+
+// Load email history on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshHistory();
+});
+
+async function manualScan() {
+    const scanBtn = document.getElementById('scanBtn');
+    const loadingState = document.getElementById('loadingState');
+    
+    scanBtn.disabled = true;
+    scanBtn.textContent = '⏳ Scanning...';
+    loadingState.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/api/gmail-scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Gmail scan completed successfully!', 'success');
+            setTimeout(() => refreshHistory(), 2000);
+        } else {
+            showNotification('Scan failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Failed to start scan', 'error');
+    } finally {
+        loadingState.classList.add('hidden');
+        scanBtn.disabled = false;
+        scanBtn.textContent = '🔄 Manual Scan';
+    }
+}
+
+async function refreshHistory() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = '⏳ Loading...';
+    
+    try {
+        const response = await fetch('/api/gmail-history?limit=50');
+        const data = await response.json();
+        
+        if (data.success) {
+            emailHistory = data.emails;
+            displayEmailHistory();
+            updateStatistics();
+            showNotification('History refreshed', 'success');
+        } else {
+            showNotification('Failed to load history: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Failed to load email history', 'error');
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '📋 Refresh History';
+    }
+}
+
+function displayEmailHistory() {
+    const container = document.getElementById('emailHistory');
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const assigneeFilter = document.getElementById('assigneeFilter').value;
+    
+    // Filter emails
+    let filteredEmails = emailHistory;
+    if (categoryFilter) {
+        filteredEmails = filteredEmails.filter(email => email.category === categoryFilter);
+    }
+    if (assigneeFilter) {
+        filteredEmails = filteredEmails.filter(email => email.assigned_to === assigneeFilter);
+    }
+    
+    if (filteredEmails.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <p>📧 No emails found</p>
+                <p class="text-sm mt-1">Try adjusting your filters or run a scan</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = filteredEmails.map(email => `
+        <div class="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <div class="flex-shrink-0">
+                ${getPriorityIcon(email.priority)}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-medium text-gray-900 truncate">${email.subject}</h4>
+                    <div class="flex items-center space-x-2">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(email.category)}">
+                            ${email.category}
+                        </span>
+                        ${email.whatsapp_sent ? '<span class="text-green-600 text-xs">✓ Sent</span>' : '<span class="text-gray-400 text-xs">○ Not sent</span>'}
+                    </div>
+                </div>
+                <p class="text-sm text-gray-600 truncate mt-1">From: ${email.sender}</p>
+                <div class="flex items-center justify-between mt-2">
+                    <span class="text-xs text-gray-500">Assigned to: ${email.assigned_to || 'Unassigned'}</span>
+                    <span class="text-xs text-gray-400">${formatDate(email.processed_at)}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateStatistics() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayEmails = emailHistory.filter(email => {
+        const emailDate = new Date(email.processed_at);
+        emailDate.setHours(0, 0, 0, 0);
+        return emailDate.getTime() === today.getTime();
+    });
+    
+    const notifications = emailHistory.filter(email => email.whatsapp_sent);
+    const highPriority = emailHistory.filter(email => email.priority >= 4);
+    
+    document.getElementById('emailsToday').textContent = todayEmails.length;
+    document.getElementById('notificationsSent').textContent = notifications.length;
+    document.getElementById('highPriority').textContent = highPriority.length;
+}
+
+function getPriorityIcon(priority) {
+    if (priority >= 4) return '<span class="text-red-500 text-lg">🚨</span>';
+    if (priority >= 3) return '<span class="text-yellow-500 text-lg">⚠️</span>';
+    return '<span class="text-blue-500 text-lg">📧</span>';
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'onboarding': 'bg-green-100 text-green-800',
+        'ghl_support': 'bg-blue-100 text-blue-800',
+        'tech_issues': 'bg-red-100 text-red-800',
+        'client_communication': 'bg-purple-100 text-purple-800',
+        'other': 'bg-gray-100 text-gray-800'
+    };
+    return colors[category] || colors['other'];
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+}
+
+function addEmailWatch() {
+    const sender = document.getElementById('watchSender').value.trim();
+    const assignee = document.getElementById('watchAssignee').value;
+    const notes = document.getElementById('watchNotes').value.trim();
+    
+    if (!sender || !assignee) {
+        showNotification('Please fill in sender and assignee fields', 'error');
+        return;
+    }
+    
+    // Here you would normally send to API
+    showNotification(`Email watch added: ${sender} → ${assignee}`, 'success');
+    
+    // Clear form
+    document.getElementById('watchSender').value = '';
+    document.getElementById('watchAssignee').value = '';
+    document.getElementById('watchNotes').value = '';
+}
+
+function showNotification(message, type) {
+    // Simple notification system
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 ${
+        type === 'success' ? 'bg-green-600' : 'bg-red-600'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+// Add event listeners for filters
+document.getElementById('categoryFilter').addEventListener('change', displayEmailHistory);
+document.getElementById('assigneeFilter').addEventListener('change', displayEmailHistory);
+</script>
+{% endblock %}

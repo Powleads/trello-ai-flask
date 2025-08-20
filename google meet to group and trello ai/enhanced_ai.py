@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhanced AI Module for Google Meet to Trello AI
-Provides advanced AI capabilities with multiple model support and improved analysis
+Enhanced AI Module for Google Meet to Trello AI - GPT-5 Powered
+Provides advanced AI capabilities with GPT-5 model support and improved analysis
 """
 
 import os
@@ -70,7 +70,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
+                    model="gpt-5",  # GPT-5 for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1000
@@ -128,7 +128,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
+                    model="gpt-5",  # GPT-5 for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1200
@@ -191,7 +191,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
+                    model="gpt-5",  # GPT-5 for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1000
@@ -250,16 +250,15 @@ class EnhancedAI:
         For each card that is mentioned, discussed, or relevant to the conversation, provide:
         1. Match confidence (0-100%)
         2. Specific context where it was mentioned
-        3. Detailed comment with ACTUAL QUOTES from the meeting discussion
+        3. CONCISE comment (max 5 lines) with the most important info only
         4. Match type (direct_mention, topic_relevance, action_item)
         
-        IMPORTANT: Your suggested comments MUST include:
-        - Direct quotes from the meeting (who said what)
-        - Specific action items mentioned
-        - Any deadlines or commitments made
-        - Progress updates given
-        - Issues or blockers discussed
-        - Team members assigned or mentioned
+        CRITICAL: Keep comments SHORT and ACTIONABLE:
+        - ONE key quote maximum
+        - ONE main action item
+        - ONE assignee if mentioned
+        - ONE deadline if mentioned
+        - NO fluff, NO unnecessary formatting
         
         Meeting Transcript:
         {transcript}
@@ -273,7 +272,7 @@ class EnhancedAI:
             "card_name": "card_name_here", 
             "match_confidence": 85,
             "context": "specific quote or context from transcript",
-            "suggested_comment": "📅 Meeting Update - [Date]\\n\\n**Discussion Summary:**\\n[Brief summary of what was discussed]\\n\\n**Direct Quotes:**\\n• Speaker: '[Exact quote from meeting]'\\n• Speaker: '[Another relevant quote]'\\n\\n**Action Items:**\\n• [Specific action item with assignee]\\n• [Another action if applicable]\\n\\n**Progress/Status:**\\n• [Current status mentioned]\\n• [Any blockers or challenges]\\n\\n**Next Steps:**\\n• [What needs to happen next]\\n• [Deadlines mentioned]\\n\\n---\\n*Auto-generated from meeting transcript*",
+            "suggested_comment": "📋 [Brief 1-2 sentence summary of discussion]\\n\\n🎯 Action: [Specific action needed]\\n👤 Assigned: [Person if mentioned]\\n⏰ Due: [Deadline if mentioned]\\n\\n💬 Key quote: '[Most relevant quote]'",
             "match_type": "direct_mention",
             "reasoning": "why this card is relevant"
         }}]
@@ -283,7 +282,7 @@ class EnhancedAI:
         
         try:
             response = self.openai_client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-5",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=2000
@@ -387,7 +386,7 @@ class EnhancedAI:
         try:
             if self.openai_client:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo",  # GPT-4 Turbo for best results
+                    model="gpt-5",  # GPT-5 for best results
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                     max_tokens=1500

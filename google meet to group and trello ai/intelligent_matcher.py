@@ -200,7 +200,7 @@ async def intelligent_card_matching(transcript_text: str, trello_client, openai_
     
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-5",
             messages=[
                 {"role": "system", "content": "You are an expert at matching meeting discussions to specific Trello cards based on context and meaning, not just keywords."},
                 {"role": "user", "content": extraction_prompt}

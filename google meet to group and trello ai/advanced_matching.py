@@ -113,7 +113,7 @@ def find_trello_cards_in_transcript_advanced(transcript_text):
             try:
                 # Use GPT-4 Turbo for better understanding
                 ai_response = openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",  # Better model as requested
+                    model="gpt-5",  # GPT-5 for best results
                     messages=[
                         {"role": "system", "content": "You are an expert at understanding Trello board reviews in meetings. You understand that discussions follow board structure (left-to-right lists, top-to-bottom cards)."},
                         {"role": "user", "content": ai_extraction_prompt}

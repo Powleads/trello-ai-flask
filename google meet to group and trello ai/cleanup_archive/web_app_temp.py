@@ -22,8 +22,6 @@ from dotenv import load_dotenv
 import requests
 from custom_trello import CustomTrelloClient
 from message_tracker import MessageTracker
-from gmail_tracker import GmailTracker, GmailScheduler, initialize_gmail_tracker
-from google_meet_analytics import google_meet_analytics
 
 # Import AI modules
 try:
@@ -121,13 +119,8 @@ def mark_card_resolved(card_id, assigned_user):
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
-# Register blueprints
-app.register_blueprint(google_meet_analytics)
-
-# Initialize message tracker and Gmail tracker
+# Initialize message tracker
 message_tracker = MessageTracker("message_tracker.db")
-gmail_tracker = initialize_gmail_tracker()
-gmail_scheduler = None
 
 # Enhanced Security Authentication System
 from functools import wraps
@@ -308,7 +301,7 @@ def index():
 @app.route('/google-meet')
 @login_required
 def google_meet_app():
-    return render_template('google_meet_analytics.html')
+    return render_template('google_meet_app.html')
 
 @app.route('/team-tracker')
 @login_required
@@ -317,249 +310,6 @@ def team_tracker_app():
                          cards=app_data['cards_needing_updates'],
                          team_members=TEAM_MEMBERS,
                          settings=app_data['settings'])
-
-@app.route('/gmail-tracker')
-@login_required
-def gmail_tracker_app():
-    return render_template('gmail_tracker.html')
-
-# ===== AUTOMATED SCHEDULER =====
-
-import threading
-import time
-from datetime import datetime, timedelta
-
-def reset_reminder_count(card_id, assigned_user):
-    """Reset reminder count when user comments on card."""
-    tracking_data = load_reminder_tracking()
-    key = f"{card_id}_{assigned_user}"
-    
-    if key in tracking_data:
-        tracking_data[key]['reminder_count'] = 0
-        tracking_data[key]['escalated'] = False
-        tracking_data[key]['status'] = 'active'
-        tracking_data[key]['last_comment_date'] = datetime.now().isoformat()
-        save_reminder_tracking(tracking_data)
-        print(f"Reset reminder count for {assigned_user} on card {card_id}")
-        return tracking_data[key]
-    
-    return None
-
-def automated_daily_scan():
-    """Automated daily scanner that runs in background thread."""
-    while True:
-        try:
-            # Wait for next scan time (check every 6 hours, scan at 9 AM)
-            now = datetime.now()
-            target_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
-            
-            # If it's past 9 AM today, schedule for tomorrow
-            if now.time() > target_time.time():
-                target_time += timedelta(days=1)
-            
-            sleep_seconds = (target_time - now).total_seconds()
-            print(f"[AUTO] Next automated scan scheduled for: {target_time}")
-            time.sleep(sleep_seconds)
-            
-            # Perform automated scan
-            print("[AUTO] AUTOMATED SCAN: Starting daily team tracker scan...")
-            perform_automated_scan()
-            
-        except Exception as e:
-            print(f"Error in automated scanner: {e}")
-            time.sleep(3600)  # Wait 1 hour before retrying
-
-def perform_automated_scan():
-    """Perform the actual automated scan and send reminders."""
-    try:
-        # Scan for overdue cards
-        scan_result = scan_trello_cards_for_updates()
-        if not scan_result.get('success'):
-            print(f"Automated scan failed: {scan_result.get('error')}")
-            return
-        
-        overdue_cards = scan_result.get('cards_needing_updates', [])
-        if not overdue_cards:
-            print("[AUTO] No overdue cards found in automated scan.")
-            return
-        
-        print(f"[AUTO] Found {len(overdue_cards)} overdue cards in automated scan.")
-        
-        # Group cards by user
-        user_cards = {}
-        for card in overdue_cards:
-            assigned_user = card.get('assigned_user')
-            assigned_whatsapp = card.get('assigned_whatsapp')
-            
-            if not assigned_user or not assigned_whatsapp:
-                continue
-            
-            if assigned_user not in user_cards:
-                user_cards[assigned_user] = []
-            user_cards[assigned_user].append(card)
-        
-        # Send reminders and check for escalations
-        group_escalations = []
-        
-        for assigned_user, cards in user_cards.items():
-            # Check if any cards need escalation
-            escalated_cards = []
-            regular_cards = []
-            
-            for card in cards:
-                reminder_status = get_reminder_status(card['id'], assigned_user)
-                if reminder_status['escalated'] or reminder_status['reminder_count'] >= 3:
-                    escalated_cards.append(card)
-                    group_escalations.append({
-                        'card_name': card['name'],
-                        'assigned_user': assigned_user,
-                        'reminder_count': reminder_status['reminder_count'],
-                        'card_url': card['url'],
-                        'hours_since_update': card.get('hours_since_assigned_update', 0)
-                    })
-                else:
-                    regular_cards.append(card)
-            
-            # Send regular reminders for non-escalated cards
-            if regular_cards:
-                send_automated_reminder(assigned_user, regular_cards)
-        
-        # Send group escalation if needed
-        if group_escalations:
-            send_group_escalation(group_escalations)
-        
-    except Exception as e:
-        print(f"Error in automated scan: {e}")
-
-def send_automated_reminder(assigned_user, cards):
-    """Send automated reminder to user."""
-    try:
-        whatsapp_number = TEAM_MEMBERS.get(assigned_user)
-        if not whatsapp_number:
-            print(f"[AUTO] No WhatsApp number for {assigned_user}")
-            return
-        
-        # Create message
-        message = f"""🤖 AUTOMATED REMINDER: Hey {assigned_user}, these cards need updates (over 24 hours). Please comment with your progress or these will escalate to the main group after 3 reminders.
-
-📋 Cards requiring updates ({len(cards)}):
-
-"""
-        
-        for i, card in enumerate(cards, 1):
-            hours = card.get('hours_since_assigned_update', 0)
-            reminder_status = get_reminder_status(card['id'], assigned_user)
-            reminder_count = reminder_status['reminder_count']
-            
-            if hours > 72:
-                urgency_icon = "🔴"
-            elif hours > 48:
-                urgency_icon = "🟡"
-            else:
-                urgency_icon = "🟢"
-            
-            days = int(hours / 24)
-            reminder_text = f" (Reminder #{reminder_count + 1})" if reminder_count > 0 else ""
-            
-            message += f"{urgency_icon} {i}. *{card['name']}*{reminder_text}\n"
-            message += f"   ⏰ {days} days without update\n"
-            message += f"   🔗 {card['url']}\n\n"
-        
-        message += "Please update these cards with your current progress. Thanks! 🚀\n\n- JGV EEsystems Auto-Tracker"
-        
-        # Send via Green API
-        green_api_instance = os.environ.get('GREEN_API_INSTANCE')
-        green_api_token = os.environ.get('GREEN_API_TOKEN')
-        
-        if not green_api_instance or not green_api_token:
-            print("[AUTO] Green API credentials not configured for automated reminders")
-            return
-        
-        green_api_url = f"https://api.green-api.com/waInstance{green_api_instance}/sendMessage/{green_api_token}"
-        
-        payload = {
-            "chatId": whatsapp_number,
-            "message": message
-        }
-        
-        response = requests.post(green_api_url, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            # Increment reminder count for each card
-            for card in cards:
-                reminder_data = increment_reminder_count(card['id'], assigned_user)
-                print(f"[AUTO] Incremented reminder count for {assigned_user} on card {card['name']}: {reminder_data['reminder_count']}")
-            
-            print(f"[AUTO] Sent reminder to {assigned_user} for {len(cards)} cards")
-        else:
-            print(f"[AUTO] Failed to send reminder to {assigned_user}: {response.status_code}")
-        
-    except Exception as e:
-        print(f"Error sending automated reminder to {assigned_user}: {e}")
-
-def send_group_escalation(escalated_cards):
-    """Send escalation message to group chat."""
-    try:
-        group_chat_id = os.environ.get('WHATSAPP_GROUP_CHAT_ID', '120363401025025313@g.us')
-        
-        escalation_message = """🚨 AUTOMATED ESCALATION: Cards Requiring Immediate Attention 🚨
-
-The following team members have not responded to 3+ reminders about their assigned cards:
-
-"""
-        
-        # Group by user
-        escalated_by_user = {}
-        for card in escalated_cards:
-            user = card['assigned_user']
-            if user not in escalated_by_user:
-                escalated_by_user[user] = []
-            escalated_by_user[user].append(card)
-        
-        for user, user_cards in escalated_by_user.items():
-            escalation_message += f"\n👤 *{user}* ({len(user_cards)} cards):\n"
-            for card in user_cards:
-                days = int(card['hours_since_update'] / 24)
-                escalation_message += f"   🔴 {card['card_name']} ({days} days, {card['reminder_count']} reminders)\n"
-                escalation_message += f"       🔗 {card['card_url']}\n"
-        
-        escalation_message += "\n⚠️ Please follow up with these team members immediately or reassign these cards.\n\n- JGV EEsystems Auto-Tracker"
-        
-        # Send to group
-        green_api_instance = os.environ.get('GREEN_API_INSTANCE')
-        green_api_token = os.environ.get('GREEN_API_TOKEN')
-        
-        if not green_api_instance or not green_api_token:
-            print("[AUTO] Green API credentials not configured for group escalation")
-            return
-        
-        green_api_url = f"https://api.green-api.com/waInstance{green_api_instance}/sendMessage/{green_api_token}"
-        
-        payload = {
-            "chatId": group_chat_id,
-            "message": escalation_message
-        }
-        
-        response = requests.post(green_api_url, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            print(f"[AUTO] Sent group escalation for {len(escalated_cards)} cards")
-        else:
-            print(f"[AUTO] Failed to send group escalation: {response.status_code}")
-        
-    except Exception as e:
-        print(f"Error sending group escalation: {e}")
-
-# Start automated scanner in background thread
-auto_scanner_thread = None
-
-def start_automated_scanner():
-    """Start the automated scanner thread."""
-    global auto_scanner_thread
-    if auto_scanner_thread is None or not auto_scanner_thread.is_alive():
-        auto_scanner_thread = threading.Thread(target=automated_daily_scan, daemon=True)
-        auto_scanner_thread.start()
-        print("[AUTO] Automated daily scanner started")
 
 # ===== UTILITY FUNCTIONS =====
 
@@ -1670,42 +1420,137 @@ def generate_participant_feedback(speaker_data, transcript):
         return {}
 
 def create_comprehensive_summary(transcript, doc_content=None, assignments=None):
-    """Create concise meeting summary with key points only."""
+    """Create detailed meeting summary with all context, prioritizing Notes tab content."""
     try:
-        today = datetime.now().strftime('%d/%m/%Y')
-        
         # Check if we have Notes tab content - prioritize this for group summary
         if doc_content and doc_content.get('notes_tab_content'):
             notes_content = doc_content['notes_tab_content'].strip()
-            if notes_content and len(notes_content) > 10:
+            if notes_content:
                 print("Using Notes tab content for group summary")
+                # Use Notes tab content as the primary summary
+                today = datetime.now().strftime('%d/%m/%Y')
                 
-                # Truncate long notes content
-                max_notes_length = 250
-                if len(notes_content) > max_notes_length:
-                    notes_content = notes_content[:max_notes_length] + "..."
+                summary_parts = [
+                    f"🎯 Meeting Summary - {today}",
+                    "",
+                    "📝 Meeting Notes:",
+                    notes_content,
+                    "",
+                    "📱 Generated from Team Meeting Notes",
+                    "All team members have been updated on their respective action items."
+                ]
                 
-                return f"""🎯 Meeting Summary - {today}
-
-{notes_content}
-
-✅ Team members updated on action items"""
+                return "\n".join(summary_parts)
         
-        # Fallback to simple auto-generated summary
-        return f"""🎯 Meeting Summary - {today}
-
-📋 Key topics discussed and action items assigned
-👥 Team members updated on their tasks
-
-✅ Trello cards updated with meeting notes"""
+        # Fallback to auto-generated summary if no Notes tab content
+        analysis = analyze_meeting_transcript(transcript, doc_content)
+        speaker_metrics = calculate_speaker_metrics(transcript)
+        
+        # Build comprehensive summary
+        summary_parts = []
+        
+        # Header with date
+        today = datetime.now().strftime('%d/%m/%Y')
+        summary_parts.append(f"🎯 Meeting Summary - {today}")
+        summary_parts.append("")
+        
+        # Attendees with participation stats
+        if speaker_metrics:
+            summary_parts.append("👥 Attendees:")
+            sorted_speakers = sorted(speaker_metrics.items(), key=lambda x: x[1]['participation_percentage'], reverse=True)
+            for speaker, metrics in sorted_speakers:
+                participation = metrics['participation_percentage']
+                engagement = metrics['engagement_score']
+                summary_parts.append(f"  • {speaker} ({participation}% participation, {engagement}/100 engagement)")
+            summary_parts.append("")
+        
+        # Meeting purpose and context
+        if analysis.get('meeting_purpose'):
+            summary_parts.append(f"🎯 Purpose: {analysis['meeting_purpose']}")
+            summary_parts.append("")
+        
+        # Key discussions
+        if analysis.get('key_discussions'):
+            summary_parts.append("📋 Key Discussion Points:")
+            for i, discussion in enumerate(analysis['key_discussions'][:5], 1):
+                # Truncate long discussions
+                display_discussion = discussion[:100] + "..." if len(discussion) > 100 else discussion
+                summary_parts.append(f"  {i}. {display_discussion}")
+            summary_parts.append("")
+        
+        # Decisions made
+        if analysis.get('decisions_made') or (doc_content and doc_content.get('decisions')):
+            summary_parts.append("✅ Decisions & Outcomes:")
+            
+            # From transcript
+            for decision in analysis.get('decisions_made', [])[:3]:
+                summary_parts.append(f"  • {decision}")
+            
+            # From Google Doc
+            if doc_content:
+                for decision in doc_content.get('decisions', [])[:2]:
+                    summary_parts.append(f"  • {decision}")
+            
+            if not analysis.get('decisions_made') and not (doc_content and doc_content.get('decisions')):
+                summary_parts.append("  • No specific decisions recorded")
+            
+            summary_parts.append("")
+        
+        # Assignments
+        if assignments and any(assignments.values()):
+            summary_parts.append("👤 Task Assignments:")
+            assigned_count = 0
+            for card_name, assignment_data in assignments.items():
+                if assignment_data and assignment_data.get('assigned_user'):
+                    summary_parts.append(f"  • {assignment_data['assigned_user']}: {card_name}")
+                    assigned_count += 1
+            
+            if assigned_count == 0:
+                summary_parts.append("  • No specific task assignments identified")
+            summary_parts.append("")
+        
+        # Platform and notes link
+        summary_parts.append("📝 Platform: Google Meet Transcript Analysis")
+        
+        if doc_content:
+            summary_parts.append("📄 Meeting Notes: [Google Doc with additional context]")
+        
+        summary_parts.append("")
+        
+        # Action items and follow-ups
+        follow_ups = []
+        if analysis.get('action_items'):
+            follow_ups.extend(analysis['action_items'][:3])
+        if analysis.get('follow_ups'):
+            follow_ups.extend(analysis['follow_ups'][:3])
+        if doc_content and doc_content.get('action_items'):
+            follow_ups.extend(doc_content['action_items'][:3])
+        
+        if follow_ups:
+            summary_parts.append("🔄 Next Steps & Follow-ups:")
+            for item in follow_ups[:5]:
+                summary_parts.append(f"  • {item}")
+            summary_parts.append("")
+        
+        # Footer
+        summary_parts.append("All team members have been updated on their respective action items. Please check your assigned Trello cards for detailed comments and next steps.")
+        
+        return "\n".join(summary_parts)
         
     except Exception as e:
-        print(f"Error creating summary: {e}")
+        print(f"Error creating comprehensive summary: {e}")
+        # Fallback to basic summary
         today = datetime.now().strftime('%d/%m/%Y')
-        return f"""🎯 Meeting Summary - {today}
-
-📋 Meeting completed successfully
-✅ Team members notified of updates"""
+        participants = extract_participants_fast(transcript)
+        
+        basic_summary = f"🎯 Meeting Summary - {today}\n\n"
+        basic_summary += f"👥 Attendees: {', '.join(participants) if participants else 'Team members'}\n"
+        basic_summary += "📋 Tasks Updated: Meeting analysis completed\n"
+        basic_summary += "📝 Platform: Google Meet Transcript Analysis\n\n"
+        basic_summary += "Key Outcomes:\n• Meeting transcript processed and analyzed\n• Task assignments updated in Trello\n\n"
+        basic_summary += "All team members have been updated on their respective action items. Please check your assigned Trello cards for detailed comments and next steps."
+        
+        return basic_summary
 
 def generate_meeting_comment(transcript_text, card_name, match_context="", card_id=None, doc_content=None, meeting_analysis=None):
     """Generate enhanced structured comment for Trello card using meeting structure parsing."""
@@ -3532,130 +3377,6 @@ def get_card_message_status():
         print(f"Error in card message status: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/check-card-comments', methods=['POST'])
-@login_required
-def check_card_comments():
-    """Check for new comments on cards and reset reminder counts."""
-    try:
-        data = request.json or {}
-        card_id = data.get('card_id')
-        
-        if not card_id:
-            return jsonify({'success': False, 'error': 'Card ID required'})
-        
-        # Get card comments from Trello API
-        api_key = os.environ.get('TRELLO_API_KEY')
-        token = os.environ.get('TRELLO_TOKEN')
-        
-        if not api_key or not token:
-            return jsonify({'success': False, 'error': 'Trello API credentials not configured'})
-        
-        # Get card actions (comments)
-        url = f"https://api.trello.com/1/cards/{card_id}/actions"
-        params = {
-            'key': api_key,
-            'token': token,
-            'filter': 'commentCard',
-            'limit': 50
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        if response.status_code != 200:
-            return jsonify({'success': False, 'error': f'Trello API error: {response.status_code}'})
-        
-        comments = response.json()
-        
-        # Check for recent comments (within last 24 hours)
-        now = datetime.now()
-        recent_comments = []
-        
-        for comment in comments:
-            comment_date = datetime.fromisoformat(comment['date'].replace('Z', '+00:00'))
-            hours_since_comment = (now - comment_date.replace(tzinfo=None)).total_seconds() / 3600
-            
-            if hours_since_comment <= 24:  # Comment within last 24 hours
-                member_id = comment['memberCreator']['id']
-                recent_comments.append({
-                    'member_id': member_id,
-                    'member_name': comment['memberCreator']['fullName'],
-                    'comment_text': comment['data']['text'],
-                    'comment_date': comment['date']
-                })
-        
-        # Reset reminder counts for users who commented recently
-        resets_performed = []
-        if recent_comments:
-            for comment in recent_comments:
-                member_name = comment['member_name']
-                # Try to match with team members
-                for team_member in TEAM_MEMBERS.keys():
-                    if team_member.lower() in member_name.lower() or member_name.lower() in team_member.lower():
-                        reset_result = reset_reminder_count(card_id, team_member)
-                        if reset_result:
-                            resets_performed.append({
-                                'team_member': team_member,
-                                'comment_by': member_name,
-                                'comment_date': comment['comment_date']
-                            })
-                        break
-        
-        return jsonify({
-            'success': True,
-            'recent_comments': len(recent_comments),
-            'resets_performed': resets_performed
-        })
-        
-    except Exception as e:
-        print(f"Error checking card comments: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/manual-scan', methods=['POST'])
-@login_required
-def manual_scan():
-    """Manually trigger automated scan for testing."""
-    try:
-        print("[MANUAL] Starting manual team tracker scan...")
-        perform_automated_scan()
-        return jsonify({'success': True, 'message': 'Manual scan completed'})
-    except Exception as e:
-        print(f"Error in manual scan: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/gmail-scan', methods=['POST'])
-@login_required  
-def manual_gmail_scan():
-    """Manually trigger Gmail scan for testing."""
-    try:
-        if not gmail_tracker or not gmail_tracker.gmail_service:
-            return jsonify({'success': False, 'error': 'Gmail tracker not configured'})
-        
-        print("[MANUAL] Starting manual Gmail scan...")
-        gmail_tracker.run_automated_scan()
-        return jsonify({'success': True, 'message': 'Gmail scan completed'})
-    except Exception as e:
-        print(f"Error in manual Gmail scan: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/gmail-history', methods=['GET'])
-@login_required
-def get_gmail_history():
-    """Get Gmail processing history."""
-    try:
-        if not gmail_tracker:
-            return jsonify({'success': False, 'error': 'Gmail tracker not available'})
-        
-        limit = request.args.get('limit', 50, type=int)
-        history = gmail_tracker.get_email_history(limit=limit)
-        
-        return jsonify({
-            'success': True,
-            'emails': history,
-            'total': len(history)
-        })
-    except Exception as e:
-        print(f"Error getting Gmail history: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
 @app.route('/api/send-tracked-updates', methods=['POST'])
 @login_required
 def send_tracked_updates():
@@ -3809,15 +3530,6 @@ if __name__ == '__main__':
     print(f"AI modules available: SpeakerAnalyzer={SpeakerAnalyzer is not None}")
     print("Features: Google Docs reading, Trello card matching, and automatic commenting")
     print(f"Registered routes: {[rule.rule for rule in app.url_map.iter_rules()]}")
-    
-    # Start automated scanner
-    start_automated_scanner()
-    
-    # Start Gmail scheduler if available
-    global gmail_scheduler
-    if gmail_tracker and gmail_tracker.gmail_service:
-        gmail_scheduler = GmailScheduler(gmail_tracker)
-        gmail_scheduler.start_scheduler()
     
     # Use Render's PORT environment variable or default to 5000
     port = int(os.environ.get('PORT', 5000))

@@ -1,0 +1,1373 @@
+{% extends "base.html" %}
+
+{% block title %}Team Update Tracker - JGV EEsystems AI Hub{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Team Update Tracker</h1>
+            <p class="text-gray-600">Monitor team progress and send automated update reminders</p>
+        </div>
+        <div class="flex space-x-3">
+            <button id="scan-cards-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center">
+                <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>
+                Scan Cards
+            </button>
+            <button id="settings-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center">
+                <i data-lucide="settings" class="w-4 h-4 mr-2"></i>
+                Settings
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="alert-circle" class="w-5 h-5 text-red-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Cards Needing Updates</p>
+                    <p class="text-2xl font-bold text-gray-900" id="cards-needing-updates-count">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="message-circle" class="w-5 h-5 text-blue-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Messages Sent Today</p>
+                    <p class="text-2xl font-bold text-gray-900" id="messages-sent-count">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Response Rate</p>
+                    <p class="text-2xl font-bold text-gray-900" id="response-rate">0%</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i data-lucide="users" class="w-5 h-5 text-purple-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-600">Active Team Members</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ team_members|length }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards Needing Updates -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i data-lucide="clipboard-list" class="w-5 h-5 mr-2"></i>
+                    Cards Needing Updates
+                </h2>
+                <div class="flex space-x-3">
+                    <button id="select-all-btn" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        Select All
+                    </button>
+                    <button id="preview-updates-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed mr-2" disabled>
+                        <i data-lucide="eye" class="w-4 h-4 mr-2"></i>
+                        Preview Messages
+                    </button>
+                    <button id="send-updates-btn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed" disabled style="display: none;">
+                        <i data-lucide="send" class="w-4 h-4 mr-2"></i>
+                        Send Updates
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <div id="cards-list" class="space-y-4">
+                <div class="text-center text-gray-500 py-8">
+                    <i data-lucide="search" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    <p>Click "Scan Cards" to find cards needing updates</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Team Members -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-200">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i data-lucide="users" class="w-5 h-5 mr-2"></i>
+                    Team Members
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    {% for name, phone in team_members.items() %}
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <span class="text-sm font-medium text-blue-600">{{ name[0] }}</span>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">{{ name }}</p>
+                                <p class="text-sm text-gray-500">{{ phone }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-gray-900" id="assigned-count-{{ name }}">0 assigned</p>
+                            <p class="text-xs text-gray-500" id="response-rate-{{ name }}">0% response</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-200">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i data-lucide="activity" class="w-5 h-5 mr-2"></i>
+                    Recent Activity
+                </h2>
+            </div>
+            <div class="p-6">
+                <div id="recent-activity" class="space-y-4">
+                    <div class="text-center text-gray-500 py-8">
+                        <i data-lucide="clock" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                        <p>No recent activity</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Charts -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i data-lucide="bar-chart" class="w-5 h-5 mr-2"></i>
+                Analytics Dashboard
+            </h2>
+        </div>
+        <div class="p-6">
+            <div id="analytics-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Card Completion Trends -->
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                <i data-lucide="trending-up" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">Task Distribution</h3>
+                                <p class="text-sm text-gray-600">Current workload breakdown</p>
+                            </div>
+                        </div>
+                        <div id="task-distribution" class="space-y-3">
+                            <div class="text-center text-gray-500 py-4">
+                                <i data-lucide="loader-2" class="w-6 h-6 mx-auto mb-2 animate-spin"></i>
+                                <p class="text-sm">Loading analytics...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Team Performance -->
+                    <div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-lg p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                                <i data-lucide="users" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">Team Activity</h3>
+                                <p class="text-sm text-gray-600">Last 7 days performance</p>
+                            </div>
+                        </div>
+                        <div id="team-performance" class="space-y-3">
+                            <div class="text-center text-gray-500 py-4">
+                                <i data-lucide="loader-2" class="w-6 h-6 mx-auto mb-2 animate-spin"></i>
+                                <p class="text-sm">Loading analytics...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional Analytics Row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                    <!-- Card Status Overview -->
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-100 rounded-lg p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                                <i data-lucide="pie-chart" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">Card Status</h3>
+                                <p class="text-sm text-gray-600">Update frequency</p>
+                            </div>
+                        </div>
+                        <div id="card-status-overview" class="space-y-2">
+                            <div class="text-center text-gray-500 py-2">
+                                <i data-lucide="loader-2" class="w-4 h-4 mx-auto mb-1 animate-spin"></i>
+                                <p class="text-xs">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Weekly Trends -->
+                    <div class="bg-gradient-to-br from-orange-50 to-red-100 rounded-lg p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                                <i data-lucide="calendar" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">Weekly Trends</h3>
+                                <p class="text-sm text-gray-600">Activity patterns</p>
+                            </div>
+                        </div>
+                        <div id="weekly-trends" class="space-y-2">
+                            <div class="text-center text-gray-500 py-2">
+                                <i data-lucide="loader-2" class="w-4 h-4 mx-auto mb-1 animate-spin"></i>
+                                <p class="text-xs">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Response Rates -->
+                    <div class="bg-gradient-to-br from-teal-50 to-cyan-100 rounded-lg p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
+                                <i data-lucide="message-circle" class="w-5 h-5 text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-900">Response Rate</h3>
+                                <p class="text-sm text-gray-600">Update compliance</p>
+                            </div>
+                        </div>
+                        <div id="response-rates" class="space-y-2">
+                            <div class="text-center text-gray-500 py-2">
+                                <i data-lucide="loader-2" class="w-4 h-4 mx-auto mb-1 animate-spin"></i>
+                                <p class="text-xs">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-900">Settings</h3>
+                <button id="close-settings" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="p-6 space-y-6">
+            <!-- Auto Schedule -->
+            <div>
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" id="auto-schedule" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm font-medium text-gray-900">Enable Auto Schedule</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1">Automatically scan and send updates on weekdays</p>
+            </div>
+            
+            <!-- Schedule Time -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Time</label>
+                <input type="time" id="schedule-time" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500" value="09:00">
+            </div>
+            
+            <!-- Schedule Days -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Schedule Days</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="schedule-day rounded border-gray-300 text-blue-600" value="monday" checked>
+                        <span class="text-sm">Monday</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="schedule-day rounded border-gray-300 text-blue-600" value="tuesday" checked>
+                        <span class="text-sm">Tuesday</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="schedule-day rounded border-gray-300 text-blue-600" value="wednesday" checked>
+                        <span class="text-sm">Wednesday</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="schedule-day rounded border-gray-300 text-blue-600" value="thursday" checked>
+                        <span class="text-sm">Thursday</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" class="schedule-day rounded border-gray-300 text-blue-600" value="friday" checked>
+                        <span class="text-sm">Friday</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="cancel-settings" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                Cancel
+            </button>
+            <button id="save-settings" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                Save Settings
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Message Preview Modal -->
+<div id="preview-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-900">Preview Messages Before Sending</h3>
+                <button id="close-preview" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <p class="text-sm text-gray-600 mt-1">Review the messages that will be sent to each team member</p>
+        </div>
+        
+        <div class="overflow-y-auto max-h-[60vh]">
+            <div id="message-previews" class="p-6 space-y-6">
+                <!-- Message previews will be inserted here -->
+            </div>
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 flex justify-between items-center">
+            <div class="text-sm text-gray-600">
+                <span id="message-count">0</span> messages will be sent to <span id="recipient-count">0</span> team members
+            </div>
+            <div class="flex space-x-3">
+                <button id="cancel-preview" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    Cancel
+                </button>
+                <button id="confirm-send" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center">
+                    <i data-lucide="send" class="w-4 h-4 mr-2"></i>
+                    Send All Messages
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let selectedCards = new Set();
+    let cardsData = [];
+
+    // DOM Elements
+    const scanCardsBtn = document.getElementById('scan-cards-btn');
+    const sendUpdatesBtn = document.getElementById('send-updates-btn');
+    const previewUpdatesBtn = document.getElementById('preview-updates-btn');
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettings = document.getElementById('close-settings');
+    const cancelSettings = document.getElementById('cancel-settings');
+    const saveSettings = document.getElementById('save-settings');
+    const previewModal = document.getElementById('preview-modal');
+    const closePreview = document.getElementById('close-preview');
+    const cancelPreview = document.getElementById('cancel-preview');
+    const confirmSend = document.getElementById('confirm-send');
+
+    // Event Listeners
+    scanCardsBtn.addEventListener('click', scanCards);
+    sendUpdatesBtn.addEventListener('click', sendUpdates);
+    previewUpdatesBtn.addEventListener('click', previewUpdates);
+    selectAllBtn.addEventListener('click', selectAllCards);
+    settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+    closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+    cancelSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+    saveSettings.addEventListener('click', saveSettingsData);
+    closePreview.addEventListener('click', () => previewModal.classList.add('hidden'));
+    cancelPreview.addEventListener('click', () => previewModal.classList.add('hidden'));
+    confirmSend.addEventListener('click', confirmSendUpdates);
+
+    async function scanCards() {
+        const originalText = scanCardsBtn.innerHTML;
+        showLoading(scanCardsBtn);
+        
+        try {
+            console.log('Starting card scan...');
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+            
+            const response = await fetch('/api/scan-cards', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Scan response:', data);
+            
+            if (data.success) {
+                cardsData = data.cards || [];
+                console.log(`Processing ${cardsData.length} cards`);
+                
+                renderCards();
+                updateStats();
+                loadRecentActivity(); // Load recent activity when cards are loaded
+                loadAnalytics(); // Load analytics data
+                showNotification(`Found ${data.cards_found || cardsData.length} cards needing updates`, 'success');
+            } else {
+                console.error('Scan failed:', data.error);
+                showNotification(data.error || 'Failed to scan cards', 'error');
+                // Show empty state even on error
+                renderCards();
+                updateStats();
+            }
+        } catch (error) {
+            console.error('Scan error:', error);
+            if (error.name === 'AbortError') {
+                showNotification('Scan timed out. Please try again.', 'error');
+            } else {
+                showNotification('Error scanning cards: ' + error.message, 'error');
+            }
+            // Show empty state on error
+            cardsData = [];
+            renderCards();
+            updateStats();
+        } finally {
+            hideLoading(scanCardsBtn, originalText);
+        }
+    }
+
+    function renderCards() {
+        const cardsList = document.getElementById('cards-list');
+        
+        if (cardsData.length === 0) {
+            cardsList.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i data-lucide="check-circle" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
+                    <p>No cards need updates right now!</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        cardsList.innerHTML = cardsData.map(card => `
+            <div class="card-item border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-start space-x-3">
+                    <input type="checkbox" class="card-checkbox mt-1 rounded border-gray-300 text-blue-600" 
+                           data-card-id="${card.id}" onchange="toggleCardSelection('${card.id}')">
+                    
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-sm font-medium text-gray-900 truncate">${card.name}</h3>
+                            <span class="text-xs text-gray-500">${card.board_name}</span>
+                        </div>
+                        
+                        <div class="flex items-center space-x-4 text-xs text-gray-600 mb-2">
+                            <span class="flex items-center">
+                                <i data-lucide="user" class="w-3 h-3 mr-1"></i>
+                                ${card.assigned_members.join(', ') || 'Unassigned'}
+                            </span>
+                            <span class="flex items-center">
+                                <i data-lucide="clock" class="w-3 h-3 mr-1"></i>
+                                ${card.days_since_comment} days ago
+                            </span>
+                        </div>
+                        
+                        <a href="${card.url}" target="_blank" 
+                           class="text-blue-600 hover:text-blue-800 text-xs flex items-center">
+                            <i data-lucide="external-link" class="w-3 h-3 mr-1"></i>
+                            Open in Trello
+                        </a>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            card.days_since_comment > 3 ? 'bg-red-100 text-red-800' : 
+                            card.days_since_comment > 1 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-green-100 text-green-800'
+                        }">
+                            ${card.days_since_comment > 3 ? 'Urgent' : 
+                              card.days_since_comment > 1 ? 'Overdue' : 'Recent'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        lucide.createIcons();
+    }
+
+    function toggleCardSelection(cardId) {
+        if (selectedCards.has(cardId)) {
+            selectedCards.delete(cardId);
+        } else {
+            selectedCards.add(cardId);
+        }
+        
+        updateSendButton();
+    }
+
+    function selectAllCards() {
+        const checkboxes = document.querySelectorAll('.card-checkbox');
+        const allSelected = selectedCards.size === cardsData.length;
+        
+        if (allSelected) {
+            selectedCards.clear();
+            checkboxes.forEach(cb => cb.checked = false);
+            selectAllBtn.textContent = 'Select All';
+        } else {
+            cardsData.forEach(card => selectedCards.add(card.id));
+            checkboxes.forEach(cb => cb.checked = true);
+            selectAllBtn.textContent = 'Deselect All';
+        }
+        
+        updateSendButton();
+    }
+
+    function updateSendButton() {
+        const hasSelection = selectedCards.size > 0;
+        previewUpdatesBtn.disabled = !hasSelection;
+        sendUpdatesBtn.disabled = !hasSelection;
+    }
+
+    async function previewUpdates() {
+        if (selectedCards.size === 0) {
+            showNotification('Please select cards first', 'error');
+            return;
+        }
+        
+        const originalText = previewUpdatesBtn.innerHTML;
+        showLoading(previewUpdatesBtn);
+        
+        try {
+            console.log('Generating message previews for cards:', Array.from(selectedCards));
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            
+            const response = await fetch('/api/preview-updates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    selected_cards: Array.from(selectedCards)
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Preview response:', data);
+            
+            if (data.success) {
+                if (data.previews && data.previews.length > 0) {
+                    displayMessagePreviews(data.previews);
+                    previewModal.classList.remove('hidden');
+                } else {
+                    showNotification('No messages to preview - no valid team members found for selected cards', 'info');
+                }
+            } else {
+                showNotification(data.error || 'Failed to generate message previews', 'error');
+            }
+        } catch (error) {
+            console.error('Preview error:', error);
+            if (error.name === 'AbortError') {
+                showNotification('Preview timed out. Please try again.', 'error');
+            } else {
+                showNotification('Error generating previews: ' + error.message, 'error');
+            }
+        } finally {
+            hideLoading(previewUpdatesBtn, originalText);
+        }
+    }
+
+    function displayMessagePreviews(messages) {
+        const container = document.getElementById('message-previews');
+        document.getElementById('message-count').textContent = messages.length;
+        document.getElementById('recipient-count').textContent = messages.length;
+        
+        container.innerHTML = messages.map(msg => `
+            <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span class="text-sm font-medium text-blue-600">${msg.assigned_user[0]}</span>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-900">${msg.assigned_user}</h4>
+                            <p class="text-sm text-gray-500">${msg.assigned_whatsapp}</p>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        ${msg.card_count} task${msg.card_count !== 1 ? 's' : ''}
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <div class="flex items-center mb-2">
+                        <i data-lucide="message-circle" class="w-4 h-4 text-green-600 mr-2"></i>
+                        <span class="text-sm font-medium text-gray-700">WhatsApp Message Preview</span>
+                    </div>
+                    <div class="text-sm text-gray-800 whitespace-pre-line font-mono bg-white border rounded p-3">
+${msg.message}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        lucide.createIcons();
+    }
+
+    async function confirmSendUpdates() {
+        const originalText = confirmSend.innerHTML;
+        showLoading(confirmSend);
+        
+        try {
+            const response = await fetch('/api/send-updates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    selected_cards: Array.from(selectedCards)
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification(`Successfully sent ${data.messages_sent} update messages`, 'success');
+                previewModal.classList.add('hidden');
+                selectedCards.clear();
+                document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = false);
+                updateSendButton();
+                updateStats();
+            } else {
+                showNotification(data.error || 'Failed to send updates', 'error');
+            }
+        } catch (error) {
+            showNotification('Error sending updates: ' + error.message, 'error');
+        } finally {
+            hideLoading(confirmSend, originalText);
+        }
+    }
+
+    async function sendUpdates() {
+        if (selectedCards.size === 0) return;
+        
+        const originalText = sendUpdatesBtn.innerHTML;
+        showLoading(sendUpdatesBtn);
+        
+        try {
+            const response = await fetch('/api/send-updates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    selected_cards: Array.from(selectedCards)
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification(`Sent ${data.messages_sent} update messages`, 'success');
+                selectedCards.clear();
+                document.querySelectorAll('.card-checkbox').forEach(cb => cb.checked = false);
+                updateSendButton();
+                updateStats();
+            } else {
+                showNotification(data.error || 'Failed to send updates', 'error');
+            }
+        } catch (error) {
+            showNotification('Error sending updates: ' + error.message, 'error');
+        } finally {
+            hideLoading(sendUpdatesBtn, originalText);
+        }
+    }
+
+    async function saveSettingsData() {
+        const settings = {
+            auto_schedule: document.getElementById('auto-schedule').checked,
+            schedule_time: document.getElementById('schedule-time').value,
+            schedule_days: Array.from(document.querySelectorAll('.schedule-day:checked')).map(cb => cb.value)
+        };
+        
+        try {
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settings)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification('Settings saved successfully', 'success');
+                settingsModal.classList.add('hidden');
+            } else {
+                showNotification(data.error || 'Failed to save settings', 'error');
+            }
+        } catch (error) {
+            showNotification('Error saving settings: ' + error.message, 'error');
+        }
+    }
+
+    function updateStats() {
+        document.getElementById('cards-needing-updates-count').textContent = cardsData.length;
+        
+        // Update team member assignment counts
+        const memberCounts = {};
+        cardsData.forEach(card => {
+            if (card.assigned_members && card.assigned_members.length > 0) {
+                card.assigned_members.forEach(member => {
+                    memberCounts[member] = (memberCounts[member] || 0) + 1;
+                });
+            }
+        });
+        
+        // Update the UI for each team member
+        Object.keys(memberCounts).forEach(member => {
+            const countEl = document.getElementById(`assigned-count-${member}`);
+            if (countEl) {
+                countEl.textContent = `${memberCounts[member]} assigned`;
+            }
+        });
+        
+        // Reset counts for members with no assignments
+        const teamMembers = {{ team_members|tojson|safe }};
+        Object.keys(teamMembers).forEach(member => {
+            if (!memberCounts[member]) {
+                const countEl = document.getElementById(`assigned-count-${member}`);
+                if (countEl) {
+                    countEl.textContent = '0 assigned';
+                }
+            }
+        });
+    }
+
+    async function loadRecentActivity() {
+        console.log('Loading recent activity...');
+        const activityContainer = document.getElementById('recent-activity');
+        
+        // Show loading state
+        activityContainer.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <i data-lucide="loader-2" class="w-6 h-6 mx-auto mb-2 animate-spin"></i>
+                <p>Loading recent activity...</p>
+            </div>
+        `;
+        lucide.createIcons();
+        
+        try {
+            const response = await fetch('/api/recent-activity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    days: 3
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Recent activity response:', data);
+            
+            if (data.success && data.activities && data.activities.length > 0) {
+                displayRecentActivity(data.activities);
+            } else {
+                activityContainer.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i data-lucide="calendar" class="w-6 h-6 mx-auto mb-2 opacity-50"></i>
+                        <p>No recent activity found</p>
+                        <p class="text-xs">Past 3 days</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        } catch (error) {
+            console.error('Recent activity error:', error);
+            activityContainer.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i data-lucide="alert-circle" class="w-6 h-6 mx-auto mb-2 opacity-50"></i>
+                    <p>Error loading activity</p>
+                    <p class="text-xs">${error.message}</p>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+    }
+
+    function displayRecentActivity(activities) {
+        const activityContainer = document.getElementById('recent-activity');
+        
+        const activityHtml = activities.map(activity => {
+            const timeAgo = getTimeAgo(activity.date);
+            const iconMap = {
+                'card_moved': 'arrow-right',
+                'comment': 'message-circle',
+                'card_created': 'plus-circle',
+                'member_added': 'user-plus',
+                'member_removed': 'user-minus',
+                'due_date_set': 'calendar',
+                'attachment_added': 'paperclip',
+                'checklist_item': 'check-square',
+                'card_archived': 'archive',
+                'default': 'activity'
+            };
+            
+            const icon = iconMap[activity.type] || iconMap['default'];
+            const colorMap = {
+                'card_moved': 'text-blue-600',
+                'comment': 'text-green-600',
+                'card_created': 'text-purple-600',
+                'member_added': 'text-indigo-600',
+                'member_removed': 'text-red-600',
+                'due_date_set': 'text-orange-600',
+                'attachment_added': 'text-gray-600',
+                'checklist_item': 'text-teal-600',
+                'card_archived': 'text-gray-500',
+                'default': 'text-gray-600'
+            };
+            
+            const color = colorMap[activity.type] || colorMap['default'];
+            
+            return `
+                <div class="flex items-start space-x-3 py-3 border-b border-gray-100 last:border-0">
+                    <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="${icon}" class="w-4 h-4 ${color}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-900 font-medium">${activity.description}</p>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <span class="text-xs text-gray-500">${activity.member || 'System'}</span>
+                            <span class="text-xs text-gray-400">•</span>
+                            <span class="text-xs text-gray-500">${timeAgo}</span>
+                        </div>
+                        ${activity.card_name ? `<a href="${activity.card_url || '#'}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 mt-1 block">${activity.card_name}</a>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        activityContainer.innerHTML = activityHtml;
+        lucide.createIcons();
+    }
+
+    function getTimeAgo(dateString) {
+        const now = new Date();
+        const activityDate = new Date(dateString);
+        const diffMs = now - activityDate;
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffDays > 0) {
+            return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+        } else if (diffHours > 0) {
+            return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        } else {
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            return diffMinutes > 0 ? `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago` : 'Just now';
+        }
+    }
+
+    function loadAnalytics() {
+        console.log('Loading analytics data...');
+        
+        // Generate analytics from current data
+        generateTaskDistribution();
+        generateTeamPerformance();
+        generateCardStatusOverview();
+        generateWeeklyTrends();
+        generateResponseRates();
+    }
+
+    function generateTaskDistribution() {
+        const container = document.getElementById('task-distribution');
+        
+        // Count tasks per team member
+        const memberCounts = {};
+        cardsData.forEach(card => {
+            if (card.assigned_members && card.assigned_members.length > 0) {
+                card.assigned_members.forEach(member => {
+                    memberCounts[member] = (memberCounts[member] || 0) + 1;
+                });
+            }
+        });
+
+        const totalTasks = Object.values(memberCounts).reduce((sum, count) => sum + count, 0);
+        
+        if (totalTasks === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 py-4">
+                    <i data-lucide="inbox" class="w-6 h-6 mx-auto mb-2"></i>
+                    <p class="text-sm">No active tasks found</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        const html = Object.entries(memberCounts)
+            .sort(([,a], [,b]) => b - a)
+            .map(([member, count]) => {
+                const percentage = Math.round((count / totalTasks) * 100);
+                return `
+                    <div class="flex items-center justify-between py-2">
+                        <span class="text-sm font-medium text-gray-700">${member}</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-20 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-600">${count}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+        container.innerHTML = html;
+    }
+
+    function generateTeamPerformance() {
+        const container = document.getElementById('team-performance');
+        
+        // Calculate performance metrics
+        const teamMembers = {{ team_members|tojson|safe }};
+        const memberStats = Object.keys(teamMembers).map(member => {
+            const assignedCount = cardsData.filter(card => 
+                card.assigned_members && card.assigned_members.includes(member)
+            ).length;
+            
+            const urgentCount = cardsData.filter(card => 
+                card.assigned_members && card.assigned_members.includes(member) && 
+                card.days_since_comment > 3
+            ).length;
+            
+            return {
+                member,
+                assigned: assignedCount,
+                urgent: urgentCount,
+                performance: assignedCount > 0 ? Math.round(((assignedCount - urgentCount) / assignedCount) * 100) : 100
+            };
+        }).filter(stat => stat.assigned > 0);
+
+        if (memberStats.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 py-4">
+                    <i data-lucide="users" class="w-6 h-6 mx-auto mb-2"></i>
+                    <p class="text-sm">No team activity data</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        const html = memberStats.map(stat => `
+            <div class="flex items-center justify-between py-2">
+                <div class="flex items-center space-x-2">
+                    <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                        <span class="text-xs font-medium text-green-600">${stat.member[0]}</span>
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">${stat.member}</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs px-2 py-1 rounded-full ${
+                        stat.performance >= 80 ? 'bg-green-100 text-green-800' :
+                        stat.performance >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                    }">${stat.performance}%</span>
+                    <span class="text-sm text-gray-600">${stat.assigned} tasks</span>
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = html;
+    }
+
+    function generateCardStatusOverview() {
+        const container = document.getElementById('card-status-overview');
+        
+        // Categorize cards by urgency
+        const urgent = cardsData.filter(card => card.days_since_comment > 3).length;
+        const overdue = cardsData.filter(card => card.days_since_comment > 1 && card.days_since_comment <= 3).length;
+        const recent = cardsData.filter(card => card.days_since_comment <= 1).length;
+        
+        const total = cardsData.length;
+        
+        if (total === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 py-2">
+                    <i data-lucide="check-circle" class="w-4 h-4 mx-auto mb-1"></i>
+                    <p class="text-xs">All caught up!</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-red-600">Urgent (3+ days)</span>
+                    <span class="text-xs font-medium">${urgent}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-yellow-600">Overdue (1-3 days)</span>
+                    <span class="text-xs font-medium">${overdue}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-green-600">Recent (< 1 day)</span>
+                    <span class="text-xs font-medium">${recent}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    function generateWeeklyTrends() {
+        const container = document.getElementById('weekly-trends');
+        
+        // Mock weekly trend data
+        const today = new Date();
+        const weekData = [];
+        
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            
+            // Simulate daily activity (in real implementation, this would come from actual data)
+            const dayActivity = Math.floor(Math.random() * 10) + 1;
+            weekData.push({
+                day: date.toLocaleDateString('en', { weekday: 'short' }),
+                activity: dayActivity
+            });
+        }
+
+        const maxActivity = Math.max(...weekData.map(d => d.activity));
+        
+        container.innerHTML = `
+            <div class="space-y-1">
+                ${weekData.map(day => `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-600 w-8">${day.day}</span>
+                        <div class="flex-1 mx-2">
+                            <div class="w-full bg-gray-200 rounded h-1">
+                                <div class="bg-orange-500 h-1 rounded" style="width: ${(day.activity / maxActivity) * 100}%"></div>
+                            </div>
+                        </div>
+                        <span class="text-xs text-gray-600 w-6">${day.activity}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function generateResponseRates() {
+        const container = document.getElementById('response-rates');
+        
+        // Calculate response rate based on card urgency
+        const total = cardsData.length;
+        const responded = cardsData.filter(card => card.days_since_comment <= 1).length;
+        const responseRate = total > 0 ? Math.round((responded / total) * 100) : 100;
+        
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="text-2xl font-bold text-teal-600 mb-1">${responseRate}%</div>
+                <div class="text-xs text-gray-600 mb-2">Average Response Rate</div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-teal-500 h-2 rounded-full" style="width: ${responseRate}%"></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">${responded}/${total} cards updated recently</div>
+            </div>
+        `;
+    }
+
+    // Auto-scanning functionality
+    function showAutoScanSplash() {
+        const splashOverlay = document.createElement('div');
+        splashOverlay.id = 'auto-scan-splash';
+        splashOverlay.className = 'fixed inset-0 bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 z-50 flex items-center justify-center';
+        splashOverlay.innerHTML = `
+            <div class="text-center text-white max-w-md mx-4">
+                <div class="relative mb-8">
+                    <div class="w-24 h-24 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm border border-white/30">
+                        <i data-lucide="scan-line" class="w-12 h-12 text-white"></i>
+                    </div>
+                    <div class="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <i data-lucide="check" class="w-4 h-4 text-white"></i>
+                    </div>
+                </div>
+                
+                <h2 class="text-3xl font-bold mb-3">Team Tracker AI</h2>
+                <p class="text-blue-200 mb-8">Automatically scanning your Trello boards for task updates and team progress</p>
+                
+                <div class="space-y-4 mb-8">
+                    <div class="auto-scan-step active" data-step="1">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                            <span class="text-sm font-medium">Connecting to EEInteractive board</span>
+                            <div class="ml-auto">
+                                <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-400"></i>
+                            </div>
+                        </div>
+                        <div class="h-1 bg-white/20 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-blue-500 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="auto-scan-step" data-step="2">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-white/30 text-white/60 rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                            <span class="text-sm text-white/60">Scanning cards in DOING - IN PROGRESS</span>
+                        </div>
+                        <div class="h-1 bg-white/20 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-green-500 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="auto-scan-step" data-step="3">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-white/30 text-white/60 rounded-full flex items-center justify-center text-xs font-bold">3</div>
+                            <span class="text-sm text-white/60">Analyzing team assignments</span>
+                        </div>
+                        <div class="h-1 bg-white/20 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-purple-500 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="auto-scan-step" data-step="4">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-6 h-6 bg-white/30 text-white/60 rounded-full flex items-center justify-center text-xs font-bold">4</div>
+                            <span class="text-sm text-white/60">Checking for update requirements</span>
+                        </div>
+                        <div class="h-1 bg-white/20 rounded-full overflow-hidden ml-9">
+                            <div class="h-full bg-indigo-500 rounded-full transition-all duration-1000" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="auto-scan-status" class="text-center">
+                    <p class="text-sm text-blue-200">Establishing connection to Trello API...</p>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <button id="skip-scan-btn" class="text-xs text-blue-300 hover:text-white transition-colors opacity-50 hover:opacity-100">
+                        Skip Auto-Scan
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(splashOverlay);
+        lucide.createIcons();
+        
+        // Add skip button functionality
+        document.getElementById('skip-scan-btn').addEventListener('click', () => {
+            console.log('User skipped auto-scan');
+            hideAutoScanSplash();
+            scanCards();
+        });
+        
+        // Emergency timeout fallback (15 seconds)
+        setTimeout(() => {
+            const splash = document.getElementById('auto-scan-splash');
+            if (splash) {
+                console.log('Auto-scan timeout, forcing completion');
+                hideAutoScanSplash();
+                scanCards();
+            }
+        }, 15000);
+        
+        // Start auto-scan simulation
+        simulateAutoScan();
+    }
+    
+    async function simulateAutoScan() {
+        console.log('Starting auto-scan simulation...');
+        
+        const steps = [
+            { step: 1, duration: 800, message: "Connecting to EEInteractive board" },
+            { step: 2, duration: 1000, message: "Scanning cards in DOING - IN PROGRESS" },
+            { step: 3, duration: 800, message: "Analyzing team assignments" },
+            { step: 4, duration: 600, message: "Checking for update requirements" }
+        ];
+        
+        const statusEl = document.getElementById('auto-scan-status');
+        
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+            const stepElement = document.querySelector(`.auto-scan-step[data-step="${step.step}"]`);
+            const progressBar = stepElement.querySelector('.h-full');
+            const spinner = stepElement.querySelector('.ml-auto');
+            
+            console.log(`Processing step ${step.step}...`);
+            
+            // Activate current step
+            stepElement.classList.add('active');
+            stepElement.querySelector('.w-6').className = 'w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold';
+            stepElement.querySelector('span').className = 'text-sm text-white font-medium';
+            
+            // Update status message
+            statusEl.innerHTML = `<p class="text-sm text-blue-200">${step.message}...</p>`;
+            
+            // Show spinner
+            if (spinner) {
+                spinner.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin text-blue-400"></i>';
+                lucide.createIcons();
+            }
+            
+            // Animate progress bar
+            if (progressBar) {
+                progressBar.style.width = '0%';
+                setTimeout(() => {
+                    progressBar.style.width = '100%';
+                }, 100);
+            }
+            
+            // Wait for step completion
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+            
+            // Mark step as complete
+            if (spinner) {
+                spinner.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-green-400"></i>';
+            }
+            stepElement.querySelector('.w-6').className = 'w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold';
+            lucide.createIcons();
+            
+            console.log(`Step ${step.step} completed`);
+        }
+        
+        // Final status
+        statusEl.innerHTML = '<p class="text-sm text-blue-200">Scan complete - loading results!</p>';
+        
+        // Wait a moment then close splash and scan
+        setTimeout(async () => {
+            console.log('Auto-scan complete, hiding splash...');
+            hideAutoScanSplash();
+            await scanCards();
+        }, 1000);
+    }
+    
+    function hideAutoScanSplash() {
+        console.log('Hiding auto-scan splash...');
+        const splash = document.getElementById('auto-scan-splash');
+        if (splash) {
+            splash.style.transition = 'opacity 0.5s ease-out';
+            splash.style.opacity = '0';
+            setTimeout(() => {
+                splash.remove();
+                console.log('Auto-scan splash removed');
+            }, 500);
+        }
+    }
+
+    // Utility Functions
+    function showLoading(button) {
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i>Loading...';
+        button.disabled = true;
+        lucide.createIcons();
+        return originalText;
+    }
+
+    function hideLoading(button, originalText) {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        lucide.createIcons();
+    }
+
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
+        
+        if (type === 'success') {
+            notification.classList.add('bg-green-500', 'text-white');
+        } else if (type === 'error') {
+            notification.classList.add('bg-red-500', 'text-white');
+        } else {
+            notification.classList.add('bg-blue-500', 'text-white');
+        }
+        
+        notification.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-circle' : 'info'}" class="w-5 h-5"></i>
+                <span class="text-sm font-medium">${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        lucide.createIcons();
+        
+        // Animate in
+        setTimeout(() => {
+            notification.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            notification.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }, 5000);
+    }
+
+    // Load initial data and show splash
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('Team Tracker App: JavaScript loaded successfully');
+        updateStats();
+        // Show auto-scan splash on page load
+        setTimeout(() => {
+            showAutoScanSplash();
+        }, 500);
+    });
+</script>
+{% endblock %}
