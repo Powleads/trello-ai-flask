@@ -151,6 +151,9 @@ htmlcov/
 google_credentials.json
 drive_token.pickle
 
+# Gmail API tokens (contains OAuth secrets)
+gmail_token.json
+
 # Temporary files
 tmp/
 temp/
