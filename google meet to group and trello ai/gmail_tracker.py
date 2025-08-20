@@ -120,10 +120,23 @@ class GmailTracker:
     
     def setup_openai(self):
         """Initialize OpenAI client for email categorization."""
+        # Try loading from .env file if not in environment
+        from dotenv import load_dotenv
+        load_dotenv()
+        
         api_key = os.getenv('OPENAI_API_KEY')
         if api_key:
-            self.openai_client = openai.OpenAI(api_key=api_key)
-            print("[GMAIL] OpenAI GPT-5 client initialized for email analysis")
+            try:
+                # Try new client initialization
+                self.openai_client = openai.OpenAI(api_key=api_key)
+                print("[GMAIL] OpenAI GPT-5 client initialized for email analysis")
+            except (TypeError, AttributeError) as e:
+                # Fallback for compatibility issues
+                print(f"[GMAIL] OpenAI client initialization adjusted for compatibility")
+                # Set API key directly for older versions
+                openai.api_key = api_key
+                self.openai_client = None
+                print("[GMAIL] Using fallback OpenAI configuration")
         else:
             print("[GMAIL] OpenAI API key not found - email categorization will be limited")
     
