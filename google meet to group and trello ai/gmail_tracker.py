@@ -615,7 +615,10 @@ def initialize_gmail_tracker():
         
         # Set up Gmail API if credentials exist
         if os.path.exists('credentials.json'):
-            gmail_tracker_instance.setup_gmail_api()
+            try:
+                gmail_tracker_instance.setup_gmail_api()
+            except Exception as e:
+                print(f"[GMAIL] Setup skipped: {e}")
         else:
             print("[GMAIL] Gmail credentials not found - manual setup required")
     

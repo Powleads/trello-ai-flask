@@ -3813,8 +3813,7 @@ if __name__ == '__main__':
     # Start automated scanner
     start_automated_scanner()
     
-    # Start Gmail scheduler if available
-    global gmail_scheduler
+    # Start Gmail scheduler if available  
     if gmail_tracker and gmail_tracker.gmail_service:
         gmail_scheduler = GmailScheduler(gmail_tracker)
         gmail_scheduler.start_scheduler()

@@ -2,6 +2,43 @@
 
 {% block title %}Dashboard - JGV EEsystems AI Hub{% endblock %}
 
+{% block extra_head %}
+<style>
+.tab-button {
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.tab-button:not(.active) {
+    color: #6b7280;
+}
+
+.tab-button:not(.active):hover {
+    color: #374151;
+    background-color: #f9fafb;
+    border-color: #e5e7eb;
+}
+
+.tab-button.active {
+    background-color: #eff6ff;
+    color: #2563eb;
+    border-color: #3b82f6;
+    font-weight: 600;
+}
+
+.tab-content iframe {
+    border: none;
+    background: white;
+}
+
+/* Custom iframe styling */
+iframe {
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-8">
     <!-- Hero Section -->
@@ -26,8 +63,34 @@
         </div>
     </div>
 
-    <!-- App Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Navigation Tabs -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+        <div class="flex flex-wrap gap-2 border-b border-gray-200">
+            <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-button active px-4 py-2 font-medium text-sm rounded-lg transition-colors">
+                🏠 Dashboard
+            </button>
+            <button onclick="showTab('google-meet')" id="tab-google-meet" class="tab-button px-4 py-2 font-medium text-sm rounded-lg transition-colors">
+                🎥 Google Meet Analytics
+            </button>
+            <button onclick="showTab('team-tracker')" id="tab-team-tracker" class="tab-button px-4 py-2 font-medium text-sm rounded-lg transition-colors">
+                👥 Team Tracker
+            </button>
+            <button onclick="showTab('gmail-tracker')" id="tab-gmail-tracker" class="tab-button px-4 py-2 font-medium text-sm rounded-lg transition-colors">
+                📧 Gmail Tracker
+            </button>
+            <button onclick="showTab('onboarding')" id="tab-onboarding" class="tab-button px-4 py-2 font-medium text-sm rounded-lg transition-colors opacity-50">
+                📊 Onboarding (Coming Soon)
+            </button>
+            <button onclick="showTab('facebook-ads')" id="tab-facebook-ads" class="tab-button px-4 py-2 font-medium text-sm rounded-lg transition-colors opacity-50">
+                📱 Facebook Ads (Coming Soon)
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="content-dashboard" class="tab-content">
+        <!-- Dashboard Content -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Google Meet App -->
         <div class="card-hover bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
             <div class="p-6">
@@ -175,9 +238,8 @@
                 </button>
             </div>
         </div>
-    </div>
-
-    <!-- Quick Stats -->
+        
+        <!-- Quick Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
             <div class="flex items-center space-x-3">
@@ -245,6 +307,56 @@
             </div>
         </div>
     </div>
+    </div>
+
+    <!-- Google Meet Analytics Tab -->
+    <div id="content-google-meet" class="tab-content hidden">
+        <iframe src="/google-meet" class="w-full h-screen rounded-lg border-0"></iframe>
+    </div>
+
+    <!-- Team Tracker Tab -->
+    <div id="content-team-tracker" class="tab-content hidden">
+        <iframe src="/team-tracker" class="w-full h-screen rounded-lg border-0"></iframe>
+    </div>
+
+    <!-- Gmail Tracker Tab -->
+    <div id="content-gmail-tracker" class="tab-content hidden">
+        <iframe src="/gmail-tracker" class="w-full h-screen rounded-lg border-0"></iframe>
+    </div>
+
+    <!-- Onboarding Tab (Coming Soon) -->
+    <div id="content-onboarding" class="tab-content hidden">
+        <div class="bg-white rounded-xl shadow-lg p-12 text-center">
+            <div class="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="construction" class="w-12 h-12 text-blue-600"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-4">Onboarding Analysis Tool</h3>
+            <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                Google Sheets integration with pipeline tracking and Facebook automation triggers.
+            </p>
+            <div class="bg-blue-50 rounded-lg p-4 mb-6">
+                <p class="text-sm text-blue-700 font-medium">🚧 Sprint 3 - In Development</p>
+                <p class="text-xs text-blue-600 mt-1">Expected completion: Next week</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facebook Ads Tab (Coming Soon) -->
+    <div id="content-facebook-ads" class="tab-content hidden">
+        <div class="bg-white rounded-xl shadow-lg p-12 text-center">
+            <div class="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="construction" class="w-12 h-12 text-purple-600"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-4">Facebook Ad Automation</h3>
+            <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                3-phase ad cloning system with location targeting and HTML template management.
+            </p>
+            <div class="bg-purple-50 rounded-lg p-4 mb-6">
+                <p class="text-sm text-purple-700 font-medium">🚧 Sprint 4-6 - Planned</p>
+                <p class="text-xs text-purple-600 mt-1">Expected completion: 3-4 weeks</p>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -298,9 +410,47 @@
         `).join('');
     }
     
+    // Tab switching functionality
+    function showTab(tabName) {
+        // Hide all tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        
+        // Remove active class from all tab buttons
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('active');
+            button.classList.add('text-gray-600', 'hover:text-gray-900');
+            button.classList.remove('bg-blue-50', 'text-blue-600');
+        });
+        
+        // Show selected tab content
+        const contentElement = document.getElementById('content-' + tabName);
+        if (contentElement) {
+            contentElement.classList.remove('hidden');
+        }
+        
+        // Activate selected tab button
+        const tabButton = document.getElementById('tab-' + tabName);
+        if (tabButton) {
+            tabButton.classList.add('active', 'bg-blue-50', 'text-blue-600');
+            tabButton.classList.remove('text-gray-600', 'hover:text-gray-900');
+        }
+        
+        // Save current tab to localStorage
+        localStorage.setItem('activeTab', tabName);
+    }
+    
+    // Load saved tab on page load
+    function loadSavedTab() {
+        const savedTab = localStorage.getItem('activeTab') || 'dashboard';
+        showTab(savedTab);
+    }
+
     // Initialize dashboard
     document.addEventListener('DOMContentLoaded', () => {
         loadDashboardStats();
+        loadSavedTab();
         loadRecentActivity();
     });
 </script>
