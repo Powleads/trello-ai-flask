@@ -3650,11 +3650,18 @@ def manual_gmail_scan():
             return jsonify({'success': False, 'error': 'Gmail tracker not initialized'})
             
         if not gmail_tracker.gmail_service:
-            return jsonify({
-                'success': False, 
-                'error': 'Gmail not authenticated. Please visit /auth/gmail to authenticate.',
-                'auth_required': True
-            })
+            # Try to refresh Gmail service from production OAuth
+            print("[MANUAL] Gmail service not found, attempting to refresh from OAuth...")
+            gmail_tracker.setup_production_gmail_service()
+            
+            if not gmail_tracker.gmail_service:
+                return jsonify({
+                    'success': False, 
+                    'error': 'Gmail not authenticated. Please visit /auth/gmail to authenticate.',
+                    'auth_required': True
+                })
+            else:
+                print("[MANUAL] Gmail service refreshed successfully!")
         
         # Check if watch rules exist in database
         watch_rules_data = production_db.get_watch_rules()
