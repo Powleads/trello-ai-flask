@@ -385,6 +385,10 @@ function scanCards(forceRefresh = false) {
 
 function forceRefreshCards() {
     if (confirm('⚠️ This will clear all existing card data and rescan from Trello. Continue?')) {
+        // Clear the current cards display immediately
+        currentCards = [];
+        populateCardsTable([]);
+        showNotification('Clearing data and rescanning...', 'info');
         scanCards(true);
     }
 }
