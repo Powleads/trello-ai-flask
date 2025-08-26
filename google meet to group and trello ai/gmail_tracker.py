@@ -129,7 +129,7 @@ class GmailTracker:
             try:
                 # Try new client initialization
                 self.openai_client = openai.OpenAI(api_key=api_key)
-                print("[GMAIL] OpenAI GPT-5 client initialized for email analysis")
+                print("[GMAIL] OpenAI GPT-4o client initialized for email analysis")
             except (TypeError, AttributeError) as e:
                 # Fallback for compatibility issues
                 print(f"[GMAIL] OpenAI client initialization adjusted for compatibility")
@@ -193,33 +193,36 @@ class GmailTracker:
             return False
     
     def categorize_email_with_ai(self, subject: str, content: str, sender: str) -> Dict[str, Any]:
-        """Use GPT-5 to categorize and analyze email importance."""
+        """Use GPT-4o to categorize and analyze email importance."""
         if not self.openai_client:
             return self.categorize_email_basic(subject, content, sender)
         
         prompt = f"""
-        Analyze this email and provide categorization:
+        Analyze this New Tech Onboarding email and provide categorization:
 
         FROM: {sender}
         SUBJECT: {subject}
         CONTENT: {content[:1000]}...
 
-        Please analyze and return a JSON response with:
-        1. category: one of (onboarding, ghl_support, tech_issues, client_communication, system_alerts, other)
-        2. priority: 1-5 (5 = urgent, 1 = low)
-        3. keywords: list of important keywords found
-        4. suggested_assignee: which team member should handle this
-        5. summary: brief 1-sentence summary
-        6. action_required: boolean if immediate action needed
+        This is a "New Tech Onboarding" email. Please analyze and return a JSON response with:
+        1. category: "onboarding" (fixed)
+        2. priority: 1-5 (5 = urgent, 3-4 = normal onboarding, 1-2 = low)
+        3. keywords: list of important onboarding-related keywords found
+        4. suggested_assignee: "James Taylor" (handles all onboarding)
+        5. summary: brief 1-sentence summary focused on the onboarding need
+        6. action_required: true (all onboarding emails need action)
 
-        Team members: James Taylor (general/urgent), Ezechiel (technical/GHL), Breyden (design), Dustin Salinas (operations)
+        Focus on identifying:
+        - What type of onboarding this is (new client, tech setup, etc.)
+        - Any urgency indicators
+        - Specific requirements mentioned
 
         Response must be valid JSON only.
         """
         
         try:
             response = self.openai_client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
                 max_tokens=500
@@ -229,62 +232,62 @@ class GmailTracker:
             return result
             
         except Exception as e:
-            print(f"AI categorization failed: {e}")
+            print(f"[GMAIL] AI categorization failed: {e}")
             return self.categorize_email_basic(subject, content, sender)
     
     def categorize_email_basic(self, subject: str, content: str, sender: str) -> Dict[str, Any]:
-        """Basic email categorization without AI."""
+        """Simplified email categorization focused on onboarding."""
         text = f"{subject} {content}".lower()
         
-        category = "other"
-        priority = 2
+        # Simplified onboarding detection
+        onboarding_keywords = ['new tech onboarding', 'onboarding', 'new client', 'setup', 'welcome', 'getting started']
+        
+        category = "onboarding"  # Default to onboarding since we're filtering for it
+        priority = 3  # Medium-high priority for onboarding
         keywords = []
         
-        for cat, patterns in self.category_patterns.items():
-            for pattern in patterns:
-                if pattern in text:
-                    category = cat
-                    keywords.append(pattern)
-                    if cat in ['tech_issues', 'ghl_support']:
-                        priority = 4
-                    elif cat == 'onboarding':
-                        priority = 3
-                    break
+        # Extract relevant keywords found in the email
+        for keyword in onboarding_keywords:
+            if keyword in text:
+                keywords.append(keyword)
         
-        # Determine assignee based on category
-        assignee_map = {
-            'onboarding': 'James Taylor',
-            'ghl_support': 'Ezechiel', 
-            'tech_issues': 'Ezechiel',
-            'client_communication': 'James Taylor',
-            'system_alerts': 'Ezechiel'
-        }
+        # Check for urgency indicators
+        urgency_keywords = ['urgent', 'asap', 'immediate', 'critical', 'emergency']
+        for urgent_word in urgency_keywords:
+            if urgent_word in text:
+                priority = 4
+                keywords.append(urgent_word)
+                break
         
         return {
             'category': category,
             'priority': priority,
             'keywords': keywords,
-            'suggested_assignee': assignee_map.get(category, 'James Taylor'),
-            'summary': f"Email from {sender} about {category}",
-            'action_required': priority >= 4
+            'suggested_assignee': 'James Taylor',  # Default onboarding handler
+            'summary': f"New Tech Onboarding email from {sender}",
+            'action_required': priority >= 3  # All onboarding emails need action
         }
     
-    def scan_recent_emails(self, hours_back: int = 12) -> List[Dict]:
-        """Scan recent emails for processing."""
+    def scan_recent_emails(self, hours_back: int = 24, subject_filter: str = "New Tech Onboarding") -> List[Dict]:
+        """Scan recent emails for processing - simplified to focus on specific subject."""
         if not self.gmail_service:
             print("[GMAIL] Gmail service not initialized")
             return []
         
         try:
-            # Calculate time range
+            # Calculate time range (last 24 hours by default)
             since = datetime.now(timezone.utc) - timedelta(hours=hours_back)
-            query = f'to:admin@justgoingviral.com after:{since.strftime("%Y/%m/%d")}'
+            
+            # Simplified query to focus on "New Tech Onboarding" emails only
+            query = f'subject:"{subject_filter}" after:{since.strftime("%Y/%m/%d")}'
+            
+            print(f"[GMAIL] Scanning for emails with subject containing: '{subject_filter}' in last {hours_back} hours")
             
             # Search for emails
             results = self.gmail_service.users().messages().list(
                 userId='me', 
                 q=query,
-                maxResults=50
+                maxResults=20  # Reduced limit since we're targeting specific emails
             ).execute()
             
             messages = results.get('messages', [])
@@ -464,11 +467,13 @@ Please check your email and respond as needed.
     def send_whatsapp_message(self, phone_number: str, message: str) -> bool:
         """Send WhatsApp message via Green API."""
         try:
-            green_api_instance = os.getenv('GREEN_API_INSTANCE')
+            # Use consistent environment variable names with the rest of the app
+            green_api_instance = os.getenv('GREEN_API_INSTANCE_ID', '7105263120')
             green_api_token = os.getenv('GREEN_API_TOKEN')
             
-            if not green_api_instance or not green_api_token:
-                print("Green API credentials not configured")
+            if not green_api_token:
+                print("[GMAIL] Green API token not configured")
+                print("[GMAIL] Please set GREEN_API_TOKEN in your .env file")
                 return False
             
             url = f"https://api.green-api.com/waInstance{green_api_instance}/sendMessage/{green_api_token}"
@@ -481,61 +486,103 @@ Please check your email and respond as needed.
             response = requests.post(url, json=payload, timeout=30)
             
             if response.status_code == 200:
-                print(f"WhatsApp sent to {phone_number}")
+                print(f"[GMAIL] ✅ WhatsApp notification sent to {phone_number}")
+                # Update database to mark as sent
+                self.mark_whatsapp_sent(phone_number, True)
                 return True
             else:
-                print(f"WhatsApp send failed: {response.status_code}")
+                print(f"[GMAIL] ❌ WhatsApp send failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
-            print(f"Error sending WhatsApp: {e}")
+            print(f"[GMAIL] Error sending WhatsApp: {e}")
             return False
     
+    def mark_whatsapp_sent(self, phone_number: str, sent: bool):
+        """Mark WhatsApp notification as sent in database."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE email_history 
+                SET whatsapp_sent = ? 
+                WHERE assigned_to IN (
+                    SELECT team_member FROM team_member_rules 
+                    WHERE team_member IN (
+                        SELECT key FROM (
+                            SELECT 'James Taylor' as key, '19056064550@c.us' as value
+                            UNION SELECT 'Breyden', '12894434373@c.us'
+                            UNION SELECT 'Ezechiel', '12894434373@c.us'
+                            UNION SELECT 'Dustin Salinas', '19054251997@c.us'
+                        ) WHERE value = ?
+                    )
+                )
+                AND processed_at >= datetime('now', '-1 hour')
+            ''', (sent, phone_number))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[GMAIL] Error updating WhatsApp status: {e}")
+    
     def run_automated_scan(self):
-        """Run automated email scanning."""
-        print("[GMAIL] Starting automated Gmail scan...")
+        """Run automated scan for 'New Tech Onboarding' emails in last 24 hours."""
+        print("[GMAIL] Starting automated scan for 'New Tech Onboarding' emails...")
         
         try:
-            # Scan recent emails
-            emails = self.scan_recent_emails(hours_back=12)
+            # Scan for "New Tech Onboarding" emails in last 24 hours
+            emails = self.scan_recent_emails(hours_back=24, subject_filter="New Tech Onboarding")
             
             if not emails:
-                print("[GMAIL] No new emails found")
+                print("[GMAIL] No 'New Tech Onboarding' emails found in last 24 hours")
                 return
             
             processed_count = 0
             notifications_sent = 0
             
+            print(f"[GMAIL] Processing {len(emails)} New Tech Onboarding emails...")
+            
             for email_data in emails:
                 result = self.process_email(email_data)
                 if result['success']:
                     processed_count += 1
-                    if result.get('assigned_to'):
-                        notifications_sent += 1
+                    notifications_sent += 1  # All onboarding emails trigger notifications
             
-            # Send group summary
-            self.send_group_summary(processed_count, notifications_sent)
+            # Send simplified group summary
+            self.send_onboarding_summary(processed_count, notifications_sent)
             
-            print(f"[GMAIL] Processed {processed_count} emails, sent {notifications_sent} notifications")
+            print(f"[GMAIL] Processed {processed_count} onboarding emails, sent {notifications_sent} notifications")
             
         except Exception as e:
-            print(f"Error in automated scan: {e}")
+            print(f"Error in onboarding scan: {e}")
     
-    def send_group_summary(self, processed_count: int, notifications_sent: int):
-        """Send summary to group chat."""
+    def send_onboarding_summary(self, processed_count: int, notifications_sent: int):
+        """Send simplified onboarding summary to group chat."""
         group_chat_id = os.getenv('WHATSAPP_GROUP_CHAT_ID', '120363401025025313@g.us')
         
-        message = f"""📊 EMAIL TRACKER SUMMARY
-        
-📧 Processed: {processed_count} emails
+        if processed_count > 0:
+            message = f"""🎯 NEW TECH ONBOARDING TRACKER
+
+📧 Found: {processed_count} new onboarding email(s)
+👤 Assigned to: James Taylor
 🔔 Notifications sent: {notifications_sent}
-⏰ Scan completed: {datetime.now().strftime('%H:%M %p')}
+⏰ Scan time: {datetime.now().strftime('%H:%M %p')}
 
-Team members have been notified of important emails.
+All onboarding emails have been flagged for immediate attention.
 
-- JGV Email Tracker (Automated)"""
+- JGV Onboarding Tracker (Automated)"""
+        else:
+            message = f"""🎯 NEW TECH ONBOARDING TRACKER
+
+✅ No new onboarding emails in last 24 hours
+⏰ Scan time: {datetime.now().strftime('%H:%M %p')}
+
+- JGV Onboarding Tracker (Automated)"""
         
         self.send_whatsapp_message(group_chat_id, message)
+        
+    def send_group_summary(self, processed_count: int, notifications_sent: int):
+        """Legacy method - redirects to onboarding summary."""
+        self.send_onboarding_summary(processed_count, notifications_sent)
     
     def get_email_history(self, limit: int = 50) -> List[Dict]:
         """Get recent email processing history."""
