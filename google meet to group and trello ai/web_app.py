@@ -205,17 +205,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Team member data
-TEAM_MEMBERS = {
-    'Criselle': '639494048499@c.us',
-    'Lancey': '639264438378@c.us',  # Maps to "Lancey Fem Denise Cruz" on Trello
-    # 'Ezechiel': '23754071907@c.us',  # Removed - no longer on board
-    'Levy': '237659250977@c.us',
-    'Wendy': '237677079267@c.us',
-    'Forka': '237652275097@c.us',
-    'Breyden': '13179979692@c.us',
-    'Brayan': '237676267420@c.us'
-}
+# Team member data - REMOVED, now using database-driven team management
+# All team members are loaded from the database via enhanced_team_tracker
+TEAM_MEMBERS = {}  # Empty - will be populated from database
 
 # Initialize database
 db = DatabaseManager() if DatabaseManager else None
@@ -2994,7 +2986,7 @@ def scan_cards():
                 print(f"SUCCESS: Assigned user found: {assigned_user} -> {assigned_whatsapp}")
             
             # AI-powered analysis to determine if assigned user has provided updates
-            assigned_user_last_update_hours = 999  # Default to very high
+            assigned_user_last_update_hours = None  # Start with None, will be set if found
             needs_update = True  # Default to needs update
             
             if assigned_user:
@@ -3091,7 +3083,7 @@ def scan_cards():
                         else:
                             print(f"  AI: {assigned_user} has NO comments - NEEDS UPDATE")
                             needs_update = True
-                            assigned_user_last_update_hours = 999
+                            # Keep as None if no comments found
                     
                 except Exception as e:
                     print(f"AI ANALYSIS ERROR for {card.name}: {e}")
@@ -3109,8 +3101,8 @@ def scan_cards():
                 'members': [assigned_user] if assigned_user else [],
                 'assigned_members': [assigned_user] if assigned_user else [],
                 'hours_since_activity': round(hours_since_activity, 1),  # General card activity
-                'hours_since_assigned_update': round(assigned_user_last_update_hours, 1),  # Assigned user activity
-                'days_since_comment': round(assigned_user_last_update_hours / 24, 1),  # Based on assigned user
+                'hours_since_assigned_update': round(assigned_user_last_update_hours, 1) if assigned_user_last_update_hours is not None else 999,  # Assigned user activity
+                'days_since_comment': round(assigned_user_last_update_hours / 24, 1) if assigned_user_last_update_hours is not None else 999,  # Based on assigned user
                 'needs_update': needs_update,  # AI-determined
                 'last_activity': card.date_last_activity,
                 'priority': 'high' if assigned_user_last_update_hours > 72 else 'medium' if assigned_user_last_update_hours > 24 else 'normal'

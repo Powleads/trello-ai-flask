@@ -352,7 +352,10 @@ function initializeLucide() {
     }
 }
 
-function scanCards(forceRefresh = false) {
+async function scanCards(forceRefresh = false) {
+    // Save settings first before scanning to ensure they persist
+    await saveSettings();
+    
     const scanBtn = document.getElementById('scanBtn');
     const originalText = scanBtn.innerHTML;
     scanBtn.innerHTML = forceRefresh ? '⚡ Force Refreshing...' : '⏳ Scanning...';
@@ -373,6 +376,8 @@ function scanCards(forceRefresh = false) {
                 console.log('Updated currentCards:', currentCards);
                 populateCardsTable(currentCards);
                 loadStats();
+                // Reload settings after scan to ensure sync
+                loadSettings();
             } else {
                 console.error('Scan failed:', data.error);
                 showNotification('❌ Scan failed: ' + data.error, 'error');
@@ -846,7 +851,70 @@ function addTeamMember() {
     });
 }
 
-function saveSettings() {
+async function loadSettings() {
+    console.log('Loading settings from database...');
+    
+    try {
+        const response = await fetch('/api/team-tracker/settings');
+        const data = await response.json();
+        
+        if (data.success && data.settings) {
+            const settings = data.settings;
+            console.log('Loaded settings:', settings);
+            
+            // Apply escalation intervals
+            if (settings.escalation_intervals) {
+                const [first, second, third, fourth] = settings.escalation_intervals;
+                document.getElementById('firstMessageDelay').value = first || 24;
+                document.getElementById('secondMessageDelay').value = second || 12;
+                document.getElementById('thirdMessageDelay').value = third || 6;
+                document.getElementById('maxMessages').value = fourth || 4;
+            }
+            
+            // Apply other settings
+            if (settings.enable_escalation !== undefined) {
+                document.getElementById('enableEscalation').checked = settings.enable_escalation;
+            }
+            if (settings.enable_group_messages !== undefined) {
+                document.getElementById('enableGroupMessages').checked = settings.enable_group_messages;
+            }
+            if (settings.enable_individual_messages !== undefined) {
+                document.getElementById('enableIndividualMessages').checked = settings.enable_individual_messages;
+            }
+            if (settings.working_hours_start) {
+                document.getElementById('workingHoursStart').value = settings.working_hours_start;
+            }
+            if (settings.working_hours_end) {
+                document.getElementById('workingHoursEnd').value = settings.working_hours_end;
+            }
+            if (settings.working_days && Array.isArray(settings.working_days)) {
+                // Apply working days checkboxes
+                const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                days.forEach(day => {
+                    const checkbox = document.querySelector(`input[name="workingDays"][value="${day}"]`);
+                    if (checkbox) {
+                        checkbox.checked = settings.working_days.includes(day);
+                    }
+                });
+            }
+            
+            console.log('Settings loaded and applied to UI');
+        } else {
+            console.log('No settings found in database, using defaults');
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        // Try to load from localStorage as fallback
+        const localSettings = localStorage.getItem('teamTrackerSettings');
+        if (localSettings) {
+            console.log('Loading settings from localStorage fallback');
+            const settings = JSON.parse(localSettings);
+            // Apply settings as above...
+        }
+    }
+}
+
+async function saveSettings() {
     console.log('Saving settings...');
     
     // Collect escalation settings
@@ -870,27 +938,30 @@ function saveSettings() {
     
     console.log('Settings to save:', settings);
     
-    // Send to API
-    fetch('/api/team-tracker/settings', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ settings: settings })
-    })
-    .then(response => response.json())
-    .then(data => {
+    try {
+        // Send to API and wait for response
+        const response = await fetch('/api/team-tracker/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ settings: settings })
+        });
+        
+        const data = await response.json();
         console.log('Settings save response:', data);
+        
         if (data.success) {
+            // Also save to localStorage as backup
+            localStorage.setItem('teamTrackerSettings', JSON.stringify(settings));
             showNotification('Settings saved successfully!', 'success');
         } else {
             showNotification('Failed to save settings: ' + (data.error || 'Unknown error'), 'error');
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Settings save error:', error);
         showNotification('Error saving settings: ' + error.message, 'error');
-    });
+    }
 }
 
 function getSelectedWorkingDays() {

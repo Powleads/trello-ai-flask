@@ -543,53 +543,62 @@ class EnhancedTeamTracker:
                 check_items = checklist.get('checkItems', [])
                 print(f"[ENHANCED ASSIGNEE] Checklist '{checklist.get('name', 'Unknown')}' has {len(check_items)} items")
                 
-                # Look for assignment-related checklists OR generic "Checklist"/"Checklists"
-                if ('assigned' in checklist_name or 
-                    any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible']) or
-                    checklist_name in ['checklist', 'checklists']):  # Accept generic checklist names
+                # Check ALL checklists for items named "Assigned" or containing team member names
+                print(f"[ENHANCED ASSIGNEE] Examining checklist: {checklist['name']}")
+                
+                for item in check_items:
+                    item_text = item.get('name', '').lower()
+                    item_state = item.get('state', 'incomplete')
+                    print(f"[ENHANCED ASSIGNEE]   - Item: '{item.get('name', '')}' (state: {item_state})")
                     
-                    print(f"[ENHANCED ASSIGNEE] ✓ Found potential assignment checklist: {checklist['name']}")
-                    
-                    for item in check_items:
-                        item_text = item.get('name', '').lower()
-                        item_state = item.get('state', 'incomplete')
-                        print(f"[ENHANCED ASSIGNEE]   - Item: '{item_text}' (state: {item_state})")
+                    # Check if this item is specifically named "Assigned" or contains assignment keywords
+                    is_assignment_item = (
+                        'assigned' in item_text or
+                        item_text.startswith('assigned') or
+                        any(keyword in item_text for keyword in ['assign to', 'responsible', 'owner'])
+                    )
                         
-                        # Check if item contains team member names
-                        for member_id, member_info in member_mapping.items():
-                            team_name = member_info['team_name']
-                            trello_name = member_info['trello_name']
-                            whatsapp = member_info['whatsapp']
+                    # Check if item contains team member names (either in "Assigned" item or any item)
+                    for member_id, member_info in member_mapping.items():
+                        team_name = member_info['team_name']
+                        trello_name = member_info['trello_name']
+                        whatsapp = member_info['whatsapp']
+                        
+                        # Skip admin and criselle
+                        if team_name.lower() in ['admin', 'criselle']:
+                            continue
+                        
+                        # Enhanced name matching
+                        name_variations = [
+                            team_name.lower(),
+                            trello_name.lower(),
+                            team_name.lower().replace('ey', 'y'),
+                            team_name.lower().replace('y', 'ey'),
+                        ]
+                        
+                        # Check if member is mentioned in checklist item
+                        is_mentioned = (
+                            any(variation in item_text for variation in name_variations) or
+                            any(f"@{variation}" in item_text for variation in name_variations)
+                        )
+                        
+                        # Higher confidence if it's in an "Assigned" item
+                        if is_mentioned:
+                            if is_assignment_item:
+                                confidence = 95 if item_state == 'complete' else 85
+                                print(f"[ENHANCED ASSIGNEE] ✓✓ Found {team_name} in ASSIGNMENT item: '{item.get('name', '')}' (confidence: {confidence})")
+                            else:
+                                confidence = 80 if item_state == 'complete' else 70
+                                print(f"[ENHANCED ASSIGNEE] ✓ Found {team_name} in checklist item: '{item.get('name', '')}' (confidence: {confidence})")
                             
-                            # Skip admin and criselle
-                            if team_name.lower() in ['admin', 'criselle']:
-                                continue
-                            
-                            # Enhanced name matching
-                            name_variations = [
-                                team_name.lower(),
-                                trello_name.lower(),
-                                team_name.lower().replace('ey', 'y'),
-                                team_name.lower().replace('y', 'ey'),
-                            ]
-                            
-                            # Check if member is mentioned in checklist item
-                            is_mentioned = (
-                                any(variation in item_text for variation in name_variations) or
-                                any(f"@{variation}" in item_text for variation in name_variations)
-                            )
-                            
-                            if is_mentioned:
-                                confidence = 90 if item_state == 'complete' else 75
-                                print(f"[ENHANCED ASSIGNEE] Found {team_name} in checklist item: '{item_text}' (confidence: {confidence})")
-                                return {
-                                    'name': team_name,
-                                    'whatsapp': whatsapp,
-                                    'source': f"Checklist assignment: {checklist['name']}",
-                                    'confidence': confidence,
-                                    'member_id': member_id,
-                                    'trello_name': trello_name
-                                }
+                            return {
+                                'name': team_name,
+                                'whatsapp': whatsapp,
+                                'source': f"Checklist: {checklist['name']} - {item.get('name', '')[:30]}",
+                                'confidence': confidence,
+                                'member_id': member_id,
+                                'trello_name': trello_name
+                            }
             
             return None
             
@@ -600,7 +609,7 @@ class EnhancedTeamTracker:
             return None
 
     def _check_comment_assignments(self, card_id: str, member_mapping: Dict) -> Optional[Dict]:
-        """Check recent comments for assignment indicators"""
+        """Check recent comments for assignment indicators and last non-admin commenter"""
         try:
             # Get recent comments
             url = f"https://api.trello.com/1/cards/{card_id}/actions"
@@ -617,6 +626,9 @@ class EnhancedTeamTracker:
             
             comments = response.json()
             
+            # Track last non-admin commenter as fallback
+            last_non_admin_commenter = None
+            
             # Look for assignment patterns in recent comments
             for comment in comments:
                 commenter_id = comment.get('memberCreator', {}).get('id', '')
@@ -626,6 +638,25 @@ class EnhancedTeamTracker:
                 # Skip admin comments
                 if 'admin' in commenter_name or 'criselle' in commenter_name:
                     continue
+                
+                # Track last non-admin commenter (most recent comment is first in list)
+                if not last_non_admin_commenter and commenter_id:
+                    # Try to find this commenter in our member mapping
+                    for member_id, member_info in member_mapping.items():
+                        if (member_id == commenter_id or 
+                            member_info['trello_name'].lower() in commenter_name or
+                            member_info['team_name'].lower() in commenter_name):
+                            if member_info['team_name'].lower() not in ['admin', 'criselle']:
+                                last_non_admin_commenter = {
+                                    'name': member_info['team_name'],
+                                    'whatsapp': member_info['whatsapp'],
+                                    'source': f"Last commenter (excluding admin)",
+                                    'confidence': 70,
+                                    'comment_date': comment.get('date', ''),
+                                    'member_id': member_id,
+                                    'trello_name': member_info['trello_name']
+                                }
+                                print(f"[ENHANCED ASSIGNEE] Found last non-admin commenter: {member_info['team_name']}")
                 
                 # Look for assignment patterns
                 for member_id, member_info in member_mapping.items():
@@ -657,6 +688,11 @@ class EnhancedTeamTracker:
                                 'member_id': member_id,
                                 'trello_name': trello_name
                             }
+            
+            # If no explicit assignment found, return the last non-admin commenter
+            if last_non_admin_commenter:
+                print(f"[ENHANCED ASSIGNEE] Using last non-admin commenter as assignee: {last_non_admin_commenter['name']}")
+                return last_non_admin_commenter
             
             return None
             
