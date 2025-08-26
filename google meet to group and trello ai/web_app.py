@@ -138,30 +138,7 @@ gmail_tracker = initialize_gmail_tracker()
 gmail_oauth.init_app(app)
 gmail_scheduler = None
 
-# Initialize production components for Gunicorn deployment
-def init_production_components():
-    """Initialize components needed for production deployment"""
-    print("[PROD] Initializing production components...")
-    
-    # Start automated scanner
-    start_automated_scanner()
-    
-    # Initialize Gmail tracker and scheduler
-    global gmail_tracker, gmail_scheduler
-    if gmail_tracker and hasattr(gmail_tracker, 'gmail_service') and gmail_tracker.gmail_service:
-        gmail_scheduler = GmailScheduler(gmail_tracker)
-        gmail_scheduler.start_scheduler()
-        print("[PROD] Gmail scheduler started")
-    else:
-        print("[PROD] Gmail service not available - scheduler not started")
-    
-    print(f"[PROD] Database: {'PostgreSQL' if production_db.is_production else 'SQLite'}")
-    print("[PROD] Production components initialized")
-
-# Initialize components when module is imported (for Gunicorn)
-if os.getenv('RENDER') or os.getenv('DATABASE_URL'):
-    print("[PROD] Production environment detected - initializing components")
-    init_production_components()
+# Production initialization will happen at the end of the file
 
 # Enhanced Security Authentication System
 from functools import wraps
@@ -3906,6 +3883,32 @@ Reply with your current status or any blockers you're facing.
     except Exception as e:
         print(f"Error in send_tracked_updates: {e}")
         return jsonify({'success': False, 'error': str(e)})
+
+# ===== PRODUCTION COMPONENT INITIALIZATION =====
+
+def init_production_components():
+    """Initialize components needed for production deployment"""
+    print("[PROD] Initializing production components...")
+    
+    # Start automated scanner
+    start_automated_scanner()
+    
+    # Initialize Gmail tracker and scheduler
+    global gmail_tracker, gmail_scheduler
+    if gmail_tracker and hasattr(gmail_tracker, 'gmail_service') and gmail_tracker.gmail_service:
+        gmail_scheduler = GmailScheduler(gmail_tracker)
+        gmail_scheduler.start_scheduler()
+        print("[PROD] Gmail scheduler started")
+    else:
+        print("[PROD] Gmail service not available - scheduler not started")
+    
+    print(f"[PROD] Database: {'PostgreSQL' if production_db.is_production else 'SQLite'}")
+    print("[PROD] Production components initialized")
+
+# Initialize components when module is imported (for Gunicorn)
+if os.getenv('RENDER') or os.getenv('DATABASE_URL'):
+    print("[PROD] Production environment detected - initializing components")
+    init_production_components()
 
 # ===== APPLICATION STARTUP =====
 
