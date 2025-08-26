@@ -595,15 +595,26 @@ class ProductionDatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
             
-            if self.is_production:
-                cursor.execute("SELECT name, whatsapp FROM team_members WHERE active = true")
+            # First check what columns exist
+            cursor.execute("PRAGMA table_info(team_members)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            # Build query based on available columns
+            if 'active' in columns:
+                if self.is_production:
+                    cursor.execute("SELECT name, whatsapp FROM team_members WHERE active = true")
+                else:
+                    cursor.execute("SELECT name, whatsapp FROM team_members WHERE active = 1")
             else:
-                cursor.execute("SELECT name, whatsapp FROM team_members WHERE active = 1")
+                # Fallback if active column doesn't exist yet
+                cursor.execute("SELECT name, whatsapp FROM team_members")
             
             rows = cursor.fetchall()
             conn.close()
             
-            return {row[0]: row[1] for row in rows}
+            members = {row[0]: row[1] for row in rows if row[1]}  # Only include if whatsapp exists
+            print(f"[DB] Loaded {len(members)} team members from database")
+            return members
         except Exception as e:
             print(f"[DB] Error getting team members: {e}")
             return {}
@@ -614,23 +625,45 @@ class ProductionDatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
             
+            # Check what columns exist
+            cursor.execute("PRAGMA table_info(team_members)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            # Build query based on available columns
             if self.is_production:
-                cursor.execute("""
-                    INSERT INTO team_members (name, whatsapp, active, created_at, updated_at) 
-                    VALUES (%s, %s, %s, NOW(), NOW())
-                    ON CONFLICT (name) DO UPDATE SET 
-                    whatsapp = EXCLUDED.whatsapp, 
-                    active = EXCLUDED.active,
-                    updated_at = NOW()
-                """, (name, whatsapp, active))
+                if 'created_at' in columns and 'updated_at' in columns and 'active' in columns:
+                    cursor.execute("""
+                        INSERT INTO team_members (name, whatsapp, active, created_at, updated_at) 
+                        VALUES (%s, %s, %s, NOW(), NOW())
+                        ON CONFLICT (name) DO UPDATE SET 
+                        whatsapp = EXCLUDED.whatsapp, 
+                        active = EXCLUDED.active,
+                        updated_at = NOW()
+                    """, (name, whatsapp, active))
+                else:
+                    # Simplified query for missing columns
+                    cursor.execute("""
+                        INSERT INTO team_members (name, whatsapp) 
+                        VALUES (%s, %s)
+                        ON CONFLICT (name) DO UPDATE SET 
+                        whatsapp = EXCLUDED.whatsapp
+                    """, (name, whatsapp))
             else:
-                cursor.execute("""
-                    INSERT OR REPLACE INTO team_members (name, whatsapp, active, created_at, updated_at)
-                    VALUES (?, ?, ?, datetime('now'), datetime('now'))
-                """, (name, whatsapp, int(active)))
+                if 'created_at' in columns and 'updated_at' in columns and 'active' in columns:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO team_members (name, whatsapp, active, created_at, updated_at)
+                        VALUES (?, ?, ?, datetime('now'), datetime('now'))
+                    """, (name, whatsapp, int(active)))
+                else:
+                    # Simplified query for missing columns
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO team_members (name, whatsapp)
+                        VALUES (?, ?)
+                    """, (name, whatsapp))
             
             conn.commit()
             conn.close()
+            print(f"[DB] Updated team member: {name}")
             return True
         except Exception as e:
             print(f"[DB] Error updating team member: {e}")
@@ -683,7 +716,7 @@ class ProductionDatabaseManager:
                     )
                 """)
             
-            # Check if whatsapp column exists, if not add it (migration)
+            # Check for missing columns and add them (migration)
             cursor.execute("PRAGMA table_info(team_members)")
             columns = [col[1] for col in cursor.fetchall()]
             
@@ -691,6 +724,18 @@ class ProductionDatabaseManager:
                 print("[DB] Migrating team_members table - adding whatsapp column")
                 cursor.execute("ALTER TABLE team_members ADD COLUMN whatsapp TEXT")
                 cursor.execute("UPDATE team_members SET whatsapp = '' WHERE whatsapp IS NULL")
+            
+            if 'updated_at' not in columns:
+                print("[DB] Migrating team_members table - adding updated_at column")
+                cursor.execute("ALTER TABLE team_members ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP")
+            
+            if 'created_at' not in columns:
+                print("[DB] Migrating team_members table - adding created_at column")
+                cursor.execute("ALTER TABLE team_members ADD COLUMN created_at TEXT DEFAULT CURRENT_TIMESTAMP")
+            
+            if 'active' not in columns:
+                print("[DB] Migrating team_members table - adding active column")
+                cursor.execute("ALTER TABLE team_members ADD COLUMN active INTEGER DEFAULT 1")
             
             conn.commit()
             conn.close()
