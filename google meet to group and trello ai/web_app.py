@@ -2791,43 +2791,43 @@ def scan_cards():
                 time.sleep(0.2)  # Small delay
             
             try:  # Wrap each card processing in try-catch
-            if card.closed:
-                print(f"SKIP: Closed card: {card.name}")
-                continue
-            
-            # Debug: Show which list each card is in
-            card_list_name = list_names.get(card.list_id, 'Unknown')
-            print(f"CARD: '{card.name}' is in list: {card_list_name}")
-            
-            # Skip cards not in target lists
-            if card.list_id not in target_lists:
-                continue
-            
-            # Determine if card needs active tracking
-            card_needs_tracking = card.list_id in active_lists
-            
-            if not card_needs_tracking:
-                print(f"HISTORY: Card '{card.name}' in non-active list - minimal processing")
-            
-            print(f"PROCESS: Processing card: {card.name}")
-            
-            # Calculate hours since last activity (general card activity)
-            hours_since_activity = 0
-            needs_update = False
-            try:
-                if card.date_last_activity:
-                    from datetime import datetime
-                    activity_date = datetime.fromisoformat(card.date_last_activity.replace('Z', '+00:00'))
-                    hours_since_activity = (datetime.now().replace(tzinfo=activity_date.tzinfo) - activity_date).total_seconds() / 3600
-                else:
-                    hours_since_activity = 999  # Very high number
-            except Exception as e:
-                print(f"Error parsing date for card {card.name}: {e}")
-                hours_since_activity = 999
-            
-            # Extract assigned user from checklists and comments using enhanced tracker
-            assigned_user = None
-            assigned_whatsapp = None
+                if card.closed:
+                    print(f"SKIP: Closed card: {card.name}")
+                    continue
+                
+                # Debug: Show which list each card is in
+                card_list_name = list_names.get(card.list_id, 'Unknown')
+                print(f"CARD: '{card.name}' is in list: {card_list_name}")
+                
+                # Skip cards not in target lists
+                if card.list_id not in target_lists:
+                    continue
+                
+                # Determine if card needs active tracking
+                card_needs_tracking = card.list_id in active_lists
+                
+                if not card_needs_tracking:
+                    print(f"HISTORY: Card '{card.name}' in non-active list - minimal processing")
+                
+                print(f"PROCESS: Processing card: {card.name}")
+                
+                # Calculate hours since last activity (general card activity)
+                hours_since_activity = 0
+                needs_update = False
+                try:
+                    if card.date_last_activity:
+                        from datetime import datetime
+                        activity_date = datetime.fromisoformat(card.date_last_activity.replace('Z', '+00:00'))
+                        hours_since_activity = (datetime.now().replace(tzinfo=activity_date.tzinfo) - activity_date).total_seconds() / 3600
+                    else:
+                        hours_since_activity = 999  # Very high number
+                except Exception as e:
+                    print(f"Error parsing date for card {card.name}: {e}")
+                    hours_since_activity = 999
+                
+                # Extract assigned user from checklists and comments using enhanced tracker
+                assigned_user = None
+                assigned_whatsapp = None
             
             try:
                 print(f"SEARCH: Looking for assigned user for card: {card.name}")
@@ -3143,49 +3143,53 @@ def scan_cards():
                     print(f"AI ANALYSIS ERROR for {card.name}: {e}")
                     needs_update = True  # Default to needs update on error
             
-            card_data = {
-                'id': card.id,
-                'name': card.name,
-                'description': card.description[:200] if card.description else '',
-                'url': card.url,
-                'board_name': eeinteractive_board.name,
-                'list_name': list_names.get(card.list_id, 'Unknown'),
-                'assigned_user': assigned_user,
-                'assigned_whatsapp': assigned_whatsapp,
-                'members': [assigned_user] if assigned_user else [],
-                'assigned_members': [assigned_user] if assigned_user else [],
-                'hours_since_activity': round(hours_since_activity, 1),  # General card activity
-                'hours_since_assigned_update': round(assigned_user_last_update_hours, 1) if assigned_user_last_update_hours is not None else 999,  # Assigned user activity
-                'days_since_comment': round(assigned_user_last_update_hours / 24, 1) if assigned_user_last_update_hours is not None else 999,  # Based on assigned user
-                'needs_update': needs_update,  # AI-determined
-                'last_activity': card.date_last_activity,
-                'priority': 'high' if assigned_user_last_update_hours is not None and assigned_user_last_update_hours > 72 else 'medium' if assigned_user_last_update_hours is not None and assigned_user_last_update_hours > 24 else 'normal'
-            }
+                card_data = {
+                    'id': card.id,
+                    'name': card.name,
+                    'description': card.description[:200] if card.description else '',
+                    'url': card.url,
+                    'board_name': eeinteractive_board.name,
+                    'list_name': list_names.get(card.list_id, 'Unknown'),
+                    'assigned_user': assigned_user,
+                    'assigned_whatsapp': assigned_whatsapp,
+                    'members': [assigned_user] if assigned_user else [],
+                    'assigned_members': [assigned_user] if assigned_user else [],
+                    'hours_since_activity': round(hours_since_activity, 1),  # General card activity
+                    'hours_since_assigned_update': round(assigned_user_last_update_hours, 1) if assigned_user_last_update_hours is not None else 999,  # Assigned user activity
+                    'days_since_comment': round(assigned_user_last_update_hours / 24, 1) if assigned_user_last_update_hours is not None else 999,  # Based on assigned user
+                    'needs_update': needs_update,  # AI-determined
+                    'last_activity': card.date_last_activity,
+                    'priority': 'high' if assigned_user_last_update_hours is not None and assigned_user_last_update_hours > 72 else 'medium' if assigned_user_last_update_hours is not None and assigned_user_last_update_hours > 24 else 'normal'
+                }
+                
+                all_cards.append(card_data)
             
-            all_cards.append(card_data)
-            
-            # Update database with fresh card data
-            if enhanced_team_tracker and enhanced_team_tracker.db and assigned_user:
-                try:
-                    print(f"  DB UPDATE: Storing card {card.name} -> {assigned_user}")
-                    # Use the enhanced tracker's method which handles comment dates correctly
-                    enhanced_team_tracker.update_card_tracking(
-                        card_id=card.id,
-                        card_name=card.name,
-                        assignee_name=assigned_user,
-                        assignee_phone=assigned_whatsapp or ''
-                    )
-                    print(f"  DB UPDATE: Successfully stored card {card.id}")
-                except Exception as e:
-                    print(f"  DB UPDATE ERROR: Could not update card {card.id}: {e}")
-                    import traceback
-                    print(f"  DB UPDATE TRACEBACK: {traceback.format_exc()}")
-            
-            # Add to cards needing updates - but we'll filter with enhanced logic later
-            if needs_update:
-                # Store the card object for enhanced processing
-                card_data['card'] = card  # Keep reference to original card object
-                cards_needing_updates.append(card_data)
+                # Update database with fresh card data
+                if enhanced_team_tracker and enhanced_team_tracker.db and assigned_user:
+                    try:
+                        print(f"  DB UPDATE: Storing card {card.name} -> {assigned_user}")
+                        # Use the enhanced tracker's method which handles comment dates correctly
+                        enhanced_team_tracker.update_card_tracking(
+                            card_id=card.id,
+                            card_name=card.name,
+                            assignee_name=assigned_user,
+                            assignee_phone=assigned_whatsapp or ''
+                        )
+                        print(f"  DB UPDATE: Successfully stored card {card.id}")
+                    except Exception as e:
+                        print(f"  DB UPDATE ERROR: Could not update card {card.id}: {e}")
+                        import traceback
+                        print(f"  DB UPDATE TRACEBACK: {traceback.format_exc()}")
+                
+                # Add to cards needing updates - but we'll filter with enhanced logic later
+                if needs_update:
+                    # Store the card object for enhanced processing
+                    card_data['card'] = card  # Keep reference to original card object
+                    cards_needing_updates.append(card_data)
+                    
+            except Exception as e:
+                print(f"ERROR: Failed to process card {card.name if hasattr(card, 'name') else 'unknown'}: {e}")
+                continue  # Skip this card and continue with others
         
         print(f"[ENHANCED] Found {len(cards_needing_updates)} cards with potential updates needed")
         
