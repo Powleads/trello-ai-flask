@@ -26,6 +26,10 @@ from googleapiclient.errors import HttpError
 import openai
 import requests
 
+# Production imports
+from production_db import get_production_db
+from gmail_oauth import gmail_oauth
+
 class GmailTracker:
     """Gmail Tracker for automatic email analysis and team notifications."""
     
@@ -33,74 +37,55 @@ class GmailTracker:
         self.db_path = db_path
         self.gmail_service = None
         self.openai_client = None
-        self.setup_database()
+        self.db = get_production_db()
         self.setup_openai()
+        self.setup_production_gmail_service()
         
-        # Team members mapping (reuse from main app)
-        self.team_members = {
-            'James Taylor': '19056064550@c.us',
-            'Breyden': '12894434373@c.us', 
-            'Ezechiel': '12894434373@c.us',
-            'Dustin Salinas': '19054251997@c.us'
-        }
+        # Team members from environment variables (production-ready)
+        self.team_members = self._load_team_members()
         
-        # NO hardcoded patterns - ONLY use watch rules from web interface
-        print("[GMAIL] Hardcoded category patterns REMOVED - using web interface rules only")
+        # NO hardcoded patterns - ONLY use watch rules from database
+        print("[GMAIL] Production-ready Gmail tracker initialized")
     
-    def setup_database(self):
-        """Initialize SQLite database with required tables."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    def _load_team_members(self) -> Dict[str, str]:
+        """Load team members from environment variables for production"""
+        # Try environment variables first (production)
+        team_members = {}
         
-        # Email watches table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS email_watches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email_pattern TEXT,
-                sender_pattern TEXT,
-                team_member TEXT,
-                active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                notes TEXT
-            )
-        ''')
+        # Expected format: TEAM_MEMBER_NAME=phone_number
+        for key, value in os.environ.items():
+            if key.startswith('TEAM_MEMBER_'):
+                name = key.replace('TEAM_MEMBER_', '').replace('_', ' ').title()
+                team_members[name] = value
         
-        # Email history table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS email_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email_id TEXT UNIQUE,
-                subject TEXT,
-                sender TEXT,
-                recipient TEXT,
-                category TEXT,
-                assigned_to TEXT,
-                whatsapp_sent BOOLEAN DEFAULT FALSE,
-                processed_at TEXT,
-                email_content TEXT,
-                priority INTEGER DEFAULT 1
-            )
-        ''')
+        # Fallback to hardcoded for local development
+        if not team_members:
+            print("[GMAIL] Using fallback team members for local development")
+            team_members = {
+                'James Taylor': '19056064550@c.us',
+                'Breyden': '12894434373@c.us', 
+                'Ezechiel': '12894434373@c.us',
+                'Dustin Salinas': '19054251997@c.us'
+            }
         
-        # Team member rules table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS team_member_rules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email_patterns TEXT,
-                keywords TEXT,
-                team_member TEXT,
-                priority INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # NO default rules - ONLY use watch rules from web interface
-        print("[GMAIL] Default database rules REMOVED - using web interface rules only")
-        # The team_member_rules table exists but will remain empty - only web interface rules are used
-        
-        conn.commit()
-        conn.close()
-        print("[GMAIL] Database initialized successfully")
+        print(f"[GMAIL] Loaded {len(team_members)} team members")
+        return team_members
+    
+    def setup_production_gmail_service(self):
+        """Set up Gmail service using production OAuth handler"""
+        try:
+            self.gmail_service = gmail_oauth.get_gmail_service()
+            if self.gmail_service:
+                print("[GMAIL] Production Gmail service initialized")
+                return True
+            else:
+                print("[GMAIL] Gmail service not available - authentication required")
+                return False
+        except Exception as e:
+            print(f"[GMAIL] Error setting up production Gmail service: {e}")
+            return False
+    
+    # Database setup moved to production_db.py - no longer needed here
     
     def setup_openai(self):
         """Initialize OpenAI client for email categorization."""
@@ -125,56 +110,9 @@ class GmailTracker:
             print("[GMAIL] OpenAI API key not found - email categorization will be limited")
     
     def setup_gmail_api(self, credentials_file='credentials.json', token_file='gmail_token.json'):
-        """Set up Gmail API authentication."""
-        SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-        
-        creds = None
-        
-        # Load existing token
-        if os.path.exists(token_file):
-            try:
-                with open(token_file, 'r') as token:
-                    creds_data = json.load(token)
-                    creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
-            except Exception as e:
-                print(f"Error loading token: {e}")
-        
-        # If no valid credentials, get new ones
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                except Exception as e:
-                    print(f"Error refreshing token: {e}")
-                    creds = None
-            
-            if not creds:
-                if not os.path.exists(credentials_file):
-                    print(f"[GMAIL] Gmail credentials file not found: {credentials_file}")
-                    print("Please download credentials.json from Google Cloud Console")
-                    return False
-                
-                flow = Flow.from_client_secrets_file(credentials_file, SCOPES)
-                flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
-                
-                auth_url, _ = flow.authorization_url(prompt='consent')
-                print(f"[GMAIL] Please visit this URL to authorize Gmail access: {auth_url}")
-                
-                code = input('Enter the authorization code: ')
-                flow.fetch_token(code=code)
-                creds = flow.credentials
-            
-            # Save credentials for next time
-            with open(token_file, 'w') as token:
-                token.write(creds.to_json())
-        
-        try:
-            self.gmail_service = build('gmail', 'v1', credentials=creds)
-            print("[GMAIL] API connection established")
-            return True
-        except Exception as e:
-            print(f"[GMAIL] Error setting up Gmail API: {e}")
-            return False
+        """Legacy method - redirects to production Gmail service setup"""
+        print("[GMAIL] Using production OAuth handler for Gmail authentication")
+        return self.setup_production_gmail_service()
     
     def categorize_email_with_ai(self, subject: str, content: str, sender: str, email_data: Dict = None) -> Dict[str, Any]:
         """Use GPT-4o to categorize and analyze email importance based on matched rule."""
@@ -304,16 +242,20 @@ class GmailTracker:
             }
     
     def get_watch_rules_from_web_interface(self) -> List[Dict]:
-        """Load watch rules from the web interface localStorage data."""
+        """Load watch rules from database (production) or JSON file (local)."""
         try:
-            # Try to read settings from a settings file if available
+            # Try database first (production)
+            settings = self.db.get_watch_rules()
+            if settings and settings.get('watchRules'):
+                return settings.get('watchRules', [])
+            
+            # Fallback to settings file (local development)
             settings_file = 'gmail_automation_settings.json'
             if os.path.exists(settings_file):
                 with open(settings_file, 'r') as f:
                     settings = json.load(f)
                     return settings.get('watchRules', [])
             
-            # If no file exists, return empty list (manual scan mode)
             return []
             
         except Exception as e:
@@ -522,9 +464,6 @@ class GmailTracker:
         import pytz
         from datetime import datetime
         
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         # Get all assignees and join them with commas
         all_assignees = analysis.get('all_assignees', [])
         if not all_assignees:
@@ -535,24 +474,18 @@ class GmailTracker:
         vegas_tz = pytz.timezone('America/Los_Angeles')
         vegas_time = datetime.now(vegas_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
         
-        cursor.execute('''
-            INSERT OR REPLACE INTO email_history 
-            (email_id, subject, sender, recipient, category, assigned_to, email_content, priority, processed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        # Use production database manager
+        self.db.store_email_history(
             email_data['id'],
             email_data['subject'],
             email_data['sender'],
             email_data['recipient'],
             analysis['category'],
-            assignees_text,  # Store all assignees as comma-separated string
+            assignees_text,
             email_data['content'],
             analysis['priority'],
-            vegas_time  # Use Vegas time
-        ))
-        
-        conn.commit()
-        conn.close()
+            vegas_time
+        )
     
     def send_team_notifications_to_all_assignees(self, email_data: Dict, analysis: Dict) -> bool:
         """Send WhatsApp notifications to ALL assigned team members."""
@@ -772,34 +705,8 @@ Scan time: {datetime.now().strftime('%H:%M %p')}
         self.send_rule_based_summary(processed_count, notifications_sent, category_counts, 0)
     
     def get_email_history(self, limit: int = 50) -> List[Dict]:
-        """Get recent email processing history."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT email_id, subject, sender, category, assigned_to, 
-                   whatsapp_sent, processed_at, priority
-            FROM email_history 
-            ORDER BY id DESC 
-            LIMIT ?
-        ''', (limit,))
-        
-        results = cursor.fetchall()
-        conn.close()
-        
-        return [
-            {
-                'email_id': row[0],
-                'subject': row[1],
-                'sender': row[2],
-                'category': row[3],
-                'assigned_to': row[4],  # Now contains all assignees as comma-separated
-                'whatsapp_sent': bool(row[5]),
-                'processed_at': row[6] or 'Unknown',  # Vegas time string
-                'priority': row[7]
-            }
-            for row in results
-        ]
+        """Get recent email processing history from production database."""
+        return self.db.get_email_history(limit)
 
 
 # Automated scanning scheduler

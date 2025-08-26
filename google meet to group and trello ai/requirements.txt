@@ -26,5 +26,11 @@ bcrypt==4.1.2
 # Data handling
 urllib3==2.1.0
 
+# Database support for production
+psycopg2-binary==2.9.9
+
+# Timezone handling
+pytz==2024.2
+
 # Production WSGI server
 gunicorn==21.2.0

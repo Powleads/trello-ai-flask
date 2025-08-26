@@ -23,6 +23,8 @@ import requests
 from custom_trello import CustomTrelloClient
 from message_tracker import MessageTracker
 from gmail_tracker import GmailTracker, GmailScheduler, initialize_gmail_tracker
+from gmail_oauth import gmail_oauth
+from production_db import get_production_db
 from google_meet_analytics import google_meet_analytics
 
 # Import AI modules
@@ -49,6 +51,9 @@ except ImportError as e:
 
 # Load environment
 load_dotenv()
+
+# Initialize production database
+production_db = get_production_db()
 
 # Reminder Tracking System
 REMINDER_TRACKING_FILE = 'reminder_tracking.json'
@@ -126,7 +131,11 @@ app.register_blueprint(google_meet_analytics)
 
 # Initialize message tracker and Gmail tracker
 message_tracker = MessageTracker("message_tracker.db")
+# Initialize Gmail tracker with production support
 gmail_tracker = initialize_gmail_tracker()
+
+# Initialize Gmail OAuth handler
+gmail_oauth.init_app(app)
 gmail_scheduler = None
 
 # Enhanced Security Authentication System
@@ -3635,25 +3644,29 @@ def manual_gmail_scan():
         print(f"[MANUAL] Gmail tracker exists: {gmail_tracker is not None}")
         print(f"[MANUAL] Gmail service exists: {gmail_tracker.gmail_service is not None if gmail_tracker else False}")
         
-        if not gmail_tracker or not gmail_tracker.gmail_service:
-            print("[MANUAL] ERROR: Gmail tracker not configured")
-            return jsonify({'success': False, 'error': 'Gmail tracker not configured'})
+        if not gmail_tracker:
+            return jsonify({'success': False, 'error': 'Gmail tracker not initialized'})
+            
+        if not gmail_tracker.gmail_service:
+            return jsonify({
+                'success': False, 
+                'error': 'Gmail not authenticated. Please visit /auth/gmail to authenticate.',
+                'auth_required': True
+            })
         
-        # Check if settings file exists
-        settings_file = 'gmail_automation_settings.json'
-        print(f"[MANUAL] Settings file exists: {os.path.exists(settings_file)}")
-        if not os.path.exists(settings_file):
+        # Check if watch rules exist in database
+        watch_rules_data = production_db.get_watch_rules()
+        watch_rules = watch_rules_data.get('watchRules', []) if watch_rules_data else []
+        
+        print(f"[MANUAL] Watch rules count: {len(watch_rules)}")
+        if not watch_rules:
             return jsonify({
                 'success': False, 
                 'error': 'No Gmail watch rules configured. Please set up email watch rules in the interface first.'
             })
         
-        # Show settings content
-        with open(settings_file, 'r') as f:
-            settings = json.load(f)
-            print(f"[MANUAL] Watch rules count: {len(settings.get('watchRules', []))}")
-            for i, rule in enumerate(settings.get('watchRules', [])):
-                print(f"[MANUAL] Rule {i+1}: '{rule.get('subject', '')}' -> {rule.get('category', '')} -> {rule.get('assignees', [])}")
+        for i, rule in enumerate(watch_rules):
+            print(f"[MANUAL] Rule {i+1}: '{rule.get('subject', '')}' -> {rule.get('category', '')} -> {rule.get('assignees', [])}")
         
         print("[MANUAL] Calling gmail_tracker.run_automated_scan()...")
         # Run scan with current settings
@@ -3669,27 +3682,25 @@ def manual_gmail_scan():
 @app.route('/api/gmail-history', methods=['GET'])
 @login_required
 def get_gmail_history():
-    """Get Gmail processing history."""
+    """Get Gmail processing history from production database."""
     try:
-        if not gmail_tracker:
-            return jsonify({'success': False, 'error': 'Gmail tracker not available'})
-        
         limit = request.args.get('limit', 50, type=int)
-        history = gmail_tracker.get_email_history(limit=limit)
+        history = production_db.get_email_history(limit=limit)
         
         return jsonify({
             'success': True,
             'emails': history,
-            'total': len(history)
+            'total': len(history),
+            'database': 'PostgreSQL' if production_db.is_production else 'SQLite'
         })
     except Exception as e:
         print(f"Error getting Gmail history: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': str(e)})}
 
 @app.route('/api/gmail-sync-settings', methods=['POST'])
 @login_required
 def sync_gmail_settings():
-    """Sync Gmail automation settings from web interface to JSON file for backend scanner."""
+    """Sync Gmail automation settings from web interface to production database."""
     try:
         data = request.get_json()
         
@@ -3697,22 +3708,29 @@ def sync_gmail_settings():
         if not data:
             return jsonify({'success': False, 'error': 'No settings data provided'})
         
-        # Create settings file for Gmail tracker
-        settings_file = 'gmail_automation_settings.json'
+        # Store in production database (PostgreSQL for production, SQLite for local)
+        success = production_db.store_watch_rules(data)
         
-        # Save settings to JSON file
-        with open(settings_file, 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        print(f"[GMAIL] Settings synced to {settings_file}")
-        print(f"[GMAIL] Auto-scan enabled: {data.get('enableAutoScan', False)}")
-        print(f"[GMAIL] Watch rules: {len(data.get('watchRules', []))}")
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Gmail settings synced successfully',
-            'settings_file': settings_file
-        })
+        if success:
+            # Also save to JSON file for backward compatibility (local development)
+            settings_file = 'gmail_automation_settings.json'
+            try:
+                with open(settings_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+            except Exception as e:
+                print(f"[GMAIL] Warning: Could not save to JSON file: {e}")
+            
+            print(f"[GMAIL] Settings synced to production database")
+            print(f"[GMAIL] Auto-scan enabled: {data.get('enableAutoScan', False)}")
+            print(f"[GMAIL] Watch rules: {len(data.get('watchRules', []))}")
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Gmail settings synced to production database',
+                'database': 'PostgreSQL' if production_db.is_production else 'SQLite'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to store settings in database'})
         
     except Exception as e:
         print(f"Error syncing Gmail settings: {e}")
