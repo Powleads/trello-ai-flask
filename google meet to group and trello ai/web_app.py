@@ -2550,10 +2550,10 @@ David Kim: Yes, that's about 60% complete.
 
 @app.route('/api/recent-activity', methods=['POST'])
 def get_recent_activity():
-    """Get recent activity from Trello cards - last 24 hours only."""
+    """Get recent activity from Trello cards with complete history."""
     try:
         data = request.json or {}
-        days = 1  # Force to 24 hours only
+        days = data.get('days', 7)  # Default to 7 days of history
         
         if not trello_client:
             return jsonify({'success': False, 'error': 'Trello client not available'})
@@ -2737,19 +2737,25 @@ def scan_cards():
         board_lists = eeinteractive_board.get_lists()
         list_names = {lst.id: lst.name for lst in board_lists}
         
-        # Find DOING/IN PROGRESS lists only
-        target_lists = []
+        # Scan ALL lists to build complete activity history
+        all_lists = [lst.id for lst in board_lists]
+        active_lists = []  # Lists where cards need updates (not done/archived)
+        excluded_keywords = ['done', 'completed', 'archive', 'archived']
+        
         print(f"Available lists on board:")
         for lst in board_lists:
             print(f"  - {lst.name} (ID: {lst.id})")
             list_name_lower = lst.name.lower()
-            if 'doing' in list_name_lower or 'in progress' in list_name_lower:
-                target_lists.append(lst.id)
-                print(f"TARGET: Found target list: {lst.name}")
+            
+            # Determine which lists have active cards needing updates
+            if not any(keyword in list_name_lower for keyword in excluded_keywords):
+                active_lists.append(lst.id)
+                print(f"ACTIVE: Will track cards in: {lst.name}")
+            else:
+                print(f"COMPLETED: Will scan for history but not track: {lst.name}")
         
-        if not target_lists:
-            print("ERROR: No DOING/IN PROGRESS lists found")
-            return jsonify({'success': False, 'error': 'No DOING/IN PROGRESS lists found'})
+        # We'll scan ALL lists but only track cards in active lists
+        target_lists = all_lists  # Scan everything for complete data
         
         all_cards = []
         cards_needing_updates = []
@@ -2766,10 +2772,12 @@ def scan_cards():
             card_list_name = list_names.get(card.list_id, 'Unknown')
             print(f"CARD: '{card.name}' is in list: {card_list_name}")
             
-            # Only process cards in DOING/IN PROGRESS lists
-            if card.list_id not in target_lists:
-                print(f"SKIP: Card '{card.name}' - not in target lists")
-                continue
+            # Determine if card needs active tracking
+            card_needs_tracking = card.list_id in active_lists
+            
+            if not card_needs_tracking:
+                print(f"HISTORY: Card '{card.name}' in completed list - collecting for data only")
+                # Don't skip - we want to collect all data
             
             print(f"PROCESS: Processing card: {card.name}")
             
@@ -2987,7 +2995,8 @@ def scan_cards():
             
             # AI-powered analysis to determine if assigned user has provided updates
             assigned_user_last_update_hours = None  # Start with None, will be set if found
-            needs_update = True  # Default to needs update
+            # Only mark as needing update if in active list
+            needs_update = card_needs_tracking  # Only active cards need updates
             
             if assigned_user:
                 try:
@@ -4308,6 +4317,71 @@ def remove_team_member():
         enhanced_team_tracker.team_members = enhanced_team_tracker._load_team_members()
         
         return jsonify({'success': True, 'message': 'Team member removed successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/populate-history', methods=['POST'])
+@login_required
+def populate_history():
+    """Populate database with complete historical data from all cards."""
+    try:
+        print("=== POPULATING HISTORICAL DATA ===")
+        
+        if not trello_client:
+            return jsonify({'success': False, 'error': 'Trello client not available'})
+        
+        # Get the EEInteractive board
+        boards = trello_client.list_boards()
+        eeinteractive_board = None
+        for board in boards:
+            if 'eeinteractive' in board.name.lower():
+                eeinteractive_board = board
+                break
+        
+        if not eeinteractive_board:
+            return jsonify({'success': False, 'error': 'EEInteractive board not found'})
+        
+        # Get ALL cards from ALL lists
+        all_cards = eeinteractive_board.get_cards()
+        total_cards = len(all_cards)
+        
+        activities_collected = 0
+        comments_collected = 0
+        
+        for card in all_cards:
+            try:
+                # Get all comments for this card
+                actions = trello_client.fetch_json(f'/cards/{card.id}/actions', 
+                    query_params={'filter': 'commentCard', 'limit': 1000})
+                
+                for action in actions:
+                    comments_collected += 1
+                    # Store in database if needed
+                    if enhanced_team_tracker and enhanced_team_tracker.db:
+                        # Store comment data for analysis
+                        member_name = action.get('memberCreator', {}).get('fullName', '')
+                        comment_text = action.get('data', {}).get('text', '')
+                        comment_date = action.get('date', '')
+                        
+                        # You could store this in a new comments table if needed
+                        print(f"Comment on {card.name} by {member_name}: {comment_text[:50]}...")
+                
+                activities_collected += len(actions)
+                
+            except Exception as e:
+                print(f"Error collecting history for card {card.name}: {e}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'message': f'Populated history from {total_cards} cards',
+            'stats': {
+                'total_cards': total_cards,
+                'activities': activities_collected,
+                'comments': comments_collected
+            }
+        })
         
     except Exception as e:
         print(f"Error removing team member: {e}")

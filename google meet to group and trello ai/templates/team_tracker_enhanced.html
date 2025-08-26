@@ -335,8 +335,14 @@ let currentCards = [];
 let selectedCardId = null;
 
 // Page load initialization
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     initializeLucide();
+    
+    // Load settings and team members first
+    console.log('Page loaded, initializing...');
+    await loadSettings();
+    await loadTeamMembers();
+    
     // Don't auto-load cards on page load - wait for manual scan
     // loadCards();  // REMOVED: Causing stale data issues
     loadStats();
@@ -857,35 +863,49 @@ async function loadSettings() {
     try {
         const response = await fetch('/api/team-tracker/settings');
         const data = await response.json();
+        console.log('Settings API response:', data);
         
-        if (data.success && data.settings) {
-            const settings = data.settings;
-            console.log('Loaded settings:', settings);
+        // Check if we got settings (no 'success' field in GET response)
+        const settings = data.settings || data;  // Handle both formats
+        
+        if (settings) {
+            console.log('Applying settings to UI:', settings);
             
-            // Apply escalation intervals
+            // Apply escalation intervals with null checks
             if (settings.escalation_intervals) {
                 const [first, second, third, fourth] = settings.escalation_intervals;
-                document.getElementById('firstMessageDelay').value = first || 24;
-                document.getElementById('secondMessageDelay').value = second || 12;
-                document.getElementById('thirdMessageDelay').value = third || 6;
-                document.getElementById('maxMessages').value = fourth || 4;
+                const firstInput = document.getElementById('firstMessageDelay');
+                const secondInput = document.getElementById('secondMessageDelay');
+                const thirdInput = document.getElementById('thirdMessageDelay');
+                const fourthInput = document.getElementById('maxMessages');
+                
+                if (firstInput) firstInput.value = first || 24;
+                if (secondInput) secondInput.value = second || 12;
+                if (thirdInput) thirdInput.value = third || 6;
+                if (fourthInput) fourthInput.value = fourth || 4;
             }
             
-            // Apply other settings
-            if (settings.enable_escalation !== undefined) {
-                document.getElementById('enableEscalation').checked = settings.enable_escalation;
+            // Apply other settings with null checks
+            const enableEsc = document.getElementById('enableEscalation');
+            const enableGroup = document.getElementById('enableGroupMessages');
+            const enableIndiv = document.getElementById('enableIndividualMessages');
+            const workStart = document.getElementById('workingHoursStart');
+            const workEnd = document.getElementById('workingHoursEnd');
+            
+            if (enableEsc && settings.enable_escalation !== undefined) {
+                enableEsc.checked = settings.enable_escalation;
             }
-            if (settings.enable_group_messages !== undefined) {
-                document.getElementById('enableGroupMessages').checked = settings.enable_group_messages;
+            if (enableGroup && settings.enable_group_messages !== undefined) {
+                enableGroup.checked = settings.enable_group_messages;
             }
-            if (settings.enable_individual_messages !== undefined) {
-                document.getElementById('enableIndividualMessages').checked = settings.enable_individual_messages;
+            if (enableIndiv && settings.enable_individual_messages !== undefined) {
+                enableIndiv.checked = settings.enable_individual_messages;
             }
-            if (settings.working_hours_start) {
-                document.getElementById('workingHoursStart').value = settings.working_hours_start;
+            if (workStart && settings.working_hours_start) {
+                workStart.value = settings.working_hours_start;
             }
-            if (settings.working_hours_end) {
-                document.getElementById('workingHoursEnd').value = settings.working_hours_end;
+            if (workEnd && settings.working_hours_end) {
+                workEnd.value = settings.working_hours_end;
             }
             if (settings.working_days && Array.isArray(settings.working_days)) {
                 // Apply working days checkboxes

@@ -492,17 +492,17 @@ class EnhancedTeamTracker:
                 print(f"[ENHANCED ASSIGNEE] No board member mapping available")
                 return None
             
-            # Method 1: Check checklists for assignments
-            checklist_assignee = self._check_checklist_assignments(card_id, member_mapping)
-            if checklist_assignee:
-                print(f"[ENHANCED ASSIGNEE] Found from checklists: {checklist_assignee['name']}")
-                return checklist_assignee
-            
-            # Method 2: Check recent comments for assignments
+            # Method 1: Check recent comments FIRST (most recent activity/last commenter)
             comment_assignee = self._check_comment_assignments(card_id, member_mapping)
             if comment_assignee:
-                print(f"[ENHANCED ASSIGNEE] Found from comments: {comment_assignee['name']}")
+                print(f"[ENHANCED ASSIGNEE] ✓ Found from comments: {comment_assignee['name']} (source: {comment_assignee.get('source', 'comment')}))")
                 return comment_assignee
+            
+            # Method 2: Check checklists for assignments if no comment assignee
+            checklist_assignee = self._check_checklist_assignments(card_id, member_mapping)
+            if checklist_assignee:
+                print(f"[ENHANCED ASSIGNEE] ✓ Found from checklists: {checklist_assignee['name']}")
+                return checklist_assignee
             
             print(f"[ENHANCED ASSIGNEE] No assignee found for card {card_id}")
             return None
