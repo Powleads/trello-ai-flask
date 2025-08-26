@@ -615,7 +615,7 @@ class EnhancedTeamTracker:
             url = f"https://api.trello.com/1/cards/{card_id}/actions"
             params = {
                 'filter': 'commentCard',
-                'limit': 20,
+                'limit': 10,  # Reduced to prevent timeouts
                 'key': self.api_key,
                 'token': self.token
             }

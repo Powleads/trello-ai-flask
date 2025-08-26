@@ -2704,9 +2704,10 @@ def scan_cards():
     """Scan Trello cards for team tracker - EEInteractive board only, DOING/IN PROGRESS lists."""
     print("=== SCAN CARDS ROUTE CALLED ===")
     try:
-        # Check if force refresh requested
+        # Check if force refresh requested and scan mode
         data = request.get_json() or {}
         force_refresh = data.get('force_refresh', False)
+        scan_all_lists = data.get('scan_all', False)  # Option to scan all lists
         
         print(f"=== SCANNING TRELLO CARDS FOR TEAM TRACKER (force_refresh={force_refresh}) ===")
         start_time = time.time()
@@ -2737,33 +2738,59 @@ def scan_cards():
         board_lists = eeinteractive_board.get_lists()
         list_names = {lst.id: lst.name for lst in board_lists}
         
-        # Scan ALL lists to build complete activity history
-        all_lists = [lst.id for lst in board_lists]
-        active_lists = []  # Lists where cards need updates (not done/archived)
-        excluded_keywords = ['done', 'completed', 'archive', 'archived']
-        
-        print(f"Available lists on board:")
-        for lst in board_lists:
-            print(f"  - {lst.name} (ID: {lst.id})")
-            list_name_lower = lst.name.lower()
+        # Determine which lists to scan based on mode
+        if scan_all_lists:
+            # Full scan mode - get everything for complete history
+            target_lists = [lst.id for lst in board_lists]
+            active_lists = target_lists
+            print(f"FULL SCAN MODE: Scanning all {len(board_lists)} lists")
+        else:
+            # Default mode - only scan active lists (DOING/IN PROGRESS)
+            target_lists = []
+            active_lists = []
             
-            # Determine which lists have active cards needing updates
-            if not any(keyword in list_name_lower for keyword in excluded_keywords):
-                active_lists.append(lst.id)
-                print(f"ACTIVE: Will track cards in: {lst.name}")
-            else:
-                print(f"COMPLETED: Will scan for history but not track: {lst.name}")
-        
-        # We'll scan ALL lists but only track cards in active lists
-        target_lists = all_lists  # Scan everything for complete data
+            print(f"Available lists on board:")
+            for lst in board_lists:
+                print(f"  - {lst.name} (ID: {lst.id})")
+                list_name_lower = lst.name.lower()
+                
+                # Only scan DOING/IN PROGRESS lists by default
+                if 'doing' in list_name_lower or 'in progress' in list_name_lower or 'in-progress' in list_name_lower:
+                    target_lists.append(lst.id)
+                    active_lists.append(lst.id)
+                    print(f"TARGET: Will scan and track: {lst.name}")
+            
+            if not target_lists:
+                print("WARNING: No DOING/IN PROGRESS lists found, scanning all non-archived lists")
+                excluded = ['done', 'completed', 'archive', 'archived']
+                for lst in board_lists:
+                    if not any(keyword in lst.name.lower() for keyword in excluded):
+                        target_lists.append(lst.id)
+                        active_lists.append(lst.id)
         
         all_cards = []
         cards_needing_updates = []
         
         # Get cards from EEInteractive board only
-        board_cards = eeinteractive_board.list_cards()
+        try:
+            board_cards = eeinteractive_board.list_cards()
+            total_cards = len(board_cards)
+            print(f"Total cards to process: {total_cards}")
+        except Exception as e:
+            print(f"ERROR: Failed to get cards: {e}")
+            return jsonify({'success': False, 'error': f'Failed to get cards: {str(e)}'})
         
-        for card in board_cards:
+        # Process cards in batches to prevent timeouts
+        BATCH_SIZE = 5  # Process 5 cards at a time
+        processed_count = 0
+        
+        for i, card in enumerate(board_cards):
+            # Add a small delay every batch to prevent API rate limiting
+            if i > 0 and i % BATCH_SIZE == 0:
+                print(f"Processed {i}/{total_cards} cards...")
+                time.sleep(0.2)  # Small delay
+            
+            try:  # Wrap each card processing in try-catch
             if card.closed:
                 print(f"SKIP: Closed card: {card.name}")
                 continue
@@ -2772,12 +2799,15 @@ def scan_cards():
             card_list_name = list_names.get(card.list_id, 'Unknown')
             print(f"CARD: '{card.name}' is in list: {card_list_name}")
             
+            # Skip cards not in target lists
+            if card.list_id not in target_lists:
+                continue
+            
             # Determine if card needs active tracking
             card_needs_tracking = card.list_id in active_lists
             
             if not card_needs_tracking:
-                print(f"HISTORY: Card '{card.name}' in completed list - collecting for data only")
-                # Don't skip - we want to collect all data
+                print(f"HISTORY: Card '{card.name}' in non-active list - minimal processing")
             
             print(f"PROCESS: Processing card: {card.name}")
             
@@ -2884,22 +2914,37 @@ def scan_cards():
                         print(f"  MEMBERS: Could not access Trello members: {e}")
                 
                 # Method 2.5: Use enhanced tracker's sophisticated assignee detection
-                if not assigned_user and enhanced_team_tracker:
+                # Skip enhanced detection if we have too many cards to prevent timeouts
+                USE_ENHANCED_DETECTION = total_cards < 30  # Only use for smaller boards
+                
+                if not assigned_user and enhanced_team_tracker and USE_ENHANCED_DETECTION and card_needs_tracking:
                     print(f"  ENHANCED DETECTION: Using sophisticated assignee detection for card ID: {card.id}")
                     try:
-                        # Use the enhanced tracker's assignee detection which includes checklists and comments
-                        assignee_result = enhanced_team_tracker.get_assignee_for_card(card.id)
-                        if assignee_result:
-                            assigned_user = assignee_result['name']
-                            assigned_whatsapp = assignee_result['whatsapp']
-                            print(f"FOUND: Enhanced tracker detected assignee: {assigned_user} (confidence: {assignee_result.get('confidence', 'N/A')})")
-                            print(f"  SOURCE: {assignee_result.get('source', 'Unknown')}")
-                        else:
-                            print(f"  ENHANCED DETECTION: No assignee found by enhanced tracker")
+                        # Set a timeout for the enhanced detection
+                        import signal
+                        
+                        def timeout_handler(signum, frame):
+                            raise TimeoutError("Enhanced detection timed out")
+                        
+                        # Only on non-Windows systems
+                        if hasattr(signal, 'SIGALRM'):
+                            signal.signal(signal.SIGALRM, timeout_handler)
+                            signal.alarm(3)  # 3 second timeout
+                        
+                        try:
+                            assignee_result = enhanced_team_tracker.get_assignee_for_card(card.id)
+                            if assignee_result:
+                                assigned_user = assignee_result['name']
+                                assigned_whatsapp = assignee_result['whatsapp']
+                                print(f"FOUND: Enhanced tracker detected assignee: {assigned_user}")
+                        finally:
+                            if hasattr(signal, 'SIGALRM'):
+                                signal.alarm(0)  # Cancel the alarm
+                                
+                    except TimeoutError:
+                        print(f"  ENHANCED DETECTION: Timed out after 3 seconds")
                     except Exception as e:
-                        print(f"  ENHANCED DETECTION: Error using enhanced tracker: {e}")
-                        import traceback
-                        print(f"  ENHANCED DETECTION: Traceback: {traceback.format_exc()}")
+                        print(f"  ENHANCED DETECTION: Error: {e}")
 
                 # Method 3: Check comments for assignment mentions (recent comments only)
                 if not assigned_user:
@@ -4351,9 +4396,9 @@ def populate_history():
         
         for card in all_cards:
             try:
-                # Get all comments for this card
+                # Get recent comments for this card (limit to prevent timeouts)
                 actions = trello_client.fetch_json(f'/cards/{card.id}/actions', 
-                    query_params={'filter': 'commentCard', 'limit': 1000})
+                    query_params={'filter': 'commentCard', 'limit': 50})  # Reduced from 1000
                 
                 for action in actions:
                     comments_collected += 1
