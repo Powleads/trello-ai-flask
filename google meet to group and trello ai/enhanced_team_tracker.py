@@ -514,6 +514,8 @@ class EnhancedTeamTracker:
     def _check_checklist_assignments(self, card_id: str, member_mapping: Dict) -> Optional[Dict]:
         """Check card checklists for assignment indicators"""
         try:
+            print(f"[ENHANCED ASSIGNEE] Checking checklists for card {card_id}")
+            
             # Get card checklists
             url = f"https://api.trello.com/1/cards/{card_id}/checklists"
             params = {
@@ -522,26 +524,30 @@ class EnhancedTeamTracker:
                 'fields': 'name,checkItems'
             }
             
+            print(f"[ENHANCED ASSIGNEE] Fetching checklists from: {url[:50]}...")
             response = requests.get(url, params=params, timeout=10)
             if response.status_code != 200:
                 print(f"[ENHANCED ASSIGNEE] Checklist API error {response.status_code}")
                 return None
             
             checklists = response.json()
+            print(f"[ENHANCED ASSIGNEE] Found {len(checklists)} checklists on card")
             
             for checklist in checklists:
                 checklist_name = checklist.get('name', '').lower()
                 check_items = checklist.get('checkItems', [])
+                print(f"[ENHANCED ASSIGNEE] Checklist '{checklist.get('name', 'Unknown')}' has {len(check_items)} items")
                 
                 # Look for assignment-related checklists
                 if ('assigned' in checklist_name or 
                     any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible'])):
                     
-                    print(f"[ENHANCED ASSIGNEE] Checking assignment checklist: {checklist['name']}")
+                    print(f"[ENHANCED ASSIGNEE] ✓ Found assignment checklist: {checklist['name']}")
                     
                     for item in check_items:
                         item_text = item.get('name', '').lower()
                         item_state = item.get('state', 'incomplete')
+                        print(f"[ENHANCED ASSIGNEE]   - Item: '{item_text}' (state: {item_state})")
                         
                         # Check if item contains team member names
                         for member_id, member_info in member_mapping.items():
