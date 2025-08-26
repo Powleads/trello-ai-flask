@@ -525,9 +525,14 @@ class EnhancedTeamTracker:
             }
             
             print(f"[ENHANCED ASSIGNEE] Fetching checklists from: {url[:50]}...")
+            print(f"[ENHANCED ASSIGNEE] Using API key: {self.api_key[:10] if self.api_key else 'None'}...")
+            print(f"[ENHANCED ASSIGNEE] Using token: {self.token[:10] if self.token else 'None'}...")
+            
             response = requests.get(url, params=params, timeout=10)
+            print(f"[ENHANCED ASSIGNEE] API Response status: {response.status_code}")
+            
             if response.status_code != 200:
-                print(f"[ENHANCED ASSIGNEE] Checklist API error {response.status_code}")
+                print(f"[ENHANCED ASSIGNEE] Checklist API error {response.status_code}: {response.text[:200]}")
                 return None
             
             checklists = response.json()
@@ -589,6 +594,8 @@ class EnhancedTeamTracker:
             
         except Exception as e:
             print(f"[ENHANCED ASSIGNEE] Error checking checklists: {e}")
+            import traceback
+            print(f"[ENHANCED ASSIGNEE] Traceback: {traceback.format_exc()}")
             return None
 
     def _check_comment_assignments(self, card_id: str, member_mapping: Dict) -> Optional[Dict]:

@@ -2885,7 +2885,7 @@ def scan_cards():
                 
                 # Method 2.5: Use enhanced tracker's sophisticated assignee detection
                 if not assigned_user and enhanced_team_tracker:
-                    print(f"  ENHANCED DETECTION: Using sophisticated assignee detection...")
+                    print(f"  ENHANCED DETECTION: Using sophisticated assignee detection for card ID: {card.id}")
                     try:
                         # Use the enhanced tracker's assignee detection which includes checklists and comments
                         assignee_result = enhanced_team_tracker.get_assignee_for_card(card.id)
@@ -2894,8 +2894,12 @@ def scan_cards():
                             assigned_whatsapp = assignee_result['whatsapp']
                             print(f"FOUND: Enhanced tracker detected assignee: {assigned_user} (confidence: {assignee_result.get('confidence', 'N/A')})")
                             print(f"  SOURCE: {assignee_result.get('source', 'Unknown')}")
+                        else:
+                            print(f"  ENHANCED DETECTION: No assignee found by enhanced tracker")
                     except Exception as e:
                         print(f"  ENHANCED DETECTION: Error using enhanced tracker: {e}")
+                        import traceback
+                        print(f"  ENHANCED DETECTION: Traceback: {traceback.format_exc()}")
 
                 # Method 3: Check comments for assignment mentions (recent comments only)
                 if not assigned_user:
