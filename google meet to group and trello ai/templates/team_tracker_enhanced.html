@@ -851,10 +851,10 @@ function saveSettings() {
     
     // Collect escalation settings
     const escalationIntervals = [
-        parseInt(document.getElementById('firstMessageDelay').value) || 24,
-        parseInt(document.getElementById('secondMessageDelay').value) || 12,
-        parseInt(document.getElementById('thirdMessageDelay').value) || 6,
-        parseInt(document.getElementById('fourthMessageDelay').value) || 4
+        parseInt(document.getElementById('firstMessageDelay')?.value) || 24,
+        parseInt(document.getElementById('secondMessageDelay')?.value) || 12,
+        parseInt(document.getElementById('thirdMessageDelay')?.value) || 6,
+        parseInt(document.getElementById('maxMessages')?.value) || 4  // Use maxMessages as 4th interval
     ];
     
     // Collect other settings

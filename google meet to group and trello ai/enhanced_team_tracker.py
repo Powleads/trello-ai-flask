@@ -477,5 +477,178 @@ class EnhancedTeamTracker:
         
         return cards_needing_messages
 
+    def get_assignee_for_card(self, card_id: str) -> Optional[Dict]:
+        """Get the assigned user for a specific card using sophisticated detection"""
+        try:
+            if not self.api_key or not self.token:
+                print(f"[ENHANCED ASSIGNEE] No Trello API credentials")
+                return None
+            
+            print(f"[ENHANCED ASSIGNEE] Detecting assignee for card {card_id}")
+            
+            # Get board member mapping
+            member_mapping = self.get_board_members_mapping()
+            if not member_mapping:
+                print(f"[ENHANCED ASSIGNEE] No board member mapping available")
+                return None
+            
+            # Method 1: Check checklists for assignments
+            checklist_assignee = self._check_checklist_assignments(card_id, member_mapping)
+            if checklist_assignee:
+                print(f"[ENHANCED ASSIGNEE] Found from checklists: {checklist_assignee['name']}")
+                return checklist_assignee
+            
+            # Method 2: Check recent comments for assignments
+            comment_assignee = self._check_comment_assignments(card_id, member_mapping)
+            if comment_assignee:
+                print(f"[ENHANCED ASSIGNEE] Found from comments: {comment_assignee['name']}")
+                return comment_assignee
+            
+            print(f"[ENHANCED ASSIGNEE] No assignee found for card {card_id}")
+            return None
+            
+        except Exception as e:
+            print(f"[ENHANCED ASSIGNEE] Error detecting assignee: {e}")
+            return None
+
+    def _check_checklist_assignments(self, card_id: str, member_mapping: Dict) -> Optional[Dict]:
+        """Check card checklists for assignment indicators"""
+        try:
+            # Get card checklists
+            url = f"https://api.trello.com/1/cards/{card_id}/checklists"
+            params = {
+                'key': self.api_key,
+                'token': self.token,
+                'fields': 'name,checkItems'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                print(f"[ENHANCED ASSIGNEE] Checklist API error {response.status_code}")
+                return None
+            
+            checklists = response.json()
+            
+            for checklist in checklists:
+                checklist_name = checklist.get('name', '').lower()
+                check_items = checklist.get('checkItems', [])
+                
+                # Look for assignment-related checklists
+                if ('assigned' in checklist_name or 
+                    any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible'])):
+                    
+                    print(f"[ENHANCED ASSIGNEE] Checking assignment checklist: {checklist['name']}")
+                    
+                    for item in check_items:
+                        item_text = item.get('name', '').lower()
+                        item_state = item.get('state', 'incomplete')
+                        
+                        # Check if item contains team member names
+                        for member_id, member_info in member_mapping.items():
+                            team_name = member_info['team_name']
+                            trello_name = member_info['trello_name']
+                            whatsapp = member_info['whatsapp']
+                            
+                            # Skip admin and criselle
+                            if team_name.lower() in ['admin', 'criselle']:
+                                continue
+                            
+                            # Enhanced name matching
+                            name_variations = [
+                                team_name.lower(),
+                                trello_name.lower(),
+                                team_name.lower().replace('ey', 'y'),
+                                team_name.lower().replace('y', 'ey'),
+                            ]
+                            
+                            # Check if member is mentioned in checklist item
+                            is_mentioned = (
+                                any(variation in item_text for variation in name_variations) or
+                                any(f"@{variation}" in item_text for variation in name_variations)
+                            )
+                            
+                            if is_mentioned:
+                                confidence = 90 if item_state == 'complete' else 75
+                                print(f"[ENHANCED ASSIGNEE] Found {team_name} in checklist item: '{item_text}' (confidence: {confidence})")
+                                return {
+                                    'name': team_name,
+                                    'whatsapp': whatsapp,
+                                    'source': f"Checklist assignment: {checklist['name']}",
+                                    'confidence': confidence,
+                                    'member_id': member_id,
+                                    'trello_name': trello_name
+                                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"[ENHANCED ASSIGNEE] Error checking checklists: {e}")
+            return None
+
+    def _check_comment_assignments(self, card_id: str, member_mapping: Dict) -> Optional[Dict]:
+        """Check recent comments for assignment indicators"""
+        try:
+            # Get recent comments
+            url = f"https://api.trello.com/1/cards/{card_id}/actions"
+            params = {
+                'filter': 'commentCard',
+                'limit': 20,
+                'key': self.api_key,
+                'token': self.token
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                return None
+            
+            comments = response.json()
+            
+            # Look for assignment patterns in recent comments
+            for comment in comments:
+                commenter_id = comment.get('memberCreator', {}).get('id', '')
+                commenter_name = comment.get('memberCreator', {}).get('fullName', '').lower()
+                comment_text = comment.get('data', {}).get('text', '').lower()
+                
+                # Skip admin comments
+                if 'admin' in commenter_name or 'criselle' in commenter_name:
+                    continue
+                
+                # Look for assignment patterns
+                for member_id, member_info in member_mapping.items():
+                    team_name = member_info['team_name']
+                    trello_name = member_info['trello_name']
+                    whatsapp = member_info['whatsapp']
+                    
+                    if team_name.lower() in ['admin', 'criselle']:
+                        continue
+                    
+                    assignment_patterns = [
+                        f"@{team_name.lower()}",
+                        f"assign this to {team_name.lower()}",
+                        f"assigned to {team_name.lower()}",
+                        f"{team_name.lower()} please",
+                        f"{team_name.lower()} can you",
+                        f"{team_name.lower()} take this",
+                    ]
+                    
+                    for pattern in assignment_patterns:
+                        if pattern in comment_text:
+                            print(f"[ENHANCED ASSIGNEE] Found assignment pattern '{pattern}' in comment")
+                            return {
+                                'name': team_name,
+                                'whatsapp': whatsapp,
+                                'source': f"Comment assignment by {commenter_name}",
+                                'confidence': 85,
+                                'comment_date': comment.get('date', ''),
+                                'member_id': member_id,
+                                'trello_name': trello_name
+                            }
+            
+            return None
+            
+        except Exception as e:
+            print(f"[ENHANCED ASSIGNEE] Error checking comments: {e}")
+            return None
+
 # Global instance
 enhanced_team_tracker = EnhancedTeamTracker()
