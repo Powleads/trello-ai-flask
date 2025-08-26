@@ -325,6 +325,13 @@ def google_meet_app():
 @app.route('/team-tracker')
 @login_required
 def team_tracker_app():
+    # Redirect to enhanced version
+    return render_template('team_tracker_enhanced.html')
+
+@app.route('/team-tracker/legacy')
+@login_required  
+def legacy_team_tracker_app():
+    """Legacy team tracker page"""
     return render_template('team_tracker.html', 
                          cards=app_data['cards_needing_updates'],
                          team_members=TEAM_MEMBERS,
@@ -3921,6 +3928,84 @@ def init_production_components():
     
     print(f"[PROD] Database: {'PostgreSQL' if production_db.is_production else 'SQLite'}")
     print("[PROD] Production components initialized")
+
+# ===== ENHANCED TEAM TRACKER API ENDPOINTS =====
+
+@app.route('/api/team-tracker/card-details/<card_id>', methods=['GET'])
+@login_required
+def get_card_details(card_id):
+    """Get detailed information about a specific card including message history"""
+    try:
+        # Get card status from enhanced team tracker database
+        card_status = production_db.get_team_tracker_card(card_id)
+        
+        # Get assignee's last comment date
+        if card_status:
+            assignee = card_status['assignee_name']
+            last_comment = enhanced_team_tracker.get_assignee_last_comment_date(card_id, assignee)
+            
+            return jsonify({
+                'success': True,
+                'card_status': card_status,
+                'last_assignee_comment': last_comment.isoformat() if last_comment else None,
+                'escalation_info': {
+                    'current_level': card_status.get('escalation_level', 0),
+                    'message_count': card_status.get('message_count', 0),
+                    'next_followup': enhanced_team_tracker.calculate_escalation_schedule(card_status.get('message_count', 0))
+                }
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Card not found in tracking database'})
+            
+    except Exception as e:
+        print(f"Error getting card details: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/stats', methods=['GET'])
+@login_required
+def get_enhanced_team_stats():
+    """Get enhanced team tracker statistics"""
+    try:
+        # Get message stats from existing system
+        today_stats = message_tracker.get_daily_analytics()
+        
+        # Get enhanced stats from production database
+        conn = production_db.get_connection()
+        cursor = conn.cursor()
+        
+        # Count responses today
+        if production_db.is_production:
+            cursor.execute("""
+                SELECT COUNT(*) FROM team_tracker_messages 
+                WHERE response_detected_at >= CURRENT_DATE
+            """)
+        else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM team_tracker_messages 
+                WHERE response_detected_at >= date('now')
+            """)
+        
+        responses_result = cursor.fetchone()
+        responses_today = responses_result[0] if responses_result else 0
+        
+        # Count active cards being tracked
+        cursor.execute("SELECT COUNT(*) FROM team_tracker_cards WHERE status = 'active'")
+        active_result = cursor.fetchone()
+        active_cards = active_result[0] if active_result else 0
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'today_messages': today_stats.get('messages_sent', 0) if today_stats else 0,
+            'responses_today': responses_today,
+            'active_cards': active_cards,
+            'team_members': len(enhanced_team_tracker.team_members)
+        })
+        
+    except Exception as e:
+        print(f"Error getting enhanced team stats: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 # Initialize components when module is imported (for Gunicorn)
 if os.getenv('RENDER') or os.getenv('DATABASE_URL'):
