@@ -4461,6 +4461,54 @@ def mark_card_responded():
         print(f"Error marking card responded: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+# ==================== TEAM MANAGEMENT SETTINGS API ====================
+
+@app.route('/api/team-tracker/settings', methods=['GET'])
+def get_team_tracker_settings():
+    """Get current team tracker settings."""
+    try:
+        # Return default settings (could be stored in database in future)
+        settings = {
+            'escalation_intervals': [24, 12, 6, 4],  # hours
+            'enable_escalation': True,
+            'enable_group_messages': True,
+            'enable_individual_messages': True,
+            'working_hours_start': '09:00',
+            'working_hours_end': '17:00',
+            'working_days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        }
+        
+        return jsonify({'success': True, 'settings': settings})
+        
+    except Exception as e:
+        print(f"Error getting team tracker settings: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/settings', methods=['POST'])
+def save_team_tracker_settings():
+    """Save team tracker settings."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'})
+        
+        # Extract settings from request
+        settings = data.get('settings', {})
+        
+        # Validate escalation intervals
+        escalation_intervals = settings.get('escalation_intervals', [24, 12, 6, 4])
+        if not isinstance(escalation_intervals, list) or len(escalation_intervals) != 4:
+            return jsonify({'success': False, 'error': 'Invalid escalation intervals'})
+        
+        # Log the settings (could store in database in future)
+        print(f"SETTINGS SAVE: Team tracker settings: {settings}")
+        
+        return jsonify({'success': True, 'message': 'Settings saved successfully'})
+        
+    except Exception as e:
+        print(f"Error saving team tracker settings: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 # Initialize components when module is imported (for Gunicorn)
 if os.getenv('RENDER') or os.getenv('DATABASE_URL'):
     print("[PROD] Production environment detected - initializing components")

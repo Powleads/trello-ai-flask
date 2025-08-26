@@ -847,7 +847,64 @@ function addTeamMember() {
 }
 
 function saveSettings() {
-    showNotification('Settings saved!', 'success');
+    console.log('Saving settings...');
+    
+    // Collect escalation settings
+    const escalationIntervals = [
+        parseInt(document.getElementById('firstMessageDelay').value) || 24,
+        parseInt(document.getElementById('secondMessageDelay').value) || 12,
+        parseInt(document.getElementById('thirdMessageDelay').value) || 6,
+        parseInt(document.getElementById('fourthMessageDelay').value) || 4
+    ];
+    
+    // Collect other settings
+    const settings = {
+        escalation_intervals: escalationIntervals,
+        enable_escalation: document.getElementById('enableEscalation')?.checked ?? true,
+        enable_group_messages: document.getElementById('enableGroupMessages')?.checked ?? true,
+        enable_individual_messages: document.getElementById('enableIndividualMessages')?.checked ?? true,
+        working_hours_start: document.getElementById('workingHoursStart')?.value ?? '09:00',
+        working_hours_end: document.getElementById('workingHoursEnd')?.value ?? '17:00',
+        working_days: getSelectedWorkingDays()
+    };
+    
+    console.log('Settings to save:', settings);
+    
+    // Send to API
+    fetch('/api/team-tracker/settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ settings: settings })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Settings save response:', data);
+        if (data.success) {
+            showNotification('Settings saved successfully!', 'success');
+        } else {
+            showNotification('Failed to save settings: ' + (data.error || 'Unknown error'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Settings save error:', error);
+        showNotification('Error saving settings: ' + error.message, 'error');
+    });
+}
+
+function getSelectedWorkingDays() {
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const selectedDays = [];
+    
+    days.forEach(day => {
+        const checkbox = document.getElementById(day);
+        if (checkbox && checkbox.checked) {
+            selectedDays.push(day);
+        }
+    });
+    
+    return selectedDays.length > 0 ? selectedDays : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 }
 
 function exportData() {
