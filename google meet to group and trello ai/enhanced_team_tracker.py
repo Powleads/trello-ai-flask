@@ -124,7 +124,7 @@ class EnhancedTeamTracker:
                     team_lower = team_name.lower()
                     member_lower = member_name.lower()
                     
-                    # Enhanced matching with variations
+                    # Enhanced fuzzy matching with variations and word-based matching
                     name_variations = [
                         team_lower,
                         team_lower.replace('ey', 'y'),  # Lancey -> Lancy
@@ -134,6 +134,7 @@ class EnhancedTeamTracker:
                     
                     print(f"[ENHANCED] Checking '{member_name}' vs '{team_name}'")
                     
+                    # Method 1: Direct variations matching
                     for variation in name_variations:
                         if (variation in member_lower or 
                             member_lower in variation or
@@ -143,9 +144,35 @@ class EnhancedTeamTracker:
                                 'trello_name': member_name,
                                 'whatsapp': whatsapp
                             }
-                            print(f"[ENHANCED] ✅ MATCHED {member_name} ({member_id}) -> {team_name}")
+                            print(f"[ENHANCED] ✅ MATCHED {member_name} ({member_id}) -> {team_name} (direct)")
                             matched = True
                             break
+                    
+                    # Method 2: Fuzzy word-based matching for full names
+                    if not matched:
+                        member_words = member_lower.split()
+                        team_words = team_lower.split()
+                        
+                        # Check if team name appears as first word or substring in member name
+                        for team_word in team_words:
+                            if len(team_word) > 2:  # Skip short words
+                                for member_word in member_words:
+                                    if (team_word in member_word or 
+                                        member_word in team_word or
+                                        abs(len(team_word) - len(member_word)) <= 2):  # Allow 2 char difference
+                                        # Additional fuzzy check for similar names
+                                        similar_chars = sum(1 for a, b in zip(team_word, member_word) if a == b)
+                                        if similar_chars >= max(3, len(team_word) - 2):  # Allow 2 char mismatch
+                                            member_mapping[member_id] = {
+                                                'team_name': team_name,
+                                                'trello_name': member_name,
+                                                'whatsapp': whatsapp
+                                            }
+                                            print(f"[ENHANCED] ✅ MATCHED {member_name} ({member_id}) -> {team_name} (fuzzy)")
+                                            matched = True
+                                            break
+                                if matched:
+                                    break
                     
                     if not matched:
                         print(f"[ENHANCED] ❌ No match for '{member_name}' with '{team_name}'")
