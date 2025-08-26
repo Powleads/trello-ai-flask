@@ -689,6 +689,96 @@ class ProductionDatabaseManager:
         except Exception as e:
             print(f"[DB] Error initializing team members table: {e}")
     
+    def clear_all_cards(self):
+        """Clear ONLY team tracker cards - preserves Gmail data"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # ONLY clear team tracker tables - NEVER touch Gmail tables
+            cursor.execute("DELETE FROM team_tracker_cards")
+            cursor.execute("DELETE FROM team_tracker_messages")
+            
+            # Explicitly preserve Gmail tables:
+            # - email_watches (Gmail watches)
+            # - email_history (Gmail tracker data)
+            # - team_member_rules (Gmail rules)
+            # - gmail_tracker (if exists)
+            # - gmail_rules (if exists)
+            # - gmail_whatsapp_sends (if exists)
+            
+            conn.commit()
+            conn.close()
+            print("[DB] Cleared ONLY team tracker cards/messages - Gmail data preserved")
+            return True
+        except Exception as e:
+            print(f"[DB] Error clearing cards: {e}")
+            return False
+    
+    def delete_card(self, card_id: str) -> bool:
+        """Delete a specific card from tracking"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM team_tracker_cards WHERE card_id = ?", (card_id,))
+            cursor.execute("DELETE FROM team_tracker_messages WHERE card_id = ?", (card_id,))
+            conn.commit()
+            rows_deleted = cursor.rowcount
+            conn.close()
+            print(f"[DB] Deleted card {card_id} ({rows_deleted} rows)")
+            return rows_deleted > 0
+        except Exception as e:
+            print(f"[DB] Error deleting card: {e}")
+            return False
+    
+    def get_all_cards(self) -> List[Dict]:
+        """Get all tracked cards from database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM team_tracker_cards
+                ORDER BY last_updated DESC
+            """)
+            
+            cards = []
+            for row in cursor.fetchall():
+                cards.append({
+                    'card_id': row[0],
+                    'card_name': row[1],
+                    'list_name': row[2],
+                    'assigned_user': row[3],
+                    'assigned_whatsapp': row[4],
+                    'last_comment_date': row[5],
+                    'hours_since_assigned_update': row[6],
+                    'needs_update': bool(row[7]),
+                    'last_message_sent': row[8],
+                    'message_count': row[9],
+                    'next_message_due': row[10],
+                    'response_detected': bool(row[11]),
+                    'last_updated': row[12]
+                })
+            
+            conn.close()
+            return cards
+        except Exception as e:
+            print(f"[DB] Error getting all cards: {e}")
+            return []
+    
+    def clear_team_members(self):
+        """Clear all team members from database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM team_members")
+            conn.commit()
+            conn.close()
+            print("[DB] Cleared all team members")
+            return True
+        except Exception as e:
+            print(f"[DB] Error clearing team members: {e}")
+            return False
+    
     def seed_team_members(self):
         """Seed initial team members (current active team)"""
         try:

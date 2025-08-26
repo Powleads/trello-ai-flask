@@ -2712,8 +2712,17 @@ def scan_cards():
     """Scan Trello cards for team tracker - EEInteractive board only, DOING/IN PROGRESS lists."""
     print("=== SCAN CARDS ROUTE CALLED ===")
     try:
-        print("=== SCANNING TRELLO CARDS FOR TEAM TRACKER ===")
+        # Check if force refresh requested
+        data = request.get_json() or {}
+        force_refresh = data.get('force_refresh', False)
+        
+        print(f"=== SCANNING TRELLO CARDS FOR TEAM TRACKER (force_refresh={force_refresh}) ===")
         start_time = time.time()
+        
+        # If force refresh, clear ONLY team tracker cards (Gmail data preserved)
+        if force_refresh and enhanced_team_tracker and enhanced_team_tracker.db:
+            print("FORCE REFRESH: Clearing ONLY team tracker cards (Gmail data preserved)")
+            enhanced_team_tracker.db.clear_all_cards()  # This only clears team_tracker tables
         
         if not trello_client:
             return jsonify({'success': False, 'error': 'Trello client not available'})
@@ -4264,6 +4273,82 @@ def remove_team_member():
         
     except Exception as e:
         print(f"Error removing team member: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/cards', methods=['GET'])
+@login_required
+def get_tracker_cards():
+    """Get existing cards from database without scanning."""
+    try:
+        if not enhanced_team_tracker or not enhanced_team_tracker.db:
+            return jsonify({'success': False, 'error': 'Team tracker not initialized'})
+        
+        # Get cards from database
+        cards = enhanced_team_tracker.db.get_all_cards()
+        
+        # Format cards for display
+        formatted_cards = []
+        for card in cards:
+            formatted_cards.append({
+                'id': card['card_id'],
+                'name': card['card_name'],
+                'list_name': card['list_name'],
+                'assigned_user': card['assigned_user'],
+                'hours_since_assigned_update': card.get('hours_since_assigned_update', 999),
+                'message_count': card.get('message_count', 0),
+                'next_message_due': card.get('next_message_due'),
+                'needs_update': card.get('needs_update', False),
+                'last_message_sent': card.get('last_message_sent'),
+                'response_detected': card.get('response_detected', False)
+            })
+        
+        return jsonify({'success': True, 'cards': formatted_cards})
+        
+    except Exception as e:
+        print(f"Error getting tracker cards: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/card/<card_id>', methods=['DELETE'])
+@login_required
+def delete_tracker_card(card_id):
+    """Delete a specific card from tracking."""
+    try:
+        if not enhanced_team_tracker or not enhanced_team_tracker.db:
+            return jsonify({'success': False, 'error': 'Team tracker not initialized'})
+        
+        # Delete card from database
+        success = enhanced_team_tracker.db.delete_card(card_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Card deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to delete card'})
+        
+    except Exception as e:
+        print(f"Error deleting tracker card: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/reset-team', methods=['POST'])
+@login_required
+def reset_team_members():
+    """Reset team members to default list."""
+    try:
+        if not enhanced_team_tracker or not enhanced_team_tracker.db:
+            return jsonify({'success': False, 'error': 'Team tracker not initialized'})
+        
+        # Clear all team members
+        enhanced_team_tracker.db.clear_team_members()
+        
+        # Reseed with defaults
+        enhanced_team_tracker.db.seed_team_members()
+        
+        # Reload team members
+        enhanced_team_tracker.team_members = enhanced_team_tracker._load_team_members()
+        
+        return jsonify({'success': True, 'message': 'Team members reset to defaults'})
+        
+    except Exception as e:
+        print(f"Error resetting team members: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/team-tracker/stats', methods=['GET'])
