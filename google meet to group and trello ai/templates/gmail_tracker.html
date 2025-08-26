@@ -41,12 +41,12 @@
                 </button>
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center space-x-2">
-                        <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-                        <span class="text-sm text-gray-600">Automation: OFF</span>
+                        <div id="automationIndicator" class="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span id="automationStatus" class="text-sm text-gray-600">Automation: OFF</span>
                     </div>
                     <button onclick="showMessageTemplates()" 
                             class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm">
-                        📱 View Message Templates
+                        📱 Edit Message Templates
                     </button>
                 </div>
             </div>
@@ -54,55 +54,94 @@
 
         <!-- Email Watch Configuration -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-            <h3 class="text-lg font-semibold mb-4">⚙️ Email Watch Configuration</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h4 class="font-medium mb-3">📝 Add Custom Email Watch</h4>
-                    <div class="space-y-3">
-                        <input type="text" 
-                               id="watchSubject" 
-                               placeholder="Subject filter (e.g., 'New Tech Onboarding')" 
-                               value="New Tech Onboarding"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                        <input type="text" 
-                               id="watchSender" 
-                               placeholder="Sender email or name (optional)" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                        <select id="watchAssignee" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                            <option value="James Taylor">James Taylor</option>
-                            <option value="Ezechiel">Ezechiel</option>
-                            <option value="Levy">Levy</option>
-                            <option value="Wendy">Wendy</option>
-                            <option value="Forka">Forka</option>
-                            <option value="Breyden">Breyden</option>
-                            <option value="Brayan">Brayan</option>
-                            <option value="Dustin Salinas">Dustin Salinas</option>
-                        </select>
-                        <input type="text" 
-                               id="watchNotes" 
-                               placeholder="Notes (e.g., 'Important client emails')" 
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            <h3 class="text-lg font-semibold mb-6">⚙️ Email Watch Configuration</h3>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Left Panel: Create New Watch Rule -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-5 border border-blue-200">
+                    <div class="flex items-center mb-4">
+                        <span class="text-2xl mr-3">📝</span>
+                        <h4 class="font-semibold text-gray-900">Add New Email Watch Rule</h4>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="watchSubject" class="block text-sm font-medium text-gray-700 mb-1">Subject Keywords *</label>
+                            <input type="text" 
+                                   id="watchSubject" 
+                                   placeholder="e.g. 'New Tech Onboarding', 'Urgent Support'" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="watchSender" class="block text-sm font-medium text-gray-700 mb-1">Sender Filter</label>
+                            <input type="text" 
+                                   id="watchSender" 
+                                   placeholder="e.g. 'support@client.com' (optional)" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="watchBody" class="block text-sm font-medium text-gray-700 mb-1">Body Keywords</label>
+                            <input type="text" 
+                                   id="watchBody" 
+                                   placeholder="e.g. 'urgent', 'setup required' (optional)" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="watchCategory" class="block text-sm font-medium text-gray-700 mb-1">Category & Assignment</label>
+                            <select id="watchCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="onboarding">📋 Onboarding</option>
+                                <option value="tech_issues">🔧 Tech Issues</option>
+                                <option value="ghl_support">⚙️ GHL Support</option>
+                                <option value="client_communication">💬 Client Communication</option>
+                                <option value="system_alerts">🚨 System Alerts</option>
+                                <option value="other">📄 Other</option>
+                            </select>
+                            <div id="categoryAssignee" class="mt-1 text-xs text-green-600 font-medium">
+                                → Will assign to team member
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="watchNotes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                            <input type="text" 
+                                   id="watchNotes" 
+                                   placeholder="e.g. 'High priority client emails'" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
                         <button onclick="addEmailWatch()" 
-                                class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                            ➕ Add Watch Rule
+                                class="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 font-medium transition-all">
+                            ➕ Create Watch Rule
                         </button>
                     </div>
                 </div>
                 
-                <div>
-                    <h4 class="font-medium mb-3">👥 Current Watch Rules</h4>
-                    <div id="watchRules" class="space-y-2 text-sm">
+                <!-- Right Panel: Active Watch Rules -->
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-5 border border-purple-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">👥</span>
+                            <h4 class="font-semibold text-gray-900">Active Watch Rules</h4>
+                            <span id="watchRuleCount" class="ml-2 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">0</span>
+                        </div>
+                    </div>
+                    
+                    <div id="watchRules" class="space-y-3 max-h-80 overflow-y-auto mb-4">
                         <!-- Watch rules will be populated here -->
                     </div>
-                    <div class="mt-4 space-y-2">
-                        <button onclick="showAddTeamMember()" 
-                                class="w-full px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-sm">
-                            ➕ Add Team Member
-                        </button>
-                        <button onclick="showTeamManagement()" 
-                                class="w-full px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm">
-                            👥 Manage Team Members
-                        </button>
+                    
+                    <div class="border-t border-purple-200 pt-4">
+                        <div class="grid grid-cols-1 gap-2">
+                            <button onclick="showTeamManagement()" 
+                                    class="w-full px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm font-medium transition-colors">
+                                👥 Manage Team
+                            </button>
+                            <button onclick="showAddTeamMember()" 
+                                    class="w-full px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-sm font-medium transition-colors">
+                                ➕ Add Team Member
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -343,9 +382,9 @@
 
     <!-- Team Management Modal -->
     <div id="teamManagementModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 p-6">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Manage Team Members</h3>
+                <h3 class="text-lg font-semibold text-gray-900">👥 Team Members & Category Assignments</h3>
                 <button onclick="closeTeamManagementModal()" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -353,9 +392,15 @@
                 </button>
             </div>
             
-            <div class="max-h-96 overflow-y-auto">
-                <div id="teamMembersList" class="space-y-3">
-                    <!-- Team members will be populated here -->
+            <div class="w-full">
+                <!-- Team Members List -->
+                <div>
+                    <h4 class="font-medium mb-3">Team Members</h4>
+                    <div class="max-h-96 overflow-y-auto">
+                        <div id="teamMembersList" class="space-y-3">
+                            <!-- Team members will be populated here -->
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -368,11 +413,91 @@
         </div>
     </div>
 
+    <!-- Edit Team Member Modal -->
+    <div id="editTeamMemberModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Edit Team Member</h3>
+                <button onclick="closeEditTeamMemberModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form onsubmit="handleEditTeamMember(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label for="editMemberName" class="block text-sm font-medium text-gray-700 mb-1">Team Member Name</label>
+                        <input type="text" 
+                               id="editMemberName" 
+                               required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label for="editMemberPhone" class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+                        <input type="text" 
+                               id="editMemberPhone" 
+                               required
+                               pattern="[0-9]+@c\.us"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Format: number@c.us (e.g., 1234567890@c.us)</p>
+                    </div>
+                    
+                    <div>
+                        <label for="editMemberCategories" class="block text-sm font-medium text-gray-700 mb-1">Assigned Categories</label>
+                        <div id="editMemberCategories" class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" value="onboarding" class="mr-2" name="memberCategory">
+                                <span>📋 Onboarding</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="tech_issues" class="mr-2" name="memberCategory">
+                                <span>🔧 Tech Issues</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="ghl_support" class="mr-2" name="memberCategory">
+                                <span>⚙️ GHL Support</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="client_communication" class="mr-2" name="memberCategory">
+                                <span>💬 Client Communication</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="system_alerts" class="mr-2" name="memberCategory">
+                                <span>🚨 System Alerts</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" value="other" class="mr-2" name="memberCategory">
+                                <span>📄 Other</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Select categories this team member can handle</p>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" 
+                            onclick="closeEditTeamMemberModal()" 
+                            class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     <!-- Message Templates Modal -->
     <div id="messageTemplatesModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 p-6">
+        <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">📱 WhatsApp Message Templates</h3>
+                <h3 class="text-lg font-semibold text-gray-900">📱 Edit WhatsApp Message Templates</h3>
                 <button onclick="closeMessageTemplatesModal()" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -382,61 +507,88 @@
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <h4 class="font-medium mb-3 text-blue-600">👤 Individual Team Member Message</h4>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <pre class="text-sm text-gray-800 whitespace-pre-wrap">📧 NEW ONBOARDING EMAIL ALERT
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-medium text-blue-600">👤 Individual Team Member Template</h4>
+                        <span class="text-xs text-gray-500">Las Vegas Time: <span id="currentTime"></span></span>
+                    </div>
+                    <textarea id="individualTemplate" 
+                              class="w-full h-64 p-3 border border-blue-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">📧 NEW EMAIL ALERT
 
-👤 From: [sender email]
-📋 Subject: [email subject]
-🏷️ Category: onboarding
-⚡ Priority: [1-5]/5
+👤 From: [sender_email]
+📋 Subject: [email_subject]
+🏷️ Category: [category]
+⚡ Priority: [priority]/5
 
-📝 Summary: [AI-generated summary]
+📝 Summary: [ai_summary]
 
-🔗 Keywords: [extracted keywords]
+🔗 Keywords: [keywords]
 
 Please check your email and respond as needed.
 
-- JGV Gmail Tracker</pre>
-                    </div>
+⏰ Time: [las_vegas_time]
+- JGV Gmail Tracker</textarea>
                 </div>
                 
                 <div>
-                    <h4 class="font-medium mb-3 text-green-600">👥 Group Chat Message</h4>
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <pre class="text-sm text-gray-800 whitespace-pre-wrap">🎯 NEW TECH ONBOARDING TRACKER
-
-📧 Found: [X] new onboarding email(s)
-👤 Assigned to: [Team Member Name]
-🔔 Notifications sent: [X]
-⏰ Scan time: [HH:MM AM/PM]
-
-All onboarding emails have been flagged for immediate attention.
-
-- JGV Onboarding Tracker (Automated)</pre>
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-medium text-green-600">👥 Group Chat Template</h4>
+                        <button onclick="resetTemplates()" class="text-xs text-gray-500 hover:text-gray-700">Reset to Default</button>
                     </div>
+                    <textarea id="groupTemplate" 
+                              class="w-full h-64 p-3 border border-green-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-green-500 focus:border-green-500">🎯 EMAIL TRACKER SUMMARY
+
+📧 Found: [email_count] new email(s)
+👤 Assigned to: [assigned_member]
+🔔 Notifications sent: [notification_count]
+⏰ Scan time: [las_vegas_time]
+
+All emails have been flagged for attention.
+
+- JGV Email Tracker (Automated)</textarea>
                 </div>
             </div>
             
             <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h5 class="font-medium text-yellow-800 mb-2">📋 Message Variables Available:</h5>
-                <div class="text-sm text-yellow-700 grid grid-cols-2 gap-2">
-                    <span>• [sender email] - From address</span>
-                    <span>• [email subject] - Subject line</span>
-                    <span>• [AI-generated summary] - AI analysis</span>
-                    <span>• [extracted keywords] - Found keywords</span>
-                    <span>• [Team Member Name] - Assigned person</span>
-                    <span>• [1-5]/5 - Priority level</span>
-                    <span>• [X] - Email count</span>
-                    <span>• [HH:MM AM/PM] - Current time</span>
+                <h5 class="font-medium text-yellow-800 mb-2">📋 Available Variables:</h5>
+                <div class="text-sm text-yellow-700 grid grid-cols-3 gap-3">
+                    <div>
+                        <strong>Email Data:</strong>
+                        <div>[sender_email]</div>
+                        <div>[email_subject]</div>
+                        <div>[category]</div>
+                        <div>[priority]</div>
+                    </div>
+                    <div>
+                        <strong>AI Analysis:</strong>
+                        <div>[ai_summary]</div>
+                        <div>[keywords]</div>
+                        <div>[confidence]</div>
+                    </div>
+                    <div>
+                        <strong>System Info:</strong>
+                        <div>[assigned_member]</div>
+                        <div>[email_count]</div>
+                        <div>[notification_count]</div>
+                        <div>[las_vegas_time]</div>
+                    </div>
                 </div>
             </div>
             
-            <div class="flex justify-end mt-6">
-                <button onclick="closeMessageTemplatesModal()" 
-                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                    Close
+            <div class="flex justify-between items-center mt-6">
+                <button onclick="previewTemplates()" 
+                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                    👁️ Preview with Sample Data
                 </button>
+                <div class="space-x-3">
+                    <button onclick="saveMessageTemplates()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        💾 Save Templates
+                    </button>
+                    <button onclick="closeMessageTemplatesModal()" 
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -602,78 +754,202 @@ function formatDate(dateString) {
 // Watch rules storage - start empty
 let watchRules = [];
 
-// Team members storage - complete list from main app
+// Team members with category assignments - EEsystems structure
 let teamMembers = [
-    { name: 'James Taylor', phone: '19056064550@c.us' },
-    { name: 'Ezechiel', phone: '23754071907@c.us' },
-    { name: 'Levy', phone: '237659250977@c.us' },
-    { name: 'Wendy', phone: '237677079267@c.us' },
-    { name: 'Forka', phone: '237652275097@c.us' },
-    { name: 'Breyden', phone: '13179979692@c.us' },
-    { name: 'Brayan', phone: '237676267420@c.us' },
-    { name: 'Dustin Salinas', phone: '19054251997@c.us' }
+    { name: 'James Taylor', phone: '19056064550@c.us', categories: ['onboarding', 'client_communication'], role: 'Operations Lead' },
+    { name: 'Ezechiel', phone: '23754071907@c.us', categories: ['tech_issues', 'ghl_support'], role: 'Technical Lead' },
+    { name: 'Levy', phone: '237659250977@c.us', categories: ['onboarding'], role: 'Implementation Specialist' },
+    { name: 'Wendy', phone: '237677079267@c.us', categories: ['client_communication'], role: 'Client Success' },
+    { name: 'Forka', phone: '237652275097@c.us', categories: ['system_alerts'], role: 'System Admin' },
+    { name: 'Breyden', phone: '13179979692@c.us', categories: ['other'], role: 'Design & Creative' },
+    { name: 'Brayan', phone: '237676267420@c.us', categories: ['other'], role: 'Support' },
+    { name: 'Dustin Salinas', phone: '19054251997@c.us', categories: ['onboarding', 'system_alerts'], role: 'Operations Manager' }
 ];
+
+// Category assignments - now supports MULTIPLE assignees per category
+let categoryAssignments = {
+    'onboarding': [],
+    'tech_issues': [],
+    'ghl_support': [],
+    'client_communication': [],
+    'system_alerts': [],
+    'other': []
+};
+
+// Function to initialize category assignments based on team members
+function initializeCategoryAssignments() {
+    // Reset assignments
+    Object.keys(categoryAssignments).forEach(cat => {
+        categoryAssignments[cat] = [];
+    });
+    
+    // Build assignments from team members who have categories
+    teamMembers.forEach(member => {
+        if (member.categories) {
+            member.categories.forEach(category => {
+                if (categoryAssignments[category] && !categoryAssignments[category].includes(member.name)) {
+                    categoryAssignments[category].push(member.name);
+                }
+            });
+        }
+    });
+}
+
+// Las Vegas timezone functions  
+function getLasVegasTime() {
+    const now = new Date();
+    // Force Pacific Time with proper formatting
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZoneName: 'short'
+    });
+    
+    return formatter.format(now);
+}
+
+function updateCurrentTime() {
+    const timeElement = document.getElementById('currentTime');
+    if (timeElement) {
+        timeElement.textContent = getLasVegasTime();
+    }
+}
+
+// Update time every second
+setInterval(updateCurrentTime, 1000);
 
 function addEmailWatch() {
     const subject = document.getElementById('watchSubject').value.trim();
     const sender = document.getElementById('watchSender').value.trim();
-    const assignee = document.getElementById('watchAssignee').value;
+    const body = document.getElementById('watchBody').value.trim();
+    const category = document.getElementById('watchCategory').value;
     const notes = document.getElementById('watchNotes').value.trim();
     
-    if (!subject || !assignee) {
-        showNotification('Please fill in subject and assignee fields', 'error');
+    if (!subject) {
+        showNotification('Please enter a subject filter', 'error');
         return;
     }
+    
+    // Get all assignees for this category (now an array)
+    const assignees = categoryAssignments[category] || [];
     
     // Add to watch rules
     watchRules.push({
         subject: subject,
         sender: sender,
-        assignee: assignee,
-        notes: notes || 'Custom watch rule'
+        body: body,
+        category: category,
+        assignees: assignees,  // Now stores array of assignees
+        notes: notes || 'Auto-assigned rule',
+        created_at: getLasVegasTime()
     });
     
+    // Save immediately to localStorage
+    saveAutomationSettings();
+    
     updateWatchRulesDisplay();
-    showNotification(`Email watch added: "${subject}" → ${assignee}`, 'success');
+    const assigneeText = assignees.length > 0 ? assignees.join(', ') : 'Unassigned';
+    showNotification(`Email watch added: "${subject}" → ${assigneeText} (${category})`, 'success');
     
     // Clear form
     document.getElementById('watchSubject').value = '';
     document.getElementById('watchSender').value = '';
+    document.getElementById('watchBody').value = '';
     document.getElementById('watchNotes').value = '';
 }
 
 function removeWatch(index) {
     watchRules.splice(index, 1);
+    
+    // Save immediately to localStorage
+    saveAutomationSettings();
+    
     updateWatchRulesDisplay();
     showNotification('Watch rule removed', 'success');
 }
 
 function updateWatchRulesDisplay() {
     const container = document.getElementById('watchRules');
+    const countElement = document.getElementById('watchRuleCount');
+    
+    // Update count
+    if (countElement) {
+        countElement.textContent = watchRules.length;
+    }
     
     if (watchRules.length === 0) {
         container.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-                <p class="text-sm">No watch rules configured</p>
-                <p class="text-xs mt-1">Add a rule above to start monitoring specific emails</p>
+            <div class="text-center py-6 text-gray-500">
+                <div class="text-4xl mb-2">📭</div>
+                <p class="text-sm font-medium">No watch rules configured</p>
+                <p class="text-xs mt-1">Create your first rule to start monitoring emails</p>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = watchRules.map((rule, index) => `
-        <div class="flex justify-between items-center p-2 bg-blue-50 border border-blue-200 rounded">
-            <div>
-                <span class="font-medium">"${rule.subject}"</span>
-                ${rule.sender ? `<span class="text-xs text-gray-600"> from: ${rule.sender}</span>` : ''}
-                <span class="block text-xs text-gray-500">→ ${rule.assignee}</span>
+    const getCategoryIcon = (category) => {
+        const icons = {
+            'onboarding': '📋',
+            'tech_issues': '🔧',
+            'ghl_support': '⚙️',
+            'client_communication': '💬',
+            'system_alerts': '🚨',
+            'other': '📄'
+        };
+        return icons[category] || '📄';
+    };
+    
+    const getStatusColor = (rule) => {
+        // Check if rule has assignees (support both old single and new array format)
+        const hasAssignees = (rule.assignees && rule.assignees.length > 0) || rule.assignee;
+        return hasAssignees ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200';
+    };
+    
+    container.innerHTML = watchRules.filter(rule => rule).map((rule, index) => {
+        // Support both old format (assignee) and new format (assignees array)
+        const assigneesList = rule.assignees || (rule.assignee ? [rule.assignee] : []);
+        const assigneeText = assigneesList.length > 0 ? assigneesList.join(', ') : 'Unassigned';
+        
+        return `
+        <div class="p-3 ${getStatusColor(rule)} border rounded-lg hover:shadow-sm transition-shadow">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="font-medium text-gray-900">"${rule.subject || 'Untitled Rule'}"</span>
+                        <div class="flex items-center">
+                            <span class="px-2 py-1 bg-white border rounded text-xs font-medium">
+                                ${getCategoryIcon(rule.category)} ${rule.category ? rule.category.replace('_', ' ') : 'Unknown'}
+                            </span>
+                        </div>
+                    </div>
+                    ${rule.sender ? `<div class="text-xs text-gray-600 mb-1">📧 From: ${rule.sender}</div>` : ''}
+                    ${rule.body ? `<div class="text-xs text-gray-600 mb-1">🔍 Contains: "${rule.body}"</div>` : ''}
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs text-green-600 font-medium">
+                            → ${assigneeText}
+                            ${assigneesList.length > 1 ? ` <span class="text-blue-600">(${assigneesList.length} people)</span>` : ''}
+                        </div>
+                        ${rule.created_at ? `<div class="text-xs text-gray-400">${rule.created_at}</div>` : ''}
+                    </div>
+                </div>
+                <button onclick="removeWatch(${index})" 
+                        class="ml-3 p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
+                        title="Delete rule">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                </button>
             </div>
-            <button onclick="removeWatch(${index})" 
-                    class="text-red-600 hover:text-red-800">
-                ✕
-            </button>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function showAddTeamMember() {
@@ -712,11 +988,12 @@ function handleAddTeamMember(event) {
         return;
     }
     
-    // Add the new member
+    // Add the new member with empty categories array
     teamMembers.push({ 
         name: name, 
         phone: phone, 
-        role: role || 'Team Member' 
+        role: role || 'Team Member',
+        categories: []
     });
     
     updateTeamMemberOptions();
@@ -727,22 +1004,43 @@ function handleAddTeamMember(event) {
 function updateTeamMemberOptions() {
     const select = document.getElementById('watchAssignee');
     const assigneeFilter = document.getElementById('assigneeFilter');
+    const teamMembersCount = document.getElementById('teamMembers');
     
-    // Update main select
-    select.innerHTML = teamMembers.map(member => 
-        `<option value="${member.name}">${member.name}</option>`
-    ).join('');
+    // Update main select (only if it exists - it doesn't exist in current template)
+    if (select) {
+        select.innerHTML = teamMembers.map(member => 
+            `<option value="${member.name}">${member.name}</option>`
+        ).join('');
+    }
     
     // Update filter select
-    assigneeFilter.innerHTML = `
-        <option value="">All Assignees</option>
-        ${teamMembers.map(member => 
-            `<option value="${member.name}">${member.name}</option>`
-        ).join('')}
-    `;
+    if (assigneeFilter) {
+        assigneeFilter.innerHTML = `
+            <option value="">All Assignees</option>
+            ${teamMembers.map(member => 
+                `<option value="${member.name}">${member.name}</option>`
+            ).join('')}
+        `;
+    }
     
     // Update team members count
-    document.getElementById('teamMembers').textContent = teamMembers.length;
+    if (teamMembersCount) {
+        teamMembersCount.textContent = teamMembers.length;
+    }
+}
+
+function updateAutomationStatus() {
+    const enableAutoScan = document.getElementById('enableAutoScan').checked;
+    const indicator = document.getElementById('automationIndicator');
+    const status = document.getElementById('automationStatus');
+    
+    if (enableAutoScan) {
+        indicator.className = 'w-3 h-3 bg-green-500 rounded-full animate-pulse';
+        status.textContent = 'Automation: ON';
+    } else {
+        indicator.className = 'w-3 h-3 bg-red-500 rounded-full';
+        status.textContent = 'Automation: OFF';
+    }
 }
 
 function saveAutomationSettings() {
@@ -756,11 +1054,17 @@ function saveAutomationSettings() {
         notificationRoute: document.querySelector('input[name="notificationRoute"]:checked').value,
         enableSummary: document.getElementById('enableSummary').checked,
         watchRules: watchRules,
-        teamMembers: teamMembers
+        teamMembers: teamMembers,
+        categoryAssignments: categoryAssignments,
+        messageTemplates: {
+            individual: document.getElementById('individualTemplate')?.value || getDefaultIndividualTemplate(),
+            group: document.getElementById('groupTemplate')?.value || getDefaultGroupTemplate()
+        }
     };
     
-    // Here you would normally save to backend
+    // Save to localStorage with persistence
     localStorage.setItem('gmailAutomationSettings', JSON.stringify(settings));
+    updateAutomationStatus();
     showNotification('Automation settings saved successfully!', 'success');
 }
 
@@ -792,8 +1096,188 @@ function loadAutomationSettings() {
             updateTeamMemberOptions();
         }
         
+        // Load category assignments and migrate from old format if needed
+        if (settings.categoryAssignments) {
+            Object.keys(settings.categoryAssignments).forEach(category => {
+                const saved = settings.categoryAssignments[category];
+                if (typeof saved === 'string') {
+                    // Migrate old string format to array
+                    categoryAssignments[category] = saved ? [saved] : [];
+                } else if (Array.isArray(saved)) {
+                    categoryAssignments[category] = saved;
+                } else {
+                    categoryAssignments[category] = [];
+                }
+            });
+        }
+        
+        // Load message templates
+        if (settings.messageTemplates) {
+            loadMessageTemplates(settings.messageTemplates);
+        }
+        
+        // Update automation status after loading
+        updateAutomationStatus();
+        
     } catch (e) {
         console.error('Error loading settings:', e);
+    }
+    
+    // Update automation status
+    updateAutomationStatus();
+}
+
+// Message Template Functions
+function getDefaultIndividualTemplate() {
+    return `📧 NEW EMAIL ALERT
+
+👤 From: [sender_email]
+📋 Subject: [email_subject]
+🏷️ Category: [category]
+⚡ Priority: [priority]/5
+
+📝 Summary: [ai_summary]
+
+🔗 Keywords: [keywords]
+
+Please check your email and respond as needed.
+
+⏰ Time: [las_vegas_time]
+- JGV Gmail Tracker`;
+}
+
+function getDefaultGroupTemplate() {
+    return `🎯 EMAIL TRACKER SUMMARY
+
+📧 Found: [email_count] new email(s)
+👤 Assigned to: [assigned_member]
+🔔 Notifications sent: [notification_count]
+⏰ Scan time: [las_vegas_time]
+
+All emails have been flagged for attention.
+
+- JGV Email Tracker (Automated)`;
+}
+
+function loadMessageTemplates(templates) {
+    const individualTemplate = document.getElementById('individualTemplate');
+    const groupTemplate = document.getElementById('groupTemplate');
+    
+    if (individualTemplate && templates.individual) {
+        individualTemplate.value = templates.individual;
+    }
+    
+    if (groupTemplate && templates.group) {
+        groupTemplate.value = templates.group;
+    }
+}
+
+function resetTemplates() {
+    if (confirm('Reset message templates to defaults?')) {
+        document.getElementById('individualTemplate').value = getDefaultIndividualTemplate();
+        document.getElementById('groupTemplate').value = getDefaultGroupTemplate();
+        showNotification('Templates reset to defaults', 'success');
+    }
+}
+
+function saveMessageTemplates() {
+    const individualTemplate = document.getElementById('individualTemplate').value;
+    const groupTemplate = document.getElementById('groupTemplate').value;
+    
+    // Save with current automation settings
+    const currentSettings = JSON.parse(localStorage.getItem('gmailAutomationSettings') || '{}');
+    currentSettings.messageTemplates = {
+        individual: individualTemplate,
+        group: groupTemplate
+    };
+    
+    // Ensure we save all current form data too
+    currentSettings.enableAutoScan = document.getElementById('enableAutoScan')?.checked || false;
+    currentSettings.scanFrequency = document.getElementById('scanFrequency')?.value || 'daily';
+    currentSettings.notificationRoute = document.querySelector('input[name="notificationRoute"]:checked')?.value || 'individual';
+    currentSettings.enableSummary = document.getElementById('enableSummary')?.checked || false;
+    currentSettings.watchRules = watchRules;
+    currentSettings.teamMembers = teamMembers;
+    currentSettings.categoryAssignments = categoryAssignments;
+    
+    localStorage.setItem('gmailAutomationSettings', JSON.stringify(currentSettings));
+    showNotification('Message templates saved successfully!', 'success');
+}
+
+function previewTemplates() {
+    const sampleData = {
+        sender_email: 'support@techcenter.com',
+        email_subject: 'New Tech Onboarding - Wellness Center Setup Required',
+        category: 'onboarding',
+        priority: '3',
+        ai_summary: 'Client needs immediate tech onboarding assistance for new EESystem setup',
+        keywords: 'onboarding, setup, EESystem, urgent',
+        assigned_member: 'James Taylor',
+        email_count: '2',
+        notification_count: '2',
+        las_vegas_time: getLasVegasTime(),
+        confidence: '85%'
+    };
+    
+    const individualTemplate = document.getElementById('individualTemplate').value;
+    const groupTemplate = document.getElementById('groupTemplate').value;
+    
+    let individualPreview = individualTemplate;
+    let groupPreview = groupTemplate;
+    
+    // Replace all variables
+    Object.keys(sampleData).forEach(key => {
+        const regex = new RegExp(`\\[${key}\\]`, 'g');
+        individualPreview = individualPreview.replace(regex, sampleData[key]);
+        groupPreview = groupPreview.replace(regex, sampleData[key]);
+    });
+    
+    // Show preview in new modal
+    showTemplatePreview(individualPreview, groupPreview);
+}
+
+function showTemplatePreview(individual, group) {
+    const previewHtml = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">📱 Message Preview with Sample Data</h3>
+                    <button onclick="closeTemplatePreview()" class="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-medium text-blue-600 mb-2">👤 Individual Message</h4>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                            <pre class="text-sm text-gray-800 whitespace-pre-wrap">${individual}</pre>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium text-green-600 mb-2">👥 Group Message</h4>
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                            <pre class="text-sm text-gray-800 whitespace-pre-wrap">${group}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end mt-6">
+                    <button onclick="closeTemplatePreview()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg">Close Preview</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const previewDiv = document.createElement('div');
+    previewDiv.id = 'templatePreview';
+    previewDiv.innerHTML = previewHtml;
+    document.body.appendChild(previewDiv);
+}
+
+function closeTemplatePreview() {
+    const preview = document.getElementById('templatePreview');
+    if (preview) {
+        preview.remove();
     }
 }
 
@@ -808,27 +1292,238 @@ function closeTeamManagementModal() {
 
 function updateTeamMembersList() {
     const container = document.getElementById('teamMembersList');
-    container.innerHTML = teamMembers.map((member, index) => `
-        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-            <div class="flex-1">
-                <div class="font-medium">${member.name}</div>
-                <div class="text-sm text-gray-600">${member.phone}</div>
-                ${member.role ? `<div class="text-xs text-gray-500">${member.role}</div>` : ''}
+    
+    if (!container) return;
+    
+    // Update team members list (clean and simple)
+    container.innerHTML = teamMembers.map((member, index) => {
+        return `
+            <div class="p-4 bg-gray-50 rounded-lg border">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="font-medium text-lg">${member.name}</div>
+                        <div class="text-sm text-gray-500">${member.phone}</div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="openEditTeamMemberModal(${index})" 
+                                class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm">
+                            Edit
+                        </button>
+                        <button onclick="removeTeamMember(${index})" 
+                                class="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm">
+                            Remove
+                        </button>
+                    </div>
+                </div>
             </div>
-            <button onclick="removeTeamMember(${index})" 
-                    class="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm">
-                Remove
-            </button>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+}
+
+let editingMemberIndex = -1;
+
+function openEditTeamMemberModal(index) {
+    const member = teamMembers[index];
+    if (!member) return;
+    
+    editingMemberIndex = index;
+    
+    // Populate form fields
+    document.getElementById('editMemberName').value = member.name;
+    document.getElementById('editMemberPhone').value = member.phone;
+    
+    // Set category checkboxes and show other assignees
+    const checkboxes = document.querySelectorAll('input[name="memberCategory"]');
+    checkboxes.forEach(checkbox => {
+        let assignees = categoryAssignments[checkbox.value] || [];
+        // Handle old string format
+        if (typeof assignees === 'string') {
+            assignees = assignees ? [assignees] : [];
+        } else if (!Array.isArray(assignees)) {
+            assignees = [];
+        }
+        const isAssignedToThis = assignees.includes(member.name);
+        checkbox.checked = isAssignedToThis;
+        
+        // Update the label to show other assignees
+        const label = checkbox.parentElement;
+        const existingInfo = label.querySelector('.assignee-info');
+        if (existingInfo) {
+            existingInfo.remove();
+        }
+        
+        const otherAssignees = assignees.filter(name => name !== member.name);
+        if (otherAssignees.length > 0) {
+            const info = document.createElement('span');
+            info.className = 'assignee-info text-xs text-green-600 ml-2';
+            info.textContent = `(also: ${otherAssignees.join(', ')})`;
+            label.appendChild(info);
+        }
+    });
+    
+    // Show modal
+    document.getElementById('editTeamMemberModal').classList.remove('hidden');
+}
+
+function closeEditTeamMemberModal() {
+    document.getElementById('editTeamMemberModal').classList.add('hidden');
+    editingMemberIndex = -1;
+}
+
+function handleEditTeamMember(event) {
+    event.preventDefault();
+    
+    if (editingMemberIndex === -1) return;
+    
+    const name = document.getElementById('editMemberName').value.trim();
+    const phone = document.getElementById('editMemberPhone').value.trim();
+    
+    // Validate phone format
+    const phonePattern = /^[0-9]+@c\.us$/;
+    if (!phonePattern.test(phone)) {
+        showNotification('Invalid phone format. Use: 1234567890@c.us', 'error');
+        return;
+    }
+    
+    // Check if another member already has this name or phone
+    const existingMember = teamMembers.find((member, index) => 
+        index !== editingMemberIndex && (
+            member.name.toLowerCase() === name.toLowerCase() || member.phone === phone
+        )
+    );
+    
+    if (existingMember) {
+        showNotification('Team member with this name or phone already exists', 'error');
+        return;
+    }
+    
+    const oldName = teamMembers[editingMemberIndex].name;
+    
+    // Update the member
+    teamMembers[editingMemberIndex].name = name;
+    teamMembers[editingMemberIndex].phone = phone;
+    
+    // Update category assignments (now works with arrays for multiple assignees)
+    const selectedCategories = Array.from(document.querySelectorAll('input[name="memberCategory"]:checked'))
+        .map(checkbox => checkbox.value);
+    
+    // Remove old name from all category arrays (in case name changed)
+    Object.keys(categoryAssignments).forEach(category => {
+        const assignees = categoryAssignments[category] || [];
+        const index = assignees.indexOf(oldName);
+        if (index > -1) {
+            assignees.splice(index, 1);
+        }
+    });
+    
+    // Add/remove this member from categories based on checkbox state
+    Object.keys(categoryAssignments).forEach(category => {
+        // Ensure we're working with arrays
+        if (!Array.isArray(categoryAssignments[category])) {
+            const old = categoryAssignments[category];
+            categoryAssignments[category] = old ? [old] : [];
+        }
+        
+        const assignees = categoryAssignments[category];
+        const isSelected = selectedCategories.includes(category);
+        const isCurrentlyAssigned = assignees.includes(name);
+        
+        if (isSelected && !isCurrentlyAssigned) {
+            // Add to category
+            categoryAssignments[category].push(name);
+        } else if (!isSelected && isCurrentlyAssigned) {
+            // Remove from category
+            const index = assignees.indexOf(name);
+            if (index > -1) {
+                categoryAssignments[category].splice(index, 1);
+            }
+        }
+    });
+    
+    // Debug: Log the category assignments
+    console.log('Category assignments after edit:', categoryAssignments);
+    console.log('Selected categories for', name, ':', selectedCategories);
+    
+    // Save changes
+    saveAutomationSettings();
+    updateTeamMembersList();
+    updateTeamMemberOptions();
+    updateWatchCategoryOptions();
+    updateCategoryAssigneeDisplay();  // Update the display in the watch rule form
+    
+    closeEditTeamMemberModal();
+    showNotification(`Team member updated: ${name}`, 'success');
+}
+
+
+
+function updateWatchCategoryOptions() {
+    const categorySelect = document.getElementById('watchCategory');
+    if (categorySelect) {
+        categorySelect.innerHTML = Object.entries(categoryAssignments).map(([category, assignee]) => {
+            const icons = {
+                'onboarding': '📋',
+                'tech_issues': '🔧', 
+                'ghl_support': '⚙️',
+                'client_communication': '💬',
+                'system_alerts': '🚨',
+                'other': '📄'
+            };
+            return `<option value="${category}">${icons[category]} ${category.replace('_', ' ')}</option>`;
+        }).join('');
+    }
+    // Update the assignee display
+    updateCategoryAssigneeDisplay();
+}
+
+function updateCategoryAssigneeDisplay() {
+    const categorySelect = document.getElementById('watchCategory');
+    const assigneeDisplay = document.getElementById('categoryAssignee');
+    
+    if (categorySelect && assigneeDisplay) {
+        const selectedCategory = categorySelect.value;
+        let assignees = categoryAssignments[selectedCategory] || [];
+        
+        // Ensure assignees is an array (handle old string format)
+        if (typeof assignees === 'string') {
+            assignees = assignees ? [assignees] : [];
+        } else if (!Array.isArray(assignees)) {
+            assignees = [];
+        }
+        
+        if (assignees.length > 0) {
+            const assigneeText = assignees.length === 1 
+                ? `→ Will notify <strong>${assignees[0]}</strong>`
+                : `→ Will notify <strong>${assignees.length} people</strong>: ${assignees.join(', ')}`;
+            assigneeDisplay.innerHTML = assigneeText;
+            assigneeDisplay.className = 'mt-1 text-xs text-green-600 font-medium';
+        } else {
+            assigneeDisplay.innerHTML = '⚠️ No team members assigned to this category';
+            assigneeDisplay.className = 'mt-1 text-xs text-orange-600 font-medium';
+        }
+    }
 }
 
 function removeTeamMember(index) {
     const member = teamMembers[index];
     if (confirm(`Remove ${member.name} from team?`)) {
         teamMembers.splice(index, 1);
+        
+        // Remove from all category assignment arrays
+        Object.keys(categoryAssignments).forEach(category => {
+            const assignees = categoryAssignments[category] || [];
+            const idx = assignees.indexOf(member.name);
+            if (idx > -1) {
+                categoryAssignments[category].splice(idx, 1);
+            }
+        });
+        
+        // Save changes immediately
+        saveAutomationSettings();
+        
         updateTeamMembersList();
         updateTeamMemberOptions();
+        updateWatchCategoryOptions();
         showNotification(`${member.name} removed from team`, 'success');
     }
 }
@@ -858,21 +1553,101 @@ function resetSettings() {
 }
 
 // Handle custom schedule visibility
-document.getElementById('scanFrequency').addEventListener('change', function() {
-    const customDiv = document.getElementById('customSchedule');
-    if (this.value === 'custom') {
-        customDiv.classList.remove('hidden');
+const scanFrequency = document.getElementById('scanFrequency');
+if (scanFrequency) {
+    scanFrequency.addEventListener('change', function() {
+        const customDiv = document.getElementById('customSchedule');
+        if (customDiv) {
+            if (this.value === 'custom') {
+                customDiv.classList.remove('hidden');
+            } else {
+                customDiv.classList.add('hidden');
+            }
+        }
+    });
+}
+
+// Test function to verify category assignments
+function testCategoryAssignments() {
+    console.log('=== TESTING CATEGORY ASSIGNMENTS ===');
+    console.log('Current assignments:', categoryAssignments);
+    console.log('Team members:', teamMembers.map(m => m.name));
+    
+    // Check localStorage
+    const saved = localStorage.getItem('gmailAutomationSettings');
+    if (saved) {
+        const settings = JSON.parse(saved);
+        console.log('Saved assignments:', settings.categoryAssignments);
     } else {
-        customDiv.classList.add('hidden');
+        console.log('No saved settings found');
     }
-});
+    
+    console.log('=== TEST COMPLETE ===');
+}
 
 // Load settings on page load
 document.addEventListener('DOMContentLoaded', function() {
     refreshHistory();
     loadAutomationSettings();
+    
+    // Only initialize if no saved assignments exist
+    const saved = localStorage.getItem('gmailAutomationSettings');
+    if (!saved || !JSON.parse(saved).categoryAssignments) {
+        initializeCategoryAssignments();
+    }
+    
     updateWatchRulesDisplay();
     updateTeamMemberOptions();
+    updateWatchCategoryOptions();
+    updateCurrentTime();
+    
+    // Run test on load (can be removed later)
+    testCategoryAssignments();
+    
+    // Add event listener for automation checkbox
+    const enableAutoScan = document.getElementById('enableAutoScan');
+    if (enableAutoScan) {
+        enableAutoScan.addEventListener('change', updateAutomationStatus);
+    }
+    
+    // Add category change listener for dynamic assignee display
+    const watchCategory = document.getElementById('watchCategory');
+    if (watchCategory) {
+        watchCategory.addEventListener('change', updateCategoryAssigneeDisplay);
+        // Initialize display
+        updateCategoryAssigneeDisplay();
+    }
+    
+    // Load default templates if not already loaded
+    const individualTemplate = document.getElementById('individualTemplate');
+    const groupTemplate = document.getElementById('groupTemplate');
+    
+    if (individualTemplate && !individualTemplate.value) {
+        individualTemplate.value = getDefaultIndividualTemplate();
+    }
+    if (groupTemplate && !groupTemplate.value) {
+        groupTemplate.value = getDefaultGroupTemplate();
+    }
+    
+    // Auto-save templates on changes
+    if (individualTemplate) {
+        individualTemplate.addEventListener('input', function() {
+            // Debounce saving
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(() => {
+                saveMessageTemplates();
+            }, 2000);
+        });
+    }
+    if (groupTemplate) {
+        groupTemplate.addEventListener('input', function() {
+            // Debounce saving
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(() => {
+                saveMessageTemplates();
+            }, 2000);
+        });
+    }
 });
 
 function showNotification(message, type) {
@@ -891,7 +1666,14 @@ function showNotification(message, type) {
 }
 
 // Add event listeners for filters
-document.getElementById('categoryFilter').addEventListener('change', displayEmailHistory);
-document.getElementById('assigneeFilter').addEventListener('change', displayEmailHistory);
+const categoryFilter = document.getElementById('categoryFilter');
+const assigneeFilter = document.getElementById('assigneeFilter');
+
+if (categoryFilter) {
+    categoryFilter.addEventListener('change', displayEmailHistory);
+}
+if (assigneeFilter) {
+    assigneeFilter.addEventListener('change', displayEmailHistory);
+}
 </script>
 {% endblock %}

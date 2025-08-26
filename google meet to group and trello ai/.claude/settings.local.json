@@ -27,7 +27,12 @@
       "Bash(copy enhanced_ai.py enhanced_ai_backup.py)",
       "Bash(copy enhanced_ai_fixed.py enhanced_ai.py)",
       "Bash(copy web_app_complete.py web_app.py)",
-      "Bash(start http://localhost:5000/google-meet)"
+      "Bash(start http://localhost:5000/google-meet)",
+      "mcp__JustGoingViral__read_file",
+      "mcp__JustGoingViral__eesystem",
+      "mcp__JustGoingViral__list_directory",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
