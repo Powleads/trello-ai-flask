@@ -209,7 +209,7 @@ def login_required(f):
 TEAM_MEMBERS = {
     'Criselle': '639494048499@c.us',
     'Lancey': '639264438378@c.us',
-    'Ezechiel': '23754071907@c.us',
+    # 'Ezechiel': '23754071907@c.us',  # Removed - no longer on board
     'Levy': '237659250977@c.us',
     'Wendy': '237677079267@c.us',
     'Forka': '237652275097@c.us',
@@ -694,15 +694,36 @@ def get_google_doc_text(doc_id):
 # ===== ENHANCED ASSIGNMENT DETECTION SYSTEM =====
 
 def get_board_members_mapping():
-    """Get all board members and create mapping to team members."""
+    """Get all board members and create mapping to team members - using same board detection as scan_cards."""
     try:
         api_key = os.environ.get('TRELLO_API_KEY')
         token = os.environ.get('TRELLO_TOKEN')
-        board_id = os.environ.get('TRELLO_BOARD_ID')
         
-        if not api_key or not token or not board_id:
-            print("  BOARD_MEMBERS: Missing Trello API credentials or board ID")
+        if not api_key or not token:
+            print("  BOARD_MEMBERS: Missing Trello API credentials")
             return {}
+        
+        if not trello_client:
+            print("  BOARD_MEMBERS: Trello client not available")
+            return {}
+        
+        # Use SAME board detection logic as scan_cards function
+        boards = trello_client.list_boards()
+        eeinteractive_board = None
+        
+        for board in boards:
+            if board.closed:
+                continue
+            if 'eeinteractive' in board.name.lower():
+                eeinteractive_board = board
+                break
+        
+        if not eeinteractive_board:
+            print("  BOARD_MEMBERS: EEInteractive board not found")
+            return {}
+        
+        board_id = eeinteractive_board.id
+        print(f"  BOARD_MEMBERS: Using board '{eeinteractive_board.name}' (ID: {board_id})")
         
         # Get board members
         url = f"https://api.trello.com/1/boards/{board_id}/members"
@@ -718,7 +739,19 @@ def get_board_members_mapping():
             return {}
         
         board_members = response.json()
+        print(f"  BOARD_MEMBERS: Found {len(board_members)} board members")
         member_mapping = {}
+        
+        # Debug: Show all board members and team members
+        print(f"  BOARD_MEMBERS: Available board members:")
+        for member in board_members:
+            member_name = member.get('fullName', '').strip()
+            member_id = member.get('id', '')
+            print(f"    - {member_name} (ID: {member_id})")
+        
+        print(f"  BOARD_MEMBERS: Team members to match:")
+        for team_name, whatsapp in TEAM_MEMBERS.items():
+            print(f"    - {team_name} -> {whatsapp}")
         
         # Create mapping from Trello member ID to team member info
         for member in board_members:
@@ -729,7 +762,11 @@ def get_board_members_mapping():
                 continue
                 
             # Match to our team members with name variations
+            matched = False
             for team_name, whatsapp in TEAM_MEMBERS.items():
+                if matched:
+                    break
+                    
                 team_lower = team_name.lower()
                 member_lower = member_name.lower()
                 
@@ -741,22 +778,25 @@ def get_board_members_mapping():
                     team_lower.replace(' ', ''),    # Remove spaces
                 ]
                 
-                is_match = False
+                print(f"  BOARD_MEMBERS: Checking '{member_name}' vs '{team_name}'")
+                
                 for variation in name_variations:
                     if (variation in member_lower or 
                         member_lower in variation or
                         any(part in member_lower for part in variation.split() if len(part) > 2)):
-                        is_match = True
+                        member_mapping[member_id] = {
+                            'team_name': team_name,
+                            'trello_name': member_name,
+                            'whatsapp': whatsapp
+                        }
+                        print(f"  BOARD_MEMBERS: ✅ MATCHED {member_name} ({member_id}) -> {team_name}")
+                        matched = True
                         break
                 
-                if is_match:
-                    member_mapping[member_id] = {
-                        'team_name': team_name,
-                        'trello_name': member_name,
-                        'whatsapp': whatsapp
-                    }
-                    print(f"  BOARD_MEMBERS: Mapped {member_name} ({member_id}) -> {team_name}")
-                    break
+                if not matched:
+                    print(f"  BOARD_MEMBERS: ❌ No match for '{member_name}' with '{team_name}'")
+        
+        print(f"  BOARD_MEMBERS: Final mapping has {len(member_mapping)} members")
         
         return member_mapping
         
@@ -3515,13 +3555,8 @@ def send_updates():
         if not selected_cards:
             return jsonify({'success': False, 'error': 'Selected cards not found'})
         
-        # Import team member mapping
-        TEAM_MEMBERS = {
-            'Levy': '237659250977@c.us',
-            'Lancey': '639264438378@c.us', 
-            'Wendy': '237677079267@c.us',
-            'Admin': '237659250977@c.us'
-        }
+        # Use global TEAM_MEMBERS instead of hardcoded duplicate
+        # (Removed hardcoded dictionary that was causing inconsistencies)
         
         sent_messages = []
         failed_messages = []

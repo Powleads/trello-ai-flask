@@ -48,13 +48,36 @@ class EnhancedTeamTracker:
         return team_members
     
     def get_board_members_mapping(self):
-        """Get board member mapping for accurate ID matching."""
+        """Get board member mapping using same board detection as scan_cards."""
         try:
-            board_id = os.environ.get('TRELLO_BOARD_ID')
-            
-            if not self.api_key or not self.token or not board_id:
-                print(f"[ENHANCED] Missing Trello credentials or board ID")
+            if not self.api_key or not self.token:
+                print(f"[ENHANCED] Missing Trello credentials")
                 return {}
+            
+            # Import trello_client from web_app - use same board detection
+            from web_app import trello_client
+            
+            if not trello_client:
+                print(f"[ENHANCED] Trello client not available")
+                return {}
+            
+            # Use SAME board detection logic as scan_cards function
+            boards = trello_client.list_boards()
+            eeinteractive_board = None
+            
+            for board in boards:
+                if board.closed:
+                    continue
+                if 'eeinteractive' in board.name.lower():
+                    eeinteractive_board = board
+                    break
+            
+            if not eeinteractive_board:
+                print(f"[ENHANCED] EEInteractive board not found")
+                return {}
+            
+            board_id = eeinteractive_board.id
+            print(f"[ENHANCED] Using board '{eeinteractive_board.name}' (ID: {board_id})")
             
             # Get board members
             url = f"https://api.trello.com/1/boards/{board_id}/members"
@@ -70,7 +93,19 @@ class EnhancedTeamTracker:
                 return {}
             
             board_members = response.json()
+            print(f"[ENHANCED] Found {len(board_members)} board members")
             member_mapping = {}
+            
+            # Debug: Show all board members and team members
+            print(f"[ENHANCED] Available board members:")
+            for member in board_members:
+                member_name = member.get('fullName', '').strip()
+                member_id = member.get('id', '')
+                print(f"  - {member_name} (ID: {member_id})")
+            
+            print(f"[ENHANCED] Team members to match:")
+            for team_name, whatsapp in self.team_members.items():
+                print(f"  - {team_name} -> {whatsapp}")
             
             # Create mapping from Trello member ID to team member info
             for member in board_members:
@@ -81,7 +116,11 @@ class EnhancedTeamTracker:
                     continue
                     
                 # Match to our team members with name variations
+                matched = False
                 for team_name, whatsapp in self.team_members.items():
+                    if matched:
+                        break
+                        
                     team_lower = team_name.lower()
                     member_lower = member_name.lower()
                     
@@ -93,22 +132,25 @@ class EnhancedTeamTracker:
                         team_lower.replace(' ', ''),    # Remove spaces
                     ]
                     
-                    is_match = False
+                    print(f"[ENHANCED] Checking '{member_name}' vs '{team_name}'")
+                    
                     for variation in name_variations:
                         if (variation in member_lower or 
                             member_lower in variation or
                             any(part in member_lower for part in variation.split() if len(part) > 2)):
-                            is_match = True
+                            member_mapping[member_id] = {
+                                'team_name': team_name,
+                                'trello_name': member_name,
+                                'whatsapp': whatsapp
+                            }
+                            print(f"[ENHANCED] ✅ MATCHED {member_name} ({member_id}) -> {team_name}")
+                            matched = True
                             break
                     
-                    if is_match:
-                        member_mapping[member_id] = {
-                            'team_name': team_name,
-                            'trello_name': member_name,
-                            'whatsapp': whatsapp
-                        }
-                        print(f"[ENHANCED] Mapped {member_name} ({member_id}) -> {team_name}")
-                        break
+                    if not matched:
+                        print(f"[ENHANCED] ❌ No match for '{member_name}' with '{team_name}'")
+            
+            print(f"[ENHANCED] Final mapping has {len(member_mapping)} members")
             
             return member_mapping
             
