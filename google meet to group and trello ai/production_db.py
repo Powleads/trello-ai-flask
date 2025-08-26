@@ -113,6 +113,42 @@ class ProductionDatabaseManager:
                 categories JSONB,
                 role TEXT,
                 active BOOLEAN DEFAULT TRUE,
+                notification_settings JSONB DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        ''')
+        
+        # Team tracker card status
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS team_tracker_cards (
+                id SERIAL PRIMARY KEY,
+                card_id TEXT UNIQUE NOT NULL,
+                card_name TEXT NOT NULL,
+                assignee_name TEXT NOT NULL,
+                assignee_phone TEXT,
+                last_assignee_comment_date TIMESTAMP,
+                message_count INTEGER DEFAULT 0,
+                last_message_sent TIMESTAMP,
+                escalation_level INTEGER DEFAULT 0,
+                next_message_due TIMESTAMP,
+                status TEXT DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        ''')
+        
+        # Team tracker messages with response tracking
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS team_tracker_messages (
+                id SERIAL PRIMARY KEY,
+                card_id TEXT NOT NULL,
+                assignee_name TEXT NOT NULL,
+                message_content TEXT,
+                sent_at TIMESTAMP DEFAULT NOW(),
+                response_detected_at TIMESTAMP,
+                escalation_level INTEGER DEFAULT 1,
+                next_followup_due TIMESTAMP,
+                status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         ''')
@@ -168,6 +204,42 @@ class ProductionDatabaseManager:
                 categories TEXT,
                 role TEXT,
                 active BOOLEAN DEFAULT TRUE,
+                notification_settings TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Team tracker card status
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS team_tracker_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_id TEXT UNIQUE NOT NULL,
+                card_name TEXT NOT NULL,
+                assignee_name TEXT NOT NULL,
+                assignee_phone TEXT,
+                last_assignee_comment_date TEXT,
+                message_count INTEGER DEFAULT 0,
+                last_message_sent TEXT,
+                escalation_level INTEGER DEFAULT 0,
+                next_message_due TEXT,
+                status TEXT DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Team tracker messages with response tracking
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS team_tracker_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_id TEXT NOT NULL,
+                assignee_name TEXT NOT NULL,
+                message_content TEXT,
+                sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                response_detected_at TEXT,
+                escalation_level INTEGER DEFAULT 1,
+                next_followup_due TEXT,
+                status TEXT DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -336,6 +408,186 @@ class ProductionDatabaseManager:
         except Exception as e:
             print(f"[DB] Error getting email history: {e}")
             return []
+    
+    def update_team_tracker_card(self, card_id: str, card_name: str, assignee_name: str, 
+                                 assignee_phone: str, last_comment_date: str = None) -> bool:
+        """Update or create team tracker card record"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.is_production:
+                # PostgreSQL
+                cursor.execute('''
+                    INSERT INTO team_tracker_cards 
+                    (card_id, card_name, assignee_name, assignee_phone, last_assignee_comment_date, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (card_id) DO UPDATE SET
+                    card_name = EXCLUDED.card_name,
+                    assignee_name = EXCLUDED.assignee_name,
+                    assignee_phone = EXCLUDED.assignee_phone,
+                    last_assignee_comment_date = COALESCE(EXCLUDED.last_assignee_comment_date, team_tracker_cards.last_assignee_comment_date),
+                    updated_at = NOW()
+                ''', (card_id, card_name, assignee_name, assignee_phone, last_comment_date))
+            else:
+                # SQLite
+                cursor.execute('''
+                    INSERT OR REPLACE INTO team_tracker_cards 
+                    (card_id, card_name, assignee_name, assignee_phone, last_assignee_comment_date, updated_at)
+                    VALUES (?, ?, ?, ?, ?, datetime('now'))
+                ''', (card_id, card_name, assignee_name, assignee_phone, last_comment_date))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[DB] Error updating team tracker card: {e}")
+            return False
+    
+    def get_team_tracker_card(self, card_id: str) -> Optional[Dict]:
+        """Get team tracker card status"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT card_id, card_name, assignee_name, assignee_phone, 
+                       last_assignee_comment_date, message_count, last_message_sent,
+                       escalation_level, next_message_due, status
+                FROM team_tracker_cards 
+                WHERE card_id = %s
+            ''' if self.is_production else '''
+                SELECT card_id, card_name, assignee_name, assignee_phone, 
+                       last_assignee_comment_date, message_count, last_message_sent,
+                       escalation_level, next_message_due, status
+                FROM team_tracker_cards 
+                WHERE card_id = ?
+            ''', (card_id,))
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    'card_id': result[0],
+                    'card_name': result[1],
+                    'assignee_name': result[2],
+                    'assignee_phone': result[3],
+                    'last_assignee_comment_date': result[4],
+                    'message_count': result[5],
+                    'last_message_sent': result[6],
+                    'escalation_level': result[7],
+                    'next_message_due': result[8],
+                    'status': result[9]
+                }
+            return None
+        except Exception as e:
+            print(f"[DB] Error getting team tracker card: {e}")
+            return None
+    
+    def log_team_tracker_message(self, card_id: str, assignee_name: str, message_content: str,
+                                 escalation_level: int = 1, next_followup_hours: int = 24) -> bool:
+        """Log a team tracker message and update card status"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Calculate next followup time
+            if self.is_production:
+                next_followup_sql = "NOW() + INTERVAL '%s hours'"
+                now_sql = "NOW()"
+                params = (card_id, assignee_name, message_content, escalation_level, next_followup_hours)
+            else:
+                next_followup_sql = "datetime('now', '+%s hours')"
+                now_sql = "datetime('now')"
+                params = (card_id, assignee_name, message_content, escalation_level, next_followup_hours)
+            
+            # Log the message
+            cursor.execute(f'''
+                INSERT INTO team_tracker_messages 
+                (card_id, assignee_name, message_content, escalation_level, next_followup_due)
+                VALUES ({'%s, %s, %s, %s, ' + next_followup_sql if self.is_production else '?, ?, ?, ?, ' + next_followup_sql})
+            ''', params)
+            
+            # Update card message count and status
+            if self.is_production:
+                cursor.execute('''
+                    UPDATE team_tracker_cards 
+                    SET message_count = message_count + 1,
+                        escalation_level = %s,
+                        last_message_sent = NOW(),
+                        next_message_due = NOW() + INTERVAL '%s hours',
+                        updated_at = NOW()
+                    WHERE card_id = %s
+                ''', (escalation_level, next_followup_hours, card_id))
+            else:
+                cursor.execute('''
+                    UPDATE team_tracker_cards 
+                    SET message_count = message_count + 1,
+                        escalation_level = ?,
+                        last_message_sent = datetime('now'),
+                        next_message_due = datetime('now', '+' || ? || ' hours'),
+                        updated_at = datetime('now')
+                    WHERE card_id = ?
+                ''', (escalation_level, next_followup_hours, card_id))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[DB] Error logging team tracker message: {e}")
+            return False
+    
+    def mark_team_tracker_response(self, card_id: str) -> bool:
+        """Mark that assignee has responded to a card"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Reset escalation and message count
+            if self.is_production:
+                cursor.execute('''
+                    UPDATE team_tracker_cards 
+                    SET escalation_level = 0,
+                        message_count = 0,
+                        last_assignee_comment_date = NOW(),
+                        next_message_due = NULL,
+                        status = 'responded',
+                        updated_at = NOW()
+                    WHERE card_id = %s
+                ''', (card_id,))
+                
+                cursor.execute('''
+                    UPDATE team_tracker_messages 
+                    SET response_detected_at = NOW(),
+                        status = 'responded'
+                    WHERE card_id = %s AND status = 'pending'
+                ''', (card_id,))
+            else:
+                cursor.execute('''
+                    UPDATE team_tracker_cards 
+                    SET escalation_level = 0,
+                        message_count = 0,
+                        last_assignee_comment_date = datetime('now'),
+                        next_message_due = NULL,
+                        status = 'responded',
+                        updated_at = datetime('now')
+                    WHERE card_id = ?
+                ''', (card_id,))
+                
+                cursor.execute('''
+                    UPDATE team_tracker_messages 
+                    SET response_detected_at = datetime('now'),
+                        status = 'responded'
+                    WHERE card_id = ? AND status = 'pending'
+                ''', (card_id,))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[DB] Error marking team tracker response: {e}")
+            return False
 
 # Global instance
 production_db = None

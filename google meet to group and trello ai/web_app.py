@@ -26,6 +26,7 @@ from gmail_tracker import GmailTracker, GmailScheduler, initialize_gmail_tracker
 from gmail_oauth import gmail_oauth
 from production_db import get_production_db
 from google_meet_analytics import google_meet_analytics
+from enhanced_team_tracker import enhanced_team_tracker
 
 # Import AI modules
 try:
@@ -2876,17 +2877,26 @@ def scan_cards():
             
             all_cards.append(card_data)
             
-            # Add to cards needing updates if over 24 hours
+            # Add to cards needing updates - but we'll filter with enhanced logic later
             if needs_update:
+                # Store the card object for enhanced processing
+                card_data['card'] = card  # Keep reference to original card object
                 cards_needing_updates.append(card_data)
+        
+        print(f"[ENHANCED] Found {len(cards_needing_updates)} cards with potential updates needed")
+        
+        # Use enhanced team tracker to filter cards that actually need messages
+        final_cards_needing_updates = enhanced_team_tracker.get_cards_needing_messages(cards_needing_updates)
+        
+        print(f"[ENHANCED] After enhanced filtering: {len(final_cards_needing_updates)} cards need messages")
         
         # Sort by hours since assigned user update (most urgent first)
         all_cards.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
-        cards_needing_updates.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
+        final_cards_needing_updates.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
         
         # Store in app_data for other endpoints
         app_data['all_cards'] = all_cards
-        app_data['cards_needing_updates'] = cards_needing_updates
+        app_data['cards_needing_updates'] = final_cards_needing_updates  # Use enhanced filtered results
         
         processing_time = time.time() - start_time
         print(f"Scanned {len(all_cards)} cards from EEInteractive board in {processing_time:.2f}s")
