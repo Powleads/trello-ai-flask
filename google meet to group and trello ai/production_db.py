@@ -83,7 +83,7 @@ class ProductionDatabaseManager:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS gmail_tokens (
                 id SERIAL PRIMARY KEY,
-                token_type VARCHAR(50) DEFAULT 'gmail_oauth',
+                token_type VARCHAR(50) DEFAULT 'gmail_oauth' UNIQUE,
                 token_data JSONB,
                 expires_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT NOW(),
@@ -95,6 +95,7 @@ class ProductionDatabaseManager:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS watch_rules (
                 id SERIAL PRIMARY KEY,
+                rule_name VARCHAR(100) DEFAULT 'default' UNIQUE,
                 rule_data JSONB,
                 active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT NOW(),
@@ -181,11 +182,11 @@ class ProductionDatabaseManager:
             if self.is_production:
                 # PostgreSQL
                 cursor.execute('''
-                    INSERT INTO gmail_tokens (token_data, updated_at) 
-                    VALUES (%s, NOW()) 
-                    ON CONFLICT (id) DO UPDATE SET 
+                    INSERT INTO gmail_tokens (token_type, token_data, updated_at) 
+                    VALUES (%s, %s, NOW()) 
+                    ON CONFLICT (token_type) DO UPDATE SET 
                     token_data = EXCLUDED.token_data, updated_at = NOW()
-                ''', (token_json,))
+                ''', ('gmail_oauth', token_json))
             else:
                 # SQLite
                 cursor.execute('''
@@ -228,11 +229,11 @@ class ProductionDatabaseManager:
             if self.is_production:
                 # PostgreSQL
                 cursor.execute('''
-                    INSERT INTO watch_rules (rule_data, updated_at) 
-                    VALUES (%s, NOW()) 
-                    ON CONFLICT (id) DO UPDATE SET 
+                    INSERT INTO watch_rules (rule_name, rule_data, updated_at) 
+                    VALUES (%s, %s, NOW()) 
+                    ON CONFLICT (rule_name) DO UPDATE SET 
                     rule_data = EXCLUDED.rule_data, updated_at = NOW()
-                ''', (rules_json,))
+                ''', ('default', rules_json))
             else:
                 # SQLite  
                 cursor.execute('''

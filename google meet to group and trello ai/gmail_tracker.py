@@ -790,14 +790,19 @@ def initialize_gmail_tracker():
     if gmail_tracker_instance is None:
         gmail_tracker_instance = GmailTracker()
         
-        # Set up Gmail API if credentials exist
-        if os.path.exists('credentials.json'):
-            try:
+        # Set up Gmail API - production or local
+        try:
+            # Try production OAuth first (environment variables)
+            if os.getenv('GOOGLE_CLIENT_ID') and os.getenv('GOOGLE_CLIENT_SECRET'):
+                print("[GMAIL] Using production OAuth (environment variables)")
+                gmail_tracker_instance.setup_production_gmail_service()
+            elif os.path.exists('credentials.json'):
+                print("[GMAIL] Using local credentials.json")
                 gmail_tracker_instance.setup_gmail_api()
-            except Exception as e:
-                print(f"[GMAIL] Setup skipped: {e}")
-        else:
-            print("[GMAIL] Gmail credentials not found - manual setup required")
+            else:
+                print("[GMAIL] No OAuth credentials found - authentication required via web interface")
+        except Exception as e:
+            print(f"[GMAIL] Setup error: {e}")
         
         # Print status about automation
         print("[GMAIL] Gmail tracker initialized")
