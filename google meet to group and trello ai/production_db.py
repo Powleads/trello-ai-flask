@@ -37,26 +37,35 @@ class ProductionDatabaseManager:
             print("[DB] Using specific PostgreSQL connection details")
         
         # Test PostgreSQL connection
+        print(f"[DB] POSTGRES_AVAILABLE: {POSTGRES_AVAILABLE}")
+        print(f"[DB] DATABASE_URL from env: {os.getenv('DATABASE_URL', 'NOT SET')}")
+        print(f"[DB] Constructed db_url: {self.db_url}")
+        
         if self.db_url and POSTGRES_AVAILABLE:
             try:
                 # Fix postgres:// to postgresql://
                 if self.db_url.startswith('postgres://'):
                     self.db_url = self.db_url.replace('postgres://', 'postgresql://', 1)
                 
+                print(f"[DB] Attempting PostgreSQL connection to: {self.db_url}")
                 # Test connection
                 conn = psycopg2.connect(self.db_url)
                 conn.close()
                 self.is_production = True
-                print("[DB] PostgreSQL connection successful")
+                print("[DB] ✅ PostgreSQL connection successful - using PostgreSQL database")
             except Exception as e:
-                print(f"[DB] PostgreSQL connection failed: {e}")
+                print(f"[DB] ❌ PostgreSQL connection failed: {e}")
                 print("[DB] Falling back to SQLite")
                 self.is_production = False
                 self.db_url = None
         else:
             self.is_production = False
             if not POSTGRES_AVAILABLE:
-                print("[DB] PostgreSQL not available, using SQLite")
+                print("[DB] ❌ psycopg2 not available, using SQLite")
+            elif not self.db_url:
+                print("[DB] ❌ No database URL configured, using SQLite")
+            else:
+                print("[DB] ❌ Unknown issue, using SQLite")
         
         self.init_database()
     

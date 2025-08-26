@@ -33,14 +33,19 @@ class EnhancedTeamTracker:
             if db_team_members:
                 team_members = db_team_members
                 print(f"[ENHANCED] Using database team members: {len(team_members)} members")
-                
+                print(f"[ENHANCED] Database members: {list(team_members.keys())}")
+                return team_members
+            else:
                 # Seed database if empty on first run
-                if not team_members:
-                    self.db.seed_team_members()
+                print("[ENHANCED] Database team members empty, seeding...")
+                if self.db.seed_team_members():
                     team_members = self.db.get_team_members()
                     print(f"[ENHANCED] Seeded database with {len(team_members)} team members")
-                    
-                return team_members
+                    print(f"[ENHANCED] Seeded members: {list(team_members.keys())}")
+                    if team_members:
+                        return team_members
+                else:
+                    print("[ENHANCED] Database seeding failed, trying other sources...")
         except Exception as e:
             print(f"[ENHANCED] Error loading from database: {e}")
         
@@ -52,6 +57,7 @@ class EnhancedTeamTracker:
         
         if team_members:
             print(f"[ENHANCED] Using environment variables: {len(team_members)} members")
+            print(f"[ENHANCED] Environment members: {list(team_members.keys())}")
             return team_members
         
         # Priority 3: Global TEAM_MEMBERS from web_app
