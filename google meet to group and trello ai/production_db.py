@@ -26,7 +26,8 @@ class ProductionDatabaseManager:
         self.db_url = os.getenv('DATABASE_URL')
         
         if self.is_production and not POSTGRES_AVAILABLE:
-            raise ImportError("PostgreSQL required for production but psycopg2 not installed")
+            print("[DB] WARNING: PostgreSQL not available, falling back to SQLite")
+            self.is_production = False  # Force SQLite fallback
         
         self.init_database()
     
