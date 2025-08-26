@@ -56,9 +56,26 @@ class EnhancedTeamTracker:
                 team_members[name] = value
         
         if team_members:
-            print(f"[ENHANCED] Using environment variables: {len(team_members)} members")
+            print(f"[ENHANCED] Found environment variables: {len(team_members)} members")
             print(f"[ENHANCED] Environment members: {list(team_members.keys())}")
-            return team_members
+            
+            # Seed database with environment variables, then use database going forward
+            try:
+                print("[ENHANCED] Seeding database with environment variables...")
+                for name, whatsapp in team_members.items():
+                    self.db.update_team_member(name, whatsapp, True)
+                
+                # Now get from database to ensure consistency
+                db_team_members = self.db.get_team_members()
+                if db_team_members:
+                    print(f"[ENHANCED] Migrated to database: {len(db_team_members)} members")
+                    return db_team_members
+                else:
+                    print("[ENHANCED] Database migration failed, using environment variables")
+                    return team_members
+            except Exception as e:
+                print(f"[ENHANCED] Error migrating env vars to database: {e}")
+                return team_members
         
         # Priority 3: Global TEAM_MEMBERS from web_app
         try:
@@ -80,6 +97,15 @@ class EnhancedTeamTracker:
             # NOTE: Removed James Taylor, Dustin Salinas, Ezechiel per user request
         }
         print(f"[ENHANCED] Using fallback team members (active team only): {len(team_members)} members")
+        
+        # Try to seed database with fallback data for future use
+        try:
+            print("[ENHANCED] Seeding database with fallback team members...")
+            for name, whatsapp in team_members.items():
+                self.db.update_team_member(name, whatsapp, True)
+            print("[ENHANCED] Database seeded with fallback team members")
+        except Exception as e:
+            print(f"[ENHANCED] Error seeding database with fallback: {e}")
         
         return team_members
     
