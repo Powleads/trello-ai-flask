@@ -192,33 +192,63 @@ class GmailTracker:
             print(f"[GMAIL] Error setting up Gmail API: {e}")
             return False
     
-    def categorize_email_with_ai(self, subject: str, content: str, sender: str) -> Dict[str, Any]:
-        """Use GPT-4o to categorize and analyze email importance."""
+    def categorize_email_with_ai(self, subject: str, content: str, sender: str, email_data: Dict = None) -> Dict[str, Any]:
+        """Use GPT-4o to categorize and analyze email importance based on matched rule."""
         if not self.openai_client:
-            return self.categorize_email_basic(subject, content, sender)
+            return self.categorize_email_basic(subject, content, sender, email_data)
         
-        prompt = f"""
-        Analyze this New Tech Onboarding email and provide categorization:
+        # Use rule-based assignment if available
+        if email_data and email_data.get('matched_rule'):
+            rule = email_data['matched_rule']
+            category = rule.get('category', 'other')
+            assignees = rule.get('assignees', [])
+            
+            prompt = f"""
+            Analyze this email that matched a specific watch rule and provide categorization:
 
-        FROM: {sender}
-        SUBJECT: {subject}
-        CONTENT: {content[:1000]}...
+            FROM: {sender}
+            SUBJECT: {subject}
+            CONTENT: {content[:1000]}...
+            
+            MATCHED RULE:
+            - Category: {category}
+            - Subject Filter: {rule.get('subject', 'N/A')}
+            - Sender Filter: {rule.get('sender', 'N/A')}
+            - Body Filter: {rule.get('body', 'N/A')}
+            - Assigned to: {', '.join(assignees) if assignees else 'Unassigned'}
 
-        This is a "New Tech Onboarding" email. Please analyze and return a JSON response with:
-        1. category: "onboarding" (fixed)
-        2. priority: 1-5 (5 = urgent, 3-4 = normal onboarding, 1-2 = low)
-        3. keywords: list of important onboarding-related keywords found
-        4. suggested_assignee: "James Taylor" (handles all onboarding)
-        5. summary: brief 1-sentence summary focused on the onboarding need
-        6. action_required: true (all onboarding emails need action)
+            Please analyze and return a JSON response with:
+            1. category: "{category}" (from matched rule)
+            2. priority: 1-5 (5 = urgent, 1 = low priority)
+            3. keywords: list of important keywords found
+            4. suggested_assignee: {assignees[0] if assignees else '"Unassigned"'} (from rule)
+            5. all_assignees: {assignees} (all people assigned to this category)
+            6. summary: brief 1-sentence summary focused on the content
+            7. action_required: boolean (whether immediate action is needed)
 
-        Focus on identifying:
-        - What type of onboarding this is (new client, tech setup, etc.)
-        - Any urgency indicators
-        - Specific requirements mentioned
+            Focus on determining priority and summarizing the content.
+            Response must be valid JSON only.
+            """
+        else:
+            # Fallback for emails without rules (shouldn't happen in new system)
+            prompt = f"""
+            Analyze this email and provide basic categorization:
 
-        Response must be valid JSON only.
-        """
+            FROM: {sender}
+            SUBJECT: {subject}
+            CONTENT: {content[:1000]}...
+
+            Please analyze and return a JSON response with:
+            1. category: "other"
+            2. priority: 1-5
+            3. keywords: list of important keywords found
+            4. suggested_assignee: "Unassigned"
+            5. all_assignees: []
+            6. summary: brief summary
+            7. action_required: boolean
+
+            Response must be valid JSON only.
+            """
         
         try:
             response = self.openai_client.chat.completions.create(
@@ -233,85 +263,164 @@ class GmailTracker:
             
         except Exception as e:
             print(f"[GMAIL] AI categorization failed: {e}")
-            return self.categorize_email_basic(subject, content, sender)
+            return self.categorize_email_basic(subject, content, sender, email_data)
     
-    def categorize_email_basic(self, subject: str, content: str, sender: str) -> Dict[str, Any]:
-        """Simplified email categorization focused on onboarding."""
+    def categorize_email_basic(self, subject: str, content: str, sender: str, email_data: Dict = None) -> Dict[str, Any]:
+        """Simplified email categorization based on matched rule."""
         text = f"{subject} {content}".lower()
         
-        # Simplified onboarding detection
-        onboarding_keywords = ['new tech onboarding', 'onboarding', 'new client', 'setup', 'welcome', 'getting started']
-        
-        category = "onboarding"  # Default to onboarding since we're filtering for it
-        priority = 3  # Medium-high priority for onboarding
-        keywords = []
-        
-        # Extract relevant keywords found in the email
-        for keyword in onboarding_keywords:
-            if keyword in text:
-                keywords.append(keyword)
-        
-        # Check for urgency indicators
-        urgency_keywords = ['urgent', 'asap', 'immediate', 'critical', 'emergency']
-        for urgent_word in urgency_keywords:
-            if urgent_word in text:
-                priority = 4
-                keywords.append(urgent_word)
-                break
-        
-        return {
-            'category': category,
-            'priority': priority,
-            'keywords': keywords,
-            'suggested_assignee': 'James Taylor',  # Default onboarding handler
-            'summary': f"New Tech Onboarding email from {sender}",
-            'action_required': priority >= 3  # All onboarding emails need action
-        }
+        # Use rule-based assignment if available
+        if email_data and email_data.get('matched_rule'):
+            rule = email_data['matched_rule']
+            category = rule.get('category', 'other')
+            assignees = rule.get('assignees', [])
+            
+            priority = 3  # Default medium priority
+            keywords = []
+            
+            # Extract keywords from rule filters
+            rule_keywords = []
+            if rule.get('subject'):
+                rule_keywords.extend(rule['subject'].lower().split())
+            if rule.get('body'):
+                rule_keywords.extend(rule['body'].lower().split())
+            
+            # Find which keywords are present in the email
+            for keyword in rule_keywords:
+                if keyword in text and len(keyword) > 2:  # Skip short words
+                    keywords.append(keyword)
+            
+            # Check for urgency indicators
+            urgency_keywords = ['urgent', 'asap', 'immediate', 'critical', 'emergency']
+            for urgent_word in urgency_keywords:
+                if urgent_word in text:
+                    priority = 5
+                    keywords.append(urgent_word)
+                    break
+            
+            return {
+                'category': category,
+                'priority': priority,
+                'keywords': keywords,
+                'suggested_assignee': assignees[0] if assignees else 'Unassigned',
+                'all_assignees': assignees,
+                'summary': f"Email from {sender} matching {category} rule",
+                'action_required': priority >= 3
+            }
+        else:
+            # Fallback for emails without rules
+            return {
+                'category': 'other',
+                'priority': 2,
+                'keywords': [],
+                'suggested_assignee': 'Unassigned',
+                'all_assignees': [],
+                'summary': f"Email from {sender}",
+                'action_required': False
+            }
     
-    def scan_recent_emails(self, hours_back: int = 24, subject_filter: str = "New Tech Onboarding") -> List[Dict]:
-        """Scan recent emails for processing - simplified to focus on specific subject."""
+    def get_watch_rules_from_web_interface(self) -> List[Dict]:
+        """Load watch rules from the web interface localStorage data."""
+        try:
+            # Try to read settings from a settings file if available
+            settings_file = 'gmail_automation_settings.json'
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    return settings.get('watchRules', [])
+            
+            # If no file exists, return empty list (manual scan mode)
+            return []
+            
+        except Exception as e:
+            print(f"[GMAIL] Error loading watch rules: {e}")
+            return []
+    
+    def scan_recent_emails(self, hours_back: int = 24, manual_rules: List[Dict] = None) -> List[Dict]:
+        """Scan recent emails based on active watch rules only."""
         if not self.gmail_service:
             print("[GMAIL] Gmail service not initialized")
             return []
         
+        # Get watch rules from web interface or use manual rules
+        watch_rules = manual_rules or self.get_watch_rules_from_web_interface()
+        
+        if not watch_rules:
+            print("[GMAIL] No active watch rules found. No emails will be scanned.")
+            print("[GMAIL] Please configure email watch rules in the web interface first.")
+            return []
+        
         try:
-            # Calculate time range (last 24 hours by default)
+            # Calculate time range
             since = datetime.now(timezone.utc) - timedelta(hours=hours_back)
-            
-            # Simplified query to focus on "New Tech Onboarding" emails only
-            query = f'subject:"{subject_filter}" after:{since.strftime("%Y/%m/%d")}'
-            
-            print(f"[GMAIL] Scanning for emails with subject containing: '{subject_filter}' in last {hours_back} hours")
-            
-            # Search for emails
-            results = self.gmail_service.users().messages().list(
-                userId='me', 
-                q=query,
-                maxResults=20  # Reduced limit since we're targeting specific emails
-            ).execute()
-            
-            messages = results.get('messages', [])
             processed_emails = []
             
-            print(f"[GMAIL] Found {len(messages)} emails to process")
+            print(f"[GMAIL] Scanning emails based on {len(watch_rules)} active watch rules...")
             
-            for message in messages:
+            # Process each watch rule
+            for rule_index, rule in enumerate(watch_rules):
+                subject_filter = rule.get('subject', '')
+                sender_filter = rule.get('sender', '')
+                body_filter = rule.get('body', '')
+                
+                # Skip empty rules
+                if not subject_filter and not sender_filter and not body_filter:
+                    continue
+                
+                # Build Gmail search query for this rule
+                query_parts = [f'after:{since.strftime("%Y/%m/%d")}']
+                
+                if subject_filter:
+                    query_parts.append(f'subject:"{subject_filter}"')
+                    
+                if sender_filter:
+                    query_parts.append(f'from:"{sender_filter}"')
+                
+                if body_filter:
+                    query_parts.append(f'"{body_filter}"')
+                
+                query = ' '.join(query_parts)
+                
+                print(f"[GMAIL] Rule {rule_index + 1}: {subject_filter or 'Any subject'} from {sender_filter or 'Any sender'}")
+                print(f"[GMAIL] Query: {query}")
+                
                 try:
-                    # Get full message
-                    msg = self.gmail_service.users().messages().get(
+                    # Search for emails matching this rule
+                    results = self.gmail_service.users().messages().list(
                         userId='me', 
-                        id=message['id']
+                        q=query,
+                        maxResults=50
                     ).execute()
                     
-                    # Extract email data
-                    email_data = self.extract_email_data(msg)
-                    if email_data:
-                        processed_emails.append(email_data)
-                        
+                    messages = results.get('messages', [])
+                    print(f"[GMAIL] Found {len(messages)} emails for this rule")
+                    
+                    for message in messages:
+                        try:
+                            # Get full message
+                            msg = self.gmail_service.users().messages().get(
+                                userId='me', 
+                                id=message['id']
+                            ).execute()
+                            
+                            # Extract email data
+                            email_data = self.extract_email_data(msg)
+                            if email_data and not any(e['id'] == email_data['id'] for e in processed_emails):
+                                # Add rule info to email data
+                                email_data['matched_rule'] = rule
+                                email_data['rule_category'] = rule.get('category', 'other')
+                                email_data['rule_assignees'] = rule.get('assignees', [])
+                                processed_emails.append(email_data)
+                                
+                        except Exception as e:
+                            print(f"Error processing message {message['id']}: {e}")
+                            continue
+                            
                 except Exception as e:
-                    print(f"Error processing message {message['id']}: {e}")
+                    print(f"Error processing rule {rule_index + 1}: {e}")
                     continue
             
+            print(f"[GMAIL] Total emails found matching all rules: {len(processed_emails)}")
             return processed_emails
             
         except HttpError as error:
@@ -382,25 +491,26 @@ class GmailTracker:
     def process_email(self, email_data: Dict) -> Dict:
         """Process a single email with AI categorization and team assignment."""
         try:
-            # Analyze email with AI
+            # Analyze email with AI (now includes rule context)
             analysis = self.categorize_email_with_ai(
                 email_data['subject'],
                 email_data['content'],
-                email_data['sender']
+                email_data['sender'],
+                email_data  # Pass full email_data for rule context
             )
             
             # Store in database
             self.store_email_history(email_data, analysis)
             
-            # Send notifications if required
+            # Send notifications to ALL assignees if required
             if analysis.get('action_required', False) or analysis.get('priority', 1) >= 3:
-                self.send_team_notification(email_data, analysis)
+                self.send_team_notifications_to_all_assignees(email_data, analysis)
             
             return {
                 'success': True,
                 'email_id': email_data['id'],
                 'category': analysis['category'],
-                'assigned_to': analysis['suggested_assignee'],
+                'assigned_to': analysis.get('all_assignees', [analysis.get('suggested_assignee', 'Unassigned')]),
                 'priority': analysis['priority']
             }
             
@@ -431,23 +541,33 @@ class GmailTracker:
         conn.commit()
         conn.close()
     
-    def send_team_notification(self, email_data: Dict, analysis: Dict) -> bool:
-        """Send WhatsApp notification to assigned team member."""
+    def send_team_notifications_to_all_assignees(self, email_data: Dict, analysis: Dict) -> bool:
+        """Send WhatsApp notifications to ALL assigned team members."""
+        success_count = 0
+        total_assignees = 0
+        
         try:
-            assignee = analysis['suggested_assignee']
-            whatsapp_number = self.team_members.get(assignee)
+            # Get all assignees from analysis
+            all_assignees = analysis.get('all_assignees', [])
+            if not all_assignees:
+                # Fallback to single assignee
+                assignee = analysis.get('suggested_assignee')
+                if assignee and assignee != 'Unassigned':
+                    all_assignees = [assignee]
             
-            if not whatsapp_number:
-                print(f"No WhatsApp number found for {assignee}")
+            if not all_assignees:
+                print(f"No assignees found for email {email_data['id']}")
                 return False
             
             # Create notification message
-            message = f"""📧 NEW IMPORTANT EMAIL
+            assignee_list = ', '.join(all_assignees) if len(all_assignees) > 1 else all_assignees[0]
+            message = f"""📧 NEW EMAIL ALERT
             
 👤 From: {email_data['sender']}
 📋 Subject: {email_data['subject']}
 🏷️ Category: {analysis['category']}
 ⚡ Priority: {analysis['priority']}/5
+👥 Assigned to: {assignee_list}
 
 📝 Summary: {analysis.get('summary', 'Email requires attention')}
 
@@ -457,12 +577,32 @@ Please check your email and respond as needed.
 
 - JGV Email Tracker"""
             
-            # Send via Green API
-            return self.send_whatsapp_message(whatsapp_number, message)
+            # Send to each assignee
+            for assignee in all_assignees:
+                total_assignees += 1
+                whatsapp_number = self.team_members.get(assignee)
+                
+                if not whatsapp_number:
+                    print(f"No WhatsApp number found for {assignee}")
+                    continue
+                
+                # Send via Green API
+                if self.send_whatsapp_message(whatsapp_number, message):
+                    success_count += 1
+                    print(f"✅ Notification sent to {assignee}")
+                else:
+                    print(f"❌ Failed to send notification to {assignee}")
+            
+            print(f"[GMAIL] Sent {success_count}/{total_assignees} notifications successfully")
+            return success_count > 0
             
         except Exception as e:
-            print(f"Error sending team notification: {e}")
+            print(f"Error sending team notifications: {e}")
             return False
+    
+    def send_team_notification(self, email_data: Dict, analysis: Dict) -> bool:
+        """Legacy method - redirects to new multi-assignee method."""
+        return self.send_team_notifications_to_all_assignees(email_data, analysis)
     
     def send_whatsapp_message(self, phone_number: str, message: str) -> bool:
         """Send WhatsApp message via Green API."""
@@ -524,65 +664,108 @@ Please check your email and respond as needed.
         except Exception as e:
             print(f"[GMAIL] Error updating WhatsApp status: {e}")
     
-    def run_automated_scan(self):
-        """Run automated scan for 'New Tech Onboarding' emails in last 24 hours."""
-        print("[GMAIL] Starting automated scan for 'New Tech Onboarding' emails...")
+    def run_automated_scan(self, hours_back: int = 24):
+        """Run automated scan based on active watch rules only."""
+        print("[GMAIL] Starting automated scan based on active watch rules...")
         
         try:
-            # Scan for "New Tech Onboarding" emails in last 24 hours
-            emails = self.scan_recent_emails(hours_back=24, subject_filter="New Tech Onboarding")
+            # Get watch rules from web interface
+            watch_rules = self.get_watch_rules_from_web_interface()
+            
+            if not watch_rules:
+                print("[GMAIL] No active watch rules found. Automated scan cancelled.")
+                print("[GMAIL] Please configure email watch rules in the web interface.")
+                return
+            
+            # Scan emails based on active rules
+            emails = self.scan_recent_emails(hours_back=hours_back)
             
             if not emails:
-                print("[GMAIL] No 'New Tech Onboarding' emails found in last 24 hours")
+                print(f"[GMAIL] No emails found matching active watch rules in last {hours_back} hours")
                 return
             
             processed_count = 0
             notifications_sent = 0
+            category_counts = {}
             
-            print(f"[GMAIL] Processing {len(emails)} New Tech Onboarding emails...")
+            print(f"[GMAIL] Processing {len(emails)} emails matching active rules...")
             
             for email_data in emails:
                 result = self.process_email(email_data)
                 if result['success']:
                     processed_count += 1
-                    notifications_sent += 1  # All onboarding emails trigger notifications
+                    category = result.get('category', 'other')
+                    category_counts[category] = category_counts.get(category, 0) + 1
+                    
+                    # Count assignees for notifications
+                    assignees = result.get('assigned_to', [])
+                    if isinstance(assignees, list):
+                        notifications_sent += len(assignees)
+                    elif assignees and assignees != 'Unassigned':
+                        notifications_sent += 1
             
-            # Send simplified group summary
-            self.send_onboarding_summary(processed_count, notifications_sent)
+            # Send rule-based summary
+            self.send_rule_based_summary(processed_count, notifications_sent, category_counts, len(watch_rules))
             
-            print(f"[GMAIL] Processed {processed_count} onboarding emails, sent {notifications_sent} notifications")
+            print(f"[GMAIL] Processed {processed_count} emails, sent {notifications_sent} notifications")
             
         except Exception as e:
-            print(f"Error in onboarding scan: {e}")
+            print(f"Error in automated scan: {e}")
     
-    def send_onboarding_summary(self, processed_count: int, notifications_sent: int):
-        """Send simplified onboarding summary to group chat."""
+    def send_rule_based_summary(self, processed_count: int, notifications_sent: int, category_counts: Dict, rule_count: int):
+        """Send summary based on active watch rules to group chat."""
         group_chat_id = os.getenv('WHATSAPP_GROUP_CHAT_ID', '120363401025025313@g.us')
         
         if processed_count > 0:
-            message = f"""🎯 NEW TECH ONBOARDING TRACKER
+            # Build category breakdown
+            category_lines = []
+            for category, count in category_counts.items():
+                emoji_map = {
+                    'onboarding': '📋',
+                    'tech_issues': '🔧', 
+                    'ghl_support': '🚀',
+                    'client_communication': '💬',
+                    'system_alerts': '⚠️',
+                    'other': '📄'
+                }
+                emoji = emoji_map.get(category, '📄')
+                category_lines.append(f"{emoji} {category.replace('_', ' ').title()}: {count}")
+            
+            category_breakdown = '\n'.join(category_lines)
+            
+            message = f"""🎯 EMAIL TRACKER SUMMARY
 
-📧 Found: {processed_count} new onboarding email(s)
-👤 Assigned to: James Taylor
+📧 Emails processed: {processed_count}
+📋 Active watch rules: {rule_count}
 🔔 Notifications sent: {notifications_sent}
 ⏰ Scan time: {datetime.now().strftime('%H:%M %p')}
 
-All onboarding emails have been flagged for immediate attention.
+📊 Category breakdown:
+{category_breakdown}
 
-- JGV Onboarding Tracker (Automated)"""
+All matching emails have been assigned to team members.
+
+- JGV Email Tracker (Automated)"""
         else:
-            message = f"""🎯 NEW TECH ONBOARDING TRACKER
+            message = f"""🎯 EMAIL TRACKER SUMMARY
 
-✅ No new onboarding emails in last 24 hours
+✅ No new emails matching active rules
+📋 Active watch rules: {rule_count}
 ⏰ Scan time: {datetime.now().strftime('%H:%M %p')}
 
-- JGV Onboarding Tracker (Automated)"""
+- JGV Email Tracker (Automated)"""
         
         self.send_whatsapp_message(group_chat_id, message)
+    
+    def send_onboarding_summary(self, processed_count: int, notifications_sent: int):
+        """Legacy method - redirects to rule-based summary."""
+        category_counts = {'onboarding': processed_count} if processed_count > 0 else {}
+        self.send_rule_based_summary(processed_count, notifications_sent, category_counts, 1)
         
     def send_group_summary(self, processed_count: int, notifications_sent: int):
-        """Legacy method - redirects to onboarding summary."""
-        self.send_onboarding_summary(processed_count, notifications_sent)
+        """Legacy method - redirects to rule-based summary."""
+        category_counts = {'other': processed_count} if processed_count > 0 else {}
+        self.send_rule_based_summary(processed_count, notifications_sent, category_counts, 0)
     
     def get_email_history(self, limit: int = 50) -> List[Dict]:
         """Get recent email processing history."""
@@ -617,22 +800,39 @@ All onboarding emails have been flagged for immediate attention.
 
 # Automated scanning scheduler
 class GmailScheduler:
-    """Scheduler for automated Gmail scanning twice daily."""
+    """Scheduler for automated Gmail scanning - only runs when enabled in web interface."""
     
     def __init__(self, gmail_tracker: GmailTracker):
         self.gmail_tracker = gmail_tracker
         self.running = False
         self.thread = None
     
+    def is_auto_scan_enabled(self) -> bool:
+        """Check if automatic scanning is enabled in web interface settings."""
+        try:
+            settings_file = 'gmail_automation_settings.json'
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    return settings.get('enableAutoScan', False)  # Default to FALSE
+            return False
+        except Exception as e:
+            print(f"[GMAIL] Error checking auto-scan setting: {e}")
+            return False
+    
     def start_scheduler(self):
-        """Start the automated scanning scheduler."""
+        """Start the automated scanning scheduler - only if enabled."""
         if self.running:
+            return
+            
+        if not self.is_auto_scan_enabled():
+            print("[GMAIL] Automated scanning is disabled in web interface")
             return
         
         self.running = True
         self.thread = threading.Thread(target=self._scheduler_loop, daemon=True)
         self.thread.start()
-        print("[GMAIL] Scheduler started - scanning twice daily (6 AM & 6 PM PST)")
+        print("[GMAIL] Scheduler started - will check for enabled scans twice daily")
     
     def stop_scheduler(self):
         """Stop the automated scanning scheduler."""
@@ -642,9 +842,15 @@ class GmailScheduler:
         print("[GMAIL] Scheduler stopped")
     
     def _scheduler_loop(self):
-        """Main scheduler loop."""
+        """Main scheduler loop - checks settings before each scan."""
         while self.running:
             try:
+                # Check if auto-scan is still enabled
+                if not self.is_auto_scan_enabled():
+                    print("[GMAIL] Auto-scan disabled, stopping scheduler")
+                    self.running = False
+                    break
+                
                 now = datetime.now()
                 
                 # Check if it's time for scheduled scan (6 AM or 6 PM)
@@ -681,19 +887,62 @@ def initialize_gmail_tracker():
                 print(f"[GMAIL] Setup skipped: {e}")
         else:
             print("[GMAIL] Gmail credentials not found - manual setup required")
+        
+        # Print status about automation
+        print("[GMAIL] Gmail tracker initialized")
+        print("[GMAIL] Automated scanning is DISABLED by default")
+        print("[GMAIL] Enable in web interface to activate scheduled scans")
     
     return gmail_tracker_instance
 
 
+def create_settings_from_web_interface():
+    """Helper to create settings file from web interface (for testing)."""
+    # Example settings structure - this would normally come from the web interface
+    example_settings = {
+        "enableAutoScan": False,  # Default to OFF
+        "watchRules": [
+            {
+                "subject": "New Tech Onboarding",
+                "sender": "",
+                "body": "",
+                "category": "onboarding",
+                "assignees": ["James Taylor"],
+                "notes": "Default onboarding rule",
+                "created_at": datetime.now().isoformat()
+            }
+        ],
+        "teamMembers": [
+            {"name": "James Taylor", "phone": "19056064550@c.us"},
+            {"name": "Breyden", "phone": "12894434373@c.us"},
+            {"name": "Ezechiel", "phone": "12894434373@c.us"},
+            {"name": "Dustin Salinas", "phone": "19054251997@c.us"}
+        ]
+    }
+    
+    with open('gmail_automation_settings.json', 'w') as f:
+        json.dump(example_settings, f, indent=2)
+    print("Example settings file created: gmail_automation_settings.json")
+
 if __name__ == "__main__":
     # Test the Gmail tracker
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "create-settings":
+        create_settings_from_web_interface()
+        sys.exit(0)
+    
     tracker = GmailTracker()
     
     if tracker.setup_gmail_api():
         print("Testing Gmail tracker...")
         emails = tracker.scan_recent_emails(hours_back=24)
-        print(f"Found {len(emails)} emails")
+        print(f"Found {len(emails)} emails matching active watch rules")
         
-        for email in emails[:3]:  # Process first 3 emails
-            result = tracker.process_email(email)
-            print(f"Processed: {result}")
+        if emails:
+            for email in emails[:3]:  # Process first 3 emails
+                result = tracker.process_email(email)
+                print(f"Processed: {result}")
+        else:
+            print("No emails found. Make sure you have active watch rules configured.")
+            print("Run 'python gmail_tracker.py create-settings' to create example settings.")

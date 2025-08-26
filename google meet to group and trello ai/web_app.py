@@ -3635,8 +3635,18 @@ def manual_gmail_scan():
             return jsonify({'success': False, 'error': 'Gmail tracker not configured'})
         
         print("[MANUAL] Starting manual Gmail scan...")
-        gmail_tracker.run_automated_scan()
-        return jsonify({'success': True, 'message': 'Gmail scan completed'})
+        
+        # Check if settings file exists
+        settings_file = 'gmail_automation_settings.json'
+        if not os.path.exists(settings_file):
+            return jsonify({
+                'success': False, 
+                'error': 'No Gmail watch rules configured. Please set up email watch rules in the interface first.'
+            })
+        
+        # Run scan with current settings
+        gmail_tracker.run_automated_scan(hours_back=24)
+        return jsonify({'success': True, 'message': 'Gmail scan completed - check console for details'})
     except Exception as e:
         print(f"Error in manual Gmail scan: {e}")
         return jsonify({'success': False, 'error': str(e)})
@@ -3659,6 +3669,38 @@ def get_gmail_history():
         })
     except Exception as e:
         print(f"Error getting Gmail history: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/gmail-sync-settings', methods=['POST'])
+@login_required
+def sync_gmail_settings():
+    """Sync Gmail automation settings from web interface to JSON file for backend scanner."""
+    try:
+        data = request.get_json()
+        
+        # Validate required data
+        if not data:
+            return jsonify({'success': False, 'error': 'No settings data provided'})
+        
+        # Create settings file for Gmail tracker
+        settings_file = 'gmail_automation_settings.json'
+        
+        # Save settings to JSON file
+        with open(settings_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        print(f"[GMAIL] Settings synced to {settings_file}")
+        print(f"[GMAIL] Auto-scan enabled: {data.get('enableAutoScan', False)}")
+        print(f"[GMAIL] Watch rules: {len(data.get('watchRules', []))}")
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Gmail settings synced successfully',
+            'settings_file': settings_file
+        })
+        
+    except Exception as e:
+        print(f"Error syncing Gmail settings: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/send-tracked-updates', methods=['POST'])

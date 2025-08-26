@@ -1065,7 +1065,32 @@ function saveAutomationSettings() {
     // Save to localStorage with persistence
     localStorage.setItem('gmailAutomationSettings', JSON.stringify(settings));
     updateAutomationStatus();
+    
+    // Sync settings to backend for Gmail scanner
+    syncSettingsToBackend(settings);
+    
     showNotification('Automation settings saved successfully!', 'success');
+}
+
+async function syncSettingsToBackend(settings) {
+    try {
+        const response = await fetch('/api/gmail-sync-settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            console.log('Settings synced to backend successfully');
+        } else {
+            console.error('Failed to sync settings to backend:', result.error);
+        }
+    } catch (error) {
+        console.error('Error syncing settings to backend:', error);
+    }
 }
 
 function loadAutomationSettings() {
@@ -1600,6 +1625,18 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTeamMemberOptions();
     updateWatchCategoryOptions();
     updateCurrentTime();
+    
+    // Sync initial settings to backend after loading
+    if (saved) {
+        setTimeout(() => {
+            try {
+                const settings = JSON.parse(saved);
+                syncSettingsToBackend(settings);
+            } catch (e) {
+                console.error('Error syncing initial settings:', e);
+            }
+        }, 1000);
+    }
     
     // Run test on load (can be removed later)
     testCategoryAssignments();
