@@ -224,10 +224,20 @@ class EnhancedTeamTracker:
                 if should_send:
                     card['message_data'] = message_data
                     card['send_reason'] = reason
-                    cards_needing_messages.append(card)
-                    print(f"[ENHANCED] SEND MESSAGE: {card['card'].name} -> {assignee_name} ({reason})")
+                    
+                    # Remove the raw card object to make it JSON serializable
+                    card_copy = card.copy()
+                    if 'card' in card_copy:
+                        # Keep only essential data from the card object
+                        trello_card = card_copy['card']
+                        card_copy['card_id'] = card_id
+                        card_copy['card_url'] = getattr(trello_card, 'url', '')
+                        del card_copy['card']  # Remove the non-serializable object
+                    
+                    cards_needing_messages.append(card_copy)
+                    print(f"[ENHANCED] SEND MESSAGE: {assignee_name} -> {card.get('name', 'Unknown')} ({reason})")
                 else:
-                    print(f"[ENHANCED] SKIP MESSAGE: {card['card'].name} -> {assignee_name} ({reason})")
+                    print(f"[ENHANCED] SKIP MESSAGE: {assignee_name} -> {card.get('name', 'Unknown')} ({reason})")
         
         return cards_needing_messages
 

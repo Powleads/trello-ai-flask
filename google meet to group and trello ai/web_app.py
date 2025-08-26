@@ -2897,6 +2897,12 @@ def scan_cards():
         
         print(f"[ENHANCED] After enhanced filtering: {len(final_cards_needing_updates)} cards need messages")
         
+        # Clean up any remaining card objects from the original cards_needing_updates
+        # (The enhanced tracker should have cleaned them, but let's be safe)
+        for card in cards_needing_updates:
+            if 'card' in card:
+                del card['card']
+        
         # Sort by hours since assigned user update (most urgent first)
         all_cards.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
         final_cards_needing_updates.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
