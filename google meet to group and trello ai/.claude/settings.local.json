@@ -32,7 +32,10 @@
       "mcp__JustGoingViral__eesystem",
       "mcp__JustGoingViral__list_directory",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(start http://localhost:5000/gmail-tracker)",
+      "Bash(sqlite3:*)",
+      "Bash(del gmail_tracker.db)"
     ],
     "deny": [],
     "ask": []

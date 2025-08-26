@@ -1,0 +1,77 @@
+{
+  "enableAutoScan": false,
+  "scanFrequency": "daily",
+  "customTimes": {
+    "time1": "06:00",
+    "time2": "18:00"
+  },
+  "notificationRoute": "individual",
+  "enableSummary": false,
+  "watchRules": [
+    {
+      "subject": "New Tech Onboarding",
+      "sender": "",
+      "body": "",
+      "category": "onboarding",
+      "assignees": [
+        "Levy",
+        "Wendy",
+        "Forka",
+        "Brayan"
+      ],
+      "notes": "Auto-assigned rule",
+      "created_at": "08/25/2025, 11:20:12 PM PDT"
+    }
+  ],
+  "teamMembers": [
+    {
+      "name": "Levy",
+      "phone": "237659250977@c.us",
+      "categories": [
+        "onboarding"
+      ],
+      "role": "Implementation Specialist"
+    },
+    {
+      "name": "Wendy",
+      "phone": "237677079267@c.us",
+      "categories": [
+        "client_communication"
+      ],
+      "role": "Client Success"
+    },
+    {
+      "name": "Forka",
+      "phone": "237652275097@c.us",
+      "categories": [
+        "system_alerts"
+      ],
+      "role": "System Admin"
+    },
+    {
+      "name": "Brayan",
+      "phone": "237676267420@c.us",
+      "categories": [
+        "other"
+      ],
+      "role": "Support"
+    }
+  ],
+  "categoryAssignments": {
+    "onboarding": [
+      "Levy",
+      "Wendy",
+      "Forka",
+      "Brayan"
+    ],
+    "tech_issues": [],
+    "ghl_support": [],
+    "client_communication": [],
+    "system_alerts": [],
+    "other": []
+  },
+  "messageTemplates": {
+    "individual": "\ud83d\udce7 NEW EMAIL ALERT\n\n\ud83d\udc64 From: [sender_email]\n\ud83d\udccb Subject: [email_subject]\n\ud83c\udff7\ufe0f Category: [category]\n\n\ud83d\udcdd Summary: [ai_summary]\n\n\ud83d\udd17 Keywords: [keywords]\n\nPlease check admin email and respond as needed.\n\n\u23f0 Time: [las_vegas_time]\n- JGV Gmail Tracker",
+    "group": "\ud83c\udfaf EMAIL TRACKER SUMMARY\n\n\ud83d\udce7 Found: [email_count] new email(s)\n\ud83d\udd14 Notifications sent: [notification_count]\n\u23f0 Scan time: [las_vegas_time]\n\nAll emails have been flagged for attention.\n\n- JGV Email Tracker (Automated)"
+  }
+}

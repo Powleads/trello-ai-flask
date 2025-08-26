@@ -3631,24 +3631,39 @@ def manual_scan():
 def manual_gmail_scan():
     """Manually trigger Gmail scan for testing."""
     try:
-        if not gmail_tracker or not gmail_tracker.gmail_service:
-            return jsonify({'success': False, 'error': 'Gmail tracker not configured'})
+        print("[MANUAL] ===== STARTING MANUAL GMAIL SCAN =====")
+        print(f"[MANUAL] Gmail tracker exists: {gmail_tracker is not None}")
+        print(f"[MANUAL] Gmail service exists: {gmail_tracker.gmail_service is not None if gmail_tracker else False}")
         
-        print("[MANUAL] Starting manual Gmail scan...")
+        if not gmail_tracker or not gmail_tracker.gmail_service:
+            print("[MANUAL] ERROR: Gmail tracker not configured")
+            return jsonify({'success': False, 'error': 'Gmail tracker not configured'})
         
         # Check if settings file exists
         settings_file = 'gmail_automation_settings.json'
+        print(f"[MANUAL] Settings file exists: {os.path.exists(settings_file)}")
         if not os.path.exists(settings_file):
             return jsonify({
                 'success': False, 
                 'error': 'No Gmail watch rules configured. Please set up email watch rules in the interface first.'
             })
         
+        # Show settings content
+        with open(settings_file, 'r') as f:
+            settings = json.load(f)
+            print(f"[MANUAL] Watch rules count: {len(settings.get('watchRules', []))}")
+            for i, rule in enumerate(settings.get('watchRules', [])):
+                print(f"[MANUAL] Rule {i+1}: '{rule.get('subject', '')}' -> {rule.get('category', '')} -> {rule.get('assignees', [])}")
+        
+        print("[MANUAL] Calling gmail_tracker.run_automated_scan()...")
         # Run scan with current settings
         gmail_tracker.run_automated_scan(hours_back=24)
+        print("[MANUAL] ===== MANUAL GMAIL SCAN COMPLETE =====")
         return jsonify({'success': True, 'message': 'Gmail scan completed - check console for details'})
     except Exception as e:
-        print(f"Error in manual Gmail scan: {e}")
+        print(f"[MANUAL] ERROR in manual Gmail scan: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/gmail-history', methods=['GET'])

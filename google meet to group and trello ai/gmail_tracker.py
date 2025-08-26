@@ -44,14 +44,8 @@ class GmailTracker:
             'Dustin Salinas': '19054251997@c.us'
         }
         
-        # Email categorization patterns
-        self.category_patterns = {
-            'onboarding': ['onboarding', 'new client', 'welcome', 'getting started', 'setup'],
-            'ghl_support': ['gohighlevel', 'ghl', 'support ticket', 'technical issue'],
-            'tech_issues': ['error', 'bug', 'problem', 'not working', 'broken', 'issue'],
-            'client_communication': ['client', 'customer', 'urgent', 'request'],
-            'system_alerts': ['alert', 'notification', 'system', 'automated', 'monitoring']
-        }
+        # NO hardcoded patterns - ONLY use watch rules from web interface
+        print("[GMAIL] Hardcoded category patterns REMOVED - using web interface rules only")
     
     def setup_database(self):
         """Initialize SQLite database with required tables."""
@@ -82,7 +76,7 @@ class GmailTracker:
                 category TEXT,
                 assigned_to TEXT,
                 whatsapp_sent BOOLEAN DEFAULT FALSE,
-                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                processed_at TEXT,
                 email_content TEXT,
                 priority INTEGER DEFAULT 1
             )
@@ -100,19 +94,9 @@ class GmailTracker:
             )
         ''')
         
-        # Default team member rules
-        default_rules = [
-            ('onboarding,new client,setup', 'James Taylor', 1),
-            ('gohighlevel,ghl,technical', 'Ezechiel', 2),
-            ('design,creative,branding', 'Breyden', 2),
-            ('urgent,critical,emergency', 'James Taylor', 3)
-        ]
-        
-        for keywords, member, priority in default_rules:
-            cursor.execute('''
-                INSERT OR IGNORE INTO team_member_rules (keywords, team_member, priority)
-                VALUES (?, ?, ?)
-            ''', (keywords, member, priority))
+        # NO default rules - ONLY use watch rules from web interface
+        print("[GMAIL] Default database rules REMOVED - using web interface rules only")
+        # The team_member_rules table exists but will remain empty - only web interface rules are used
         
         conn.commit()
         conn.close()
@@ -381,8 +365,9 @@ class GmailTracker:
                 
                 query = ' '.join(query_parts)
                 
-                print(f"[GMAIL] Rule {rule_index + 1}: {subject_filter or 'Any subject'} from {sender_filter or 'Any sender'}")
+                print(f"[GMAIL] RULE {rule_index + 1}: '{subject_filter or 'Any subject'}' from '{sender_filter or 'Any sender'}' -> {rule.get('category', 'unknown')}")
                 print(f"[GMAIL] Query: {query}")
+                print(f"[GMAIL] Assignees: {', '.join(rule.get('assignees', []))}")
                 
                 try:
                     # Search for emails matching this rule
@@ -393,7 +378,7 @@ class GmailTracker:
                     ).execute()
                     
                     messages = results.get('messages', [])
-                    print(f"[GMAIL] Found {len(messages)} emails for this rule")
+                    print(f"[GMAIL] Found {len(messages)} emails matching rule: '{subject_filter or 'Any subject'}'")
                     
                     for message in messages:
                         try:
@@ -411,6 +396,7 @@ class GmailTracker:
                                 email_data['rule_category'] = rule.get('category', 'other')
                                 email_data['rule_assignees'] = rule.get('assignees', [])
                                 processed_emails.append(email_data)
+                                print(f"[GMAIL] Email matched: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
                                 
                         except Exception as e:
                             print(f"Error processing message {message['id']}: {e}")
@@ -420,7 +406,19 @@ class GmailTracker:
                     print(f"Error processing rule {rule_index + 1}: {e}")
                     continue
             
-            print(f"[GMAIL] Total emails found matching all rules: {len(processed_emails)}")
+            print(f"[GMAIL] TOTAL EMAILS FOUND: {len(processed_emails)} matching {len(watch_rules)} active rules")
+            
+            # Debug: Show summary by category
+            category_counts = {}
+            for email in processed_emails:
+                cat = email.get('rule_category', 'unknown')
+                category_counts[cat] = category_counts.get(cat, 0) + 1
+            
+            if category_counts:
+                print(f"[GMAIL] BREAKDOWN BY CATEGORY:")
+                for cat, count in category_counts.items():
+                    print(f"[GMAIL]    {cat}: {count} emails")
+            
             return processed_emails
             
         except HttpError as error:
@@ -443,6 +441,7 @@ class GmailTracker:
             
             # Check if already processed
             if self.is_email_processed(message['id']):
+                print(f"[GMAIL] Skipping already processed email: {subject[:30]}...")
                 return None
             
             return {
@@ -520,22 +519,36 @@ class GmailTracker:
     
     def store_email_history(self, email_data: Dict, analysis: Dict):
         """Store processed email in database."""
+        import pytz
+        from datetime import datetime
+        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
+        # Get all assignees and join them with commas
+        all_assignees = analysis.get('all_assignees', [])
+        if not all_assignees:
+            all_assignees = [analysis.get('suggested_assignee', 'Unassigned')]
+        assignees_text = ', '.join(all_assignees)
+        
+        # Get Vegas time for timestamp
+        vegas_tz = pytz.timezone('America/Los_Angeles')
+        vegas_time = datetime.now(vegas_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+        
         cursor.execute('''
             INSERT OR REPLACE INTO email_history 
-            (email_id, subject, sender, recipient, category, assigned_to, email_content, priority)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (email_id, subject, sender, recipient, category, assigned_to, email_content, priority, processed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             email_data['id'],
             email_data['subject'],
             email_data['sender'],
             email_data['recipient'],
             analysis['category'],
-            analysis['suggested_assignee'],
+            assignees_text,  # Store all assignees as comma-separated string
             email_data['content'],
-            analysis['priority']
+            analysis['priority'],
+            vegas_time  # Use Vegas time
         ))
         
         conn.commit()
@@ -561,17 +574,17 @@ class GmailTracker:
             
             # Create notification message
             assignee_list = ', '.join(all_assignees) if len(all_assignees) > 1 else all_assignees[0]
-            message = f"""📧 NEW EMAIL ALERT
+            message = f"""NEW EMAIL ALERT
             
-👤 From: {email_data['sender']}
-📋 Subject: {email_data['subject']}
-🏷️ Category: {analysis['category']}
-⚡ Priority: {analysis['priority']}/5
-👥 Assigned to: {assignee_list}
+From: {email_data['sender']}
+Subject: {email_data['subject']}
+Category: {analysis['category']}
+Priority: {analysis['priority']}/5
+Assigned to: {assignee_list}
 
-📝 Summary: {analysis.get('summary', 'Email requires attention')}
+Summary: {analysis.get('summary', 'Email requires attention')}
 
-🔗 Keywords: {', '.join(analysis.get('keywords', []))}
+Keywords: {', '.join(analysis.get('keywords', []))}
 
 Please check your email and respond as needed.
 
@@ -589,7 +602,7 @@ Please check your email and respond as needed.
                 # Send via Green API
                 if self.send_whatsapp_message(whatsapp_number, message):
                     success_count += 1
-                    print(f"✅ Notification sent to {assignee}")
+                    print(f"Notification sent to {assignee}")
                 else:
                     print(f"❌ Failed to send notification to {assignee}")
             
@@ -626,12 +639,12 @@ Please check your email and respond as needed.
             response = requests.post(url, json=payload, timeout=30)
             
             if response.status_code == 200:
-                print(f"[GMAIL] ✅ WhatsApp notification sent to {phone_number}")
+                print(f"[GMAIL] WhatsApp notification sent to {phone_number}")
                 # Update database to mark as sent
                 self.mark_whatsapp_sent(phone_number, True)
                 return True
             else:
-                print(f"[GMAIL] ❌ WhatsApp send failed: {response.status_code} - {response.text}")
+                print(f"[GMAIL] WhatsApp send failed: {response.status_code} - {response.text}")
                 return False
                 
         except Exception as e:
@@ -720,38 +733,29 @@ Please check your email and respond as needed.
             # Build category breakdown
             category_lines = []
             for category, count in category_counts.items():
-                emoji_map = {
-                    'onboarding': '📋',
-                    'tech_issues': '🔧', 
-                    'ghl_support': '🚀',
-                    'client_communication': '💬',
-                    'system_alerts': '⚠️',
-                    'other': '📄'
-                }
-                emoji = emoji_map.get(category, '📄')
-                category_lines.append(f"{emoji} {category.replace('_', ' ').title()}: {count}")
+                    category_lines.append(f"{category.replace('_', ' ').title()}: {count}")
             
             category_breakdown = '\n'.join(category_lines)
             
-            message = f"""🎯 EMAIL TRACKER SUMMARY
+            message = f"""EMAIL TRACKER SUMMARY
 
-📧 Emails processed: {processed_count}
-📋 Active watch rules: {rule_count}
-🔔 Notifications sent: {notifications_sent}
-⏰ Scan time: {datetime.now().strftime('%H:%M %p')}
+Emails processed: {processed_count}
+Active watch rules: {rule_count}
+Notifications sent: {notifications_sent}
+Scan time: {datetime.now().strftime('%H:%M %p')}
 
-📊 Category breakdown:
+Category breakdown:
 {category_breakdown}
 
 All matching emails have been assigned to team members.
 
 - JGV Email Tracker (Automated)"""
         else:
-            message = f"""🎯 EMAIL TRACKER SUMMARY
+            message = f"""EMAIL TRACKER SUMMARY
 
-✅ No new emails matching active rules
-📋 Active watch rules: {rule_count}
-⏰ Scan time: {datetime.now().strftime('%H:%M %p')}
+No new emails matching active rules
+Active watch rules: {rule_count}
+Scan time: {datetime.now().strftime('%H:%M %p')}
 
 - JGV Email Tracker (Automated)"""
         
@@ -776,7 +780,7 @@ All matching emails have been assigned to team members.
             SELECT email_id, subject, sender, category, assigned_to, 
                    whatsapp_sent, processed_at, priority
             FROM email_history 
-            ORDER BY processed_at DESC 
+            ORDER BY id DESC 
             LIMIT ?
         ''', (limit,))
         
@@ -789,9 +793,9 @@ All matching emails have been assigned to team members.
                 'subject': row[1],
                 'sender': row[2],
                 'category': row[3],
-                'assigned_to': row[4],
+                'assigned_to': row[4],  # Now contains all assignees as comma-separated
                 'whatsapp_sent': bool(row[5]),
-                'processed_at': row[6],
+                'processed_at': row[6] or 'Unknown',  # Vegas time string
                 'priority': row[7]
             }
             for row in results
