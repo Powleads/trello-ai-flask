@@ -683,6 +683,15 @@ class ProductionDatabaseManager:
                     )
                 """)
             
+            # Check if whatsapp column exists, if not add it (migration)
+            cursor.execute("PRAGMA table_info(team_members)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'whatsapp' not in columns:
+                print("[DB] Migrating team_members table - adding whatsapp column")
+                cursor.execute("ALTER TABLE team_members ADD COLUMN whatsapp TEXT")
+                cursor.execute("UPDATE team_members SET whatsapp = '' WHERE whatsapp IS NULL")
+            
             conn.commit()
             conn.close()
             print("[DB] Team members table initialized")
