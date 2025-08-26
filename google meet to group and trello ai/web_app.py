@@ -2883,6 +2883,20 @@ def scan_cards():
                     except Exception as e:
                         print(f"  MEMBERS: Could not access Trello members: {e}")
                 
+                # Method 2.5: Use enhanced tracker's sophisticated assignee detection
+                if not assigned_user and enhanced_team_tracker:
+                    print(f"  ENHANCED DETECTION: Using sophisticated assignee detection...")
+                    try:
+                        # Use the enhanced tracker's assignee detection which includes checklists and comments
+                        assignee_result = enhanced_team_tracker.get_assignee_for_card(card.id)
+                        if assignee_result:
+                            assigned_user = assignee_result['name']
+                            assigned_whatsapp = assignee_result['whatsapp']
+                            print(f"FOUND: Enhanced tracker detected assignee: {assigned_user} (confidence: {assignee_result.get('confidence', 'N/A')})")
+                            print(f"  SOURCE: {assignee_result.get('source', 'Unknown')}")
+                    except Exception as e:
+                        print(f"  ENHANCED DETECTION: Error using enhanced tracker: {e}")
+
                 # Method 3: Check comments for assignment mentions (recent comments only)
                 if not assigned_user:
                     try:
