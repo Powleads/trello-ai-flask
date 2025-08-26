@@ -20,7 +20,10 @@ class GmailOAuthHandler:
     
     def __init__(self, app=None):
         self.app = app
-        self.scopes = ['https://www.googleapis.com/auth/gmail.readonly']
+        self.scopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/spreadsheets.readonly'
+        ]
         self.client_config = self._get_client_config()
         self.db = get_production_db()
         
@@ -81,9 +84,8 @@ class GmailOAuthHandler:
             
             authorization_url, state = flow.authorization_url(
                 access_type='offline',
-                include_granted_scopes='false',  # Don't include previously granted scopes
-                prompt='consent',  # Force fresh consent
-                approval_prompt='force'  # Force approval screen
+                include_granted_scopes='true',  # Include both Gmail and Sheets scopes
+                prompt='consent'  # Force fresh consent for both scopes
             )
             
             # Store state in session for security
