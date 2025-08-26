@@ -4007,6 +4007,28 @@ def get_enhanced_team_stats():
         print(f"Error getting enhanced team stats: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/api/team-tracker/mark-responded', methods=['POST'])
+@login_required
+def mark_card_responded():
+    """Mark that an assignee has responded to a card"""
+    try:
+        data = request.get_json()
+        card_id = data.get('card_id')
+        
+        if not card_id:
+            return jsonify({'success': False, 'error': 'Card ID required'})
+        
+        success = production_db.mark_team_tracker_response(card_id)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Card marked as responded'})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to mark card as responded'})
+            
+    except Exception as e:
+        print(f"Error marking card responded: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 # Initialize components when module is imported (for Gunicorn)
 if os.getenv('RENDER') or os.getenv('DATABASE_URL'):
     print("[PROD] Production environment detected - initializing components")

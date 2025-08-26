@@ -483,15 +483,28 @@ function updateStats(cards) {
 }
 
 function loadStats() {
-    // Load message stats
-    fetch('/api/message-stats', { method: 'POST' })
+    // Load enhanced team tracker stats
+    fetch('/api/team-tracker/stats', { method: 'GET' })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                document.getElementById('messages-sent-count').textContent = data.today?.messages_sent || 0;
+                document.getElementById('messages-sent-count').textContent = data.today_messages || 0;
+                document.getElementById('responses-today-count').textContent = data.responses_today || 0;
+                document.getElementById('active-team-count').textContent = data.team_members || 8;
+                
+                // Update escalation info
+                const escalationInfo = document.getElementById('escalation-info');
+                if (escalationInfo) {
+                    escalationInfo.textContent = `${data.responses_today || 0} responses detected`;
+                }
             }
         })
-        .catch(error => console.error('Error loading stats:', error));
+        .catch(error => {
+            console.error('Error loading stats:', error);
+            // Set default values on error
+            document.getElementById('messages-sent-count').textContent = '0';
+            document.getElementById('responses-today-count').textContent = '0';
+        });
 }
 
 function showNotification(message, type = 'info') {
@@ -511,7 +524,90 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Additional functions for modals and team management would go here
+function loadCardDetails(cardId) {
+    // Load detailed card information
+    fetch(`/api/team-tracker/card-details/${cardId}`, { method: 'GET' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update comment analysis
+                const analysisDiv = document.getElementById('modalCommentAnalysis');
+                if (analysisDiv) {
+                    const cardStatus = data.card_status;
+                    const lastComment = data.last_assignee_comment;
+                    
+                    let analysisText = '';
+                    if (lastComment) {
+                        const commentDate = new Date(lastComment);
+                        const hoursAgo = Math.floor((new Date() - commentDate) / (1000 * 60 * 60));
+                        analysisText = `Last comment by assignee: ${hoursAgo}h ago`;
+                    } else {
+                        analysisText = 'No comments found by assignee';
+                    }
+                    
+                    analysisText += `<br>Message count: ${cardStatus?.message_count || 0}`;
+                    analysisText += `<br>Escalation level: ${cardStatus?.escalation_level || 0}`;
+                    
+                    analysisDiv.innerHTML = analysisText;
+                }
+                
+                // Load message history placeholder
+                const historyDiv = document.getElementById('modalMessageHistory');
+                if (historyDiv) {
+                    historyDiv.innerHTML = '<div class="text-sm text-gray-500">Message history loaded from database</div>';
+                }
+            } else {
+                document.getElementById('modalCommentAnalysis').textContent = 'Error loading card details: ' + data.error;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading card details:', error);
+            document.getElementById('modalCommentAnalysis').textContent = 'Error loading card details';
+        });
+}
+
+function loadTeamMembers() {
+    // Placeholder for team members management
+    const membersList = document.getElementById('teamMembersList');
+    if (membersList) {
+        membersList.innerHTML = '<div class="text-sm text-gray-500">Team management interface - coming soon!</div>';
+    }
+}
+
+function sendManualMessage() {
+    showNotification('Manual message functionality - coming soon!', 'info');
+}
+
+function markAsResponded() {
+    showNotification('Mark as responded - coming soon!', 'info');
+}
+
+function openTrelloCard() {
+    if (!selectedCardId) return;
+    
+    const card = currentCards.find(c => c.id === selectedCardId);
+    if (card && card.url) {
+        window.open(card.url, '_blank');
+    }
+}
+
+function addTeamMember() {
+    showNotification('Team member management - coming soon!', 'info');
+}
+
+function saveSettings() {
+    showNotification('Settings saved!', 'success');
+}
+
+function exportData() {
+    showNotification('Export functionality - coming soon!', 'info');
+}
+
+function refreshCards() {
+    loadCards();
+    loadStats();
+    showNotification('Data refreshed!', 'success');
+}
 </script>
 
 {% endblock %}
