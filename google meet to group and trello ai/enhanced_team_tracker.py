@@ -31,18 +31,26 @@ class EnhancedTeamTracker:
                 name = key.replace('TEAM_MEMBER_', '').replace('_', ' ').title()
                 team_members[name] = value
         
-        # Fallback to hardcoded values if no env vars
+        # Fallback to global TEAM_MEMBERS from web_app if no env vars
         if not team_members:
-            team_members = {
-                'James Taylor': '19056064550@c.us',
-                'Levy': '237659250977@c.us', 
-                'Wendy': '237677079267@c.us',
-                'Forka': '237652275097@c.us',
-                'Brayan': '237676267420@c.us',
-                'Ezechiel': '23754071907@c.us',
-                'Dustin Salinas': '19054251997@c.us',
-                'Breyden': '13179979692@c.us'
-            }
+            try:
+                from web_app import TEAM_MEMBERS
+                team_members = TEAM_MEMBERS.copy()
+                print(f"[ENHANCED] Using global TEAM_MEMBERS from web_app")
+            except ImportError:
+                # Ultimate fallback (updated without Ezechiel, with Lancey)
+                team_members = {
+                    'James Taylor': '19056064550@c.us',
+                    'Levy': '237659250977@c.us', 
+                    'Wendy': '237677079267@c.us',
+                    'Forka': '237652275097@c.us',
+                    'Brayan': '237676267420@c.us',
+                    'Lancey': '639264438378@c.us',  # Added Lancey
+                    # 'Ezechiel': '23754071907@c.us',  # Removed Ezechiel
+                    'Dustin Salinas': '19054251997@c.us',
+                    'Breyden': '13179979692@c.us'
+                }
+                print(f"[ENHANCED] Using fallback team members (updated)")
         
         print(f"[ENHANCED] Loaded {len(team_members)} team members")
         return team_members
