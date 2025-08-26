@@ -2795,12 +2795,21 @@ def scan_cards():
                 print(f"Error parsing date for card {card.name}: {e}")
                 hours_since_activity = 999
             
-            # Extract assigned user from checklists and comments
+            # Extract assigned user from checklists and comments using enhanced tracker
             assigned_user = None
             assigned_whatsapp = None
             
             try:
                 print(f"SEARCH: Looking for assigned user for card: {card.name}")
+                
+                # Get current team members from enhanced tracker (database-first)
+                current_team_members = {}
+                if enhanced_team_tracker:
+                    current_team_members = enhanced_team_tracker.team_members
+                    print(f"  ENHANCED TRACKER: Using {len(current_team_members)} database team members: {list(current_team_members.keys())}")
+                else:
+                    current_team_members = TEAM_MEMBERS
+                    print(f"  FALLBACK: Using {len(current_team_members)} environment team members: {list(current_team_members.keys())}")
                 
                 # Method 1: Check card description for team member names and @mentions
                 card_description = (card.description or '').lower()
@@ -2809,7 +2818,7 @@ def scan_cards():
                 print(f"  CARD NAME: '{card_name_lower}'")
                 
                 # Check for @mentions and direct name references
-                for member_name, whatsapp_num in TEAM_MEMBERS.items():
+                for member_name, whatsapp_num in current_team_members.items():
                     member_lower = member_name.lower()
                     
                     # Skip admin and criselle from being assigned tasks
@@ -2862,7 +2871,7 @@ def scan_cards():
                                 continue
                             
                             # Check if this member matches our team (partial matching)
-                            for team_member_name, whatsapp_num in TEAM_MEMBERS.items():
+                            for team_member_name, whatsapp_num in current_team_members.items():
                                 if team_member_name.lower() in member_name_lower or member_name_lower in team_member_name.lower():
                                     assigned_user = team_member_name
                                     assigned_whatsapp = whatsapp_num
@@ -2898,7 +2907,7 @@ def scan_cards():
                                     commenter = comment.get('memberCreator', {}).get('fullName', '').lower()
                                     
                                     # Look for assignment patterns in comments
-                                    for team_member_name, whatsapp_num in TEAM_MEMBERS.items():
+                                    for team_member_name, whatsapp_num in current_team_members.items():
                                         member_lower = team_member_name.lower()
                                         
                                         if member_lower in ['admin', 'criselle']:
@@ -2935,23 +2944,25 @@ def scan_cards():
                     print(f"  SMART DEFAULTS: Attempting to assign based on card content...")
                     card_content = f"{card.name.lower()} {card_description}".lower()
                     
-                    # Content-based assignments
+                    # Content-based assignments (only if team members exist in current team)
                     if any(keyword in card_content for keyword in ['mobile', 'app', 'ios', 'android']):
-                        assigned_user = 'Wendy'
-                        assigned_whatsapp = TEAM_MEMBERS.get('Wendy')
-                        print(f"FOUND: Mobile/App content assigned to Wendy")
+                        if 'Wendy' in current_team_members:
+                            assigned_user = 'Wendy'
+                            assigned_whatsapp = current_team_members.get('Wendy')
+                            print(f"FOUND: Mobile/App content assigned to Wendy")
                     elif any(keyword in card_content for keyword in ['website', 'web', 'wordpress', 'landing', 'page']):
-                        assigned_user = 'Lancey'
-                        assigned_whatsapp = TEAM_MEMBERS.get('Lancey')
-                        print(f"FOUND: Website content assigned to Lancey")
+                        if 'Lancey' in current_team_members:
+                            assigned_user = 'Lancey'
+                            assigned_whatsapp = current_team_members.get('Lancey')
+                            print(f"FOUND: Website content assigned to Lancey")
                     elif any(keyword in card_content for keyword in ['design', 'logo', 'brand', 'graphics']):
-                        assigned_user = 'Breyden'
-                        assigned_whatsapp = TEAM_MEMBERS.get('Breyden')
-                        print(f"FOUND: Design content assigned to Breyden")
+                        if 'Breyden' in current_team_members:
+                            assigned_user = 'Breyden'
+                            assigned_whatsapp = current_team_members.get('Breyden')
+                            print(f"FOUND: Design content assigned to Breyden")
                     elif any(keyword in card_content for keyword in ['automation', 'integration', 'api', 'webhook']):
-                        assigned_user = 'Ezechiel'
-                        assigned_whatsapp = TEAM_MEMBERS.get('Ezechiel')
-                        print(f"FOUND: Automation content assigned to Ezechiel")
+                        # Skip Ezechiel as he's been removed from team
+                        print(f"SKIP: Automation content (Ezechiel no longer in team)")
                     
             except Exception as e:
                 print(f"Error extracting assigned user for card {card.name}: {e}")
