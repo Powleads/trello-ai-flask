@@ -365,12 +365,16 @@ function scanCards(forceRefresh = false) {
     })
         .then(response => response.json())
         .then(data => {
+            console.log('Scan response:', data);
             if (data.success) {
-                showNotification('✅ Scan completed successfully!', 'success');
+                console.log('Scan successful, cards received:', data.cards?.length || 0);
+                showNotification(`✅ Scan completed! Found ${data.cards?.length || 0} cards`, 'success');
                 currentCards = data.cards || [];
+                console.log('Updated currentCards:', currentCards);
                 populateCardsTable(currentCards);
                 loadStats();
             } else {
+                console.error('Scan failed:', data.error);
                 showNotification('❌ Scan failed: ' + data.error, 'error');
             }
         })
@@ -858,25 +862,35 @@ function refreshCards() {
 
 // Delete card function
 function deleteCard(cardId) {
+    console.log('Attempting to delete card:', cardId);
     if (!confirm('Are you sure you want to delete this card from tracking?')) {
         return;
     }
     
+    showNotification('Deleting card...', 'info');
+    
     fetch(`/api/team-tracker/card/${cardId}`, {
         method: 'DELETE'
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Delete response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Delete response data:', data);
         if (data.success) {
             showNotification('Card deleted successfully', 'success');
-            loadExistingCards();
+            // Remove card from current display immediately
+            currentCards = currentCards.filter(card => card.id !== cardId);
+            populateCardsTable(currentCards);
+            loadStats();
         } else {
-            showNotification('Failed to delete card: ' + data.error, 'error');
+            showNotification('Failed to delete card: ' + (data.error || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
-        showNotification('Error deleting card', 'error');
-        console.error('Error:', error);
+        console.error('Delete error:', error);
+        showNotification('Error deleting card: ' + error.message, 'error');
     });
 }
 

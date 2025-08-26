@@ -3092,25 +3092,19 @@ def scan_cards():
             # Update database with fresh card data
             if enhanced_team_tracker and enhanced_team_tracker.db and assigned_user:
                 try:
-                    # Update the card in the database with fresh data
+                    print(f"  DB UPDATE: Storing card {card.name} -> {assigned_user}")
+                    # Use the enhanced tracker's method which handles comment dates correctly
                     enhanced_team_tracker.update_card_tracking(
                         card_id=card.id,
                         card_name=card.name,
                         assignee_name=assigned_user,
                         assignee_phone=assigned_whatsapp or ''
                     )
-                    enhanced_team_tracker.db.update_team_tracker_card(
-                        card_id=card.id,
-                        card_name=card.name,
-                        list_name=list_names.get(card.idList, 'Unknown'),
-                        assignee_name=assigned_user,
-                        assignee_phone=assigned_whatsapp or '',
-                        last_comment_date=None,  # Will be updated by enhanced tracker
-                        hours_since_update=assigned_user_last_update_hours,
-                        needs_update=needs_update
-                    )
+                    print(f"  DB UPDATE: Successfully stored card {card.id}")
                 except Exception as e:
                     print(f"  DB UPDATE ERROR: Could not update card {card.id}: {e}")
+                    import traceback
+                    print(f"  DB UPDATE TRACEBACK: {traceback.format_exc()}")
             
             # Add to cards needing updates - but we'll filter with enhanced logic later
             if needs_update:
