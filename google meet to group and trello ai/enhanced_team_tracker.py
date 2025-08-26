@@ -543,11 +543,12 @@ class EnhancedTeamTracker:
                 check_items = checklist.get('checkItems', [])
                 print(f"[ENHANCED ASSIGNEE] Checklist '{checklist.get('name', 'Unknown')}' has {len(check_items)} items")
                 
-                # Look for assignment-related checklists
+                # Look for assignment-related checklists OR generic "Checklist"/"Checklists"
                 if ('assigned' in checklist_name or 
-                    any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible'])):
+                    any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible']) or
+                    checklist_name in ['checklist', 'checklists']):  # Accept generic checklist names
                     
-                    print(f"[ENHANCED ASSIGNEE] ✓ Found assignment checklist: {checklist['name']}")
+                    print(f"[ENHANCED ASSIGNEE] ✓ Found potential assignment checklist: {checklist['name']}")
                     
                     for item in check_items:
                         item_text = item.get('name', '').lower()
