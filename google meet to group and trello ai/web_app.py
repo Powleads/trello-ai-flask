@@ -4465,17 +4465,23 @@ def mark_card_responded():
 
 @app.route('/api/team-tracker/settings', methods=['GET'])
 def get_team_tracker_settings():
-    """Get current team tracker settings."""
+    """Get current team tracker settings from database."""
     try:
-        # Return default settings (could be stored in database in future)
+        # Get settings from database or use defaults
+        db = production_db or get_production_db()
+        
+        # Initialize settings table if needed
+        if db:
+            db.init_settings_table()
+        
         settings = {
-            'escalation_intervals': [24, 12, 6, 4],  # hours
-            'enable_escalation': True,
-            'enable_group_messages': True,
-            'enable_individual_messages': True,
-            'working_hours_start': '09:00',
-            'working_hours_end': '17:00',
-            'working_days': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+            'escalation_intervals': db.get_setting('escalation_intervals', [24, 12, 6, 4]) if db else [24, 12, 6, 4],
+            'enable_escalation': db.get_setting('enable_escalation', True) if db else True,
+            'enable_group_messages': db.get_setting('enable_group_messages', True) if db else True,
+            'enable_individual_messages': db.get_setting('enable_individual_messages', True) if db else True,
+            'working_hours_start': db.get_setting('working_hours_start', '09:00') if db else '09:00',
+            'working_hours_end': db.get_setting('working_hours_end', '17:00') if db else '17:00',
+            'working_days': db.get_setting('working_days', ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']) if db else ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
         }
         
         return jsonify({'success': True, 'settings': settings})
@@ -4500,8 +4506,24 @@ def save_team_tracker_settings():
         if not isinstance(escalation_intervals, list) or len(escalation_intervals) != 4:
             return jsonify({'success': False, 'error': 'Invalid escalation intervals'})
         
-        # Log the settings (could store in database in future)
-        print(f"SETTINGS SAVE: Team tracker settings: {settings}")
+        # Save settings to database
+        db = production_db or get_production_db()
+        if db:
+            db.init_settings_table()
+            import json
+            
+            # Save each setting
+            db.save_setting('escalation_intervals', json.dumps(escalation_intervals), 'json')
+            db.save_setting('enable_escalation', str(settings.get('enable_escalation', True)).lower(), 'bool')
+            db.save_setting('enable_group_messages', str(settings.get('enable_group_messages', True)).lower(), 'bool')
+            db.save_setting('enable_individual_messages', str(settings.get('enable_individual_messages', True)).lower(), 'bool')
+            db.save_setting('working_hours_start', settings.get('working_hours_start', '09:00'), 'string')
+            db.save_setting('working_hours_end', settings.get('working_hours_end', '17:00'), 'string')
+            db.save_setting('working_days', json.dumps(settings.get('working_days', ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'])), 'json')
+            
+            print(f"SETTINGS SAVE: Saved team tracker settings to database")
+        else:
+            print(f"SETTINGS SAVE: No database available, settings not persisted")
         
         return jsonify({'success': True, 'message': 'Settings saved successfully'})
         

@@ -82,6 +82,46 @@ class ProductionDatabaseManager:
             # Local: SQLite
             return sqlite3.connect(self.db_path)
     
+    def init_settings_table(self):
+        """Initialize settings table for persistent configuration"""
+        try:
+            if self.is_production:
+                # PostgreSQL
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS app_settings (
+                        id SERIAL PRIMARY KEY,
+                        setting_key TEXT UNIQUE NOT NULL,
+                        setting_value TEXT NOT NULL,
+                        setting_type TEXT DEFAULT 'string',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                ''')
+                self.conn.commit()
+            else:
+                # SQLite
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS app_settings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        setting_key TEXT UNIQUE NOT NULL,
+                        setting_value TEXT NOT NULL,
+                        setting_type TEXT DEFAULT 'string',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                conn.commit()
+                conn.close()
+            
+            print("[DB] Settings table initialized")
+            return True
+        except Exception as e:
+            print(f"[DB] Error initializing settings table: {e}")
+            return False
+
     def init_database(self):
         """Initialize database tables for both PostgreSQL and SQLite"""
         conn = self.get_connection()
@@ -893,8 +933,22 @@ class ProductionDatabaseManager:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT * FROM team_tracker_cards
-                ORDER BY last_updated DESC
+                SELECT 
+                    card_id,
+                    card_name,
+                    '' as list_name,
+                    assignee_name,
+                    assignee_phone,
+                    last_assignee_comment_date,
+                    0 as hours_since_assigned_update,
+                    CASE WHEN message_count > 0 THEN 1 ELSE 0 END as needs_update,
+                    last_message_sent,
+                    message_count,
+                    next_message_due,
+                    0 as response_detected,
+                    updated_at
+                FROM team_tracker_cards
+                ORDER BY updated_at DESC
             """)
             
             cards = []
@@ -935,6 +989,102 @@ class ProductionDatabaseManager:
             print(f"[DB] Error clearing team members: {e}")
             return False
     
+    def save_setting(self, key: str, value: str, setting_type: str = 'string'):
+        """Save a setting to the database"""
+        try:
+            if self.is_production:
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    INSERT INTO app_settings (setting_key, setting_value, setting_type)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (setting_key) 
+                    DO UPDATE SET setting_value = EXCLUDED.setting_value,
+                                  setting_type = EXCLUDED.setting_type,
+                                  updated_at = NOW()
+                ''', (key, value, setting_type))
+                self.conn.commit()
+            else:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO app_settings (setting_key, setting_value, setting_type)
+                    VALUES (?, ?, ?)
+                ''', (key, value, setting_type))
+                conn.commit()
+                conn.close()
+            
+            return True
+        except Exception as e:
+            print(f"[DB] Error saving setting {key}: {e}")
+            return False
+
+    def get_setting(self, key: str, default=None):
+        """Get a setting from the database"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.is_production:
+                cursor.execute('SELECT setting_value, setting_type FROM app_settings WHERE setting_key = %s', (key,))
+            else:
+                cursor.execute('SELECT setting_value, setting_type FROM app_settings WHERE setting_key = ?', (key,))
+            
+            result = cursor.fetchone()
+            
+            if not self.is_production:
+                conn.close()
+            
+            if result:
+                value, setting_type = result
+                # Convert based on type
+                if setting_type == 'json':
+                    import json
+                    return json.loads(value)
+                elif setting_type == 'int':
+                    return int(value)
+                elif setting_type == 'float':
+                    return float(value)
+                elif setting_type == 'bool':
+                    return value.lower() == 'true'
+                else:
+                    return value
+            
+            return default
+        except Exception as e:
+            print(f"[DB] Error getting setting {key}: {e}")
+            return default
+
+    def get_all_settings(self):
+        """Get all settings from the database"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT setting_key, setting_value, setting_type FROM app_settings')
+            results = cursor.fetchall()
+            
+            if not self.is_production:
+                conn.close()
+            
+            settings = {}
+            for key, value, setting_type in results:
+                if setting_type == 'json':
+                    import json
+                    settings[key] = json.loads(value)
+                elif setting_type == 'int':
+                    settings[key] = int(value)
+                elif setting_type == 'float':
+                    settings[key] = float(value) 
+                elif setting_type == 'bool':
+                    settings[key] = value.lower() == 'true'
+                else:
+                    settings[key] = value
+            
+            return settings
+        except Exception as e:
+            print(f"[DB] Error getting all settings: {e}")
+            return {}
+
     def seed_team_members(self):
         """Seed initial team members (current active team) with proper error handling"""
         try:
