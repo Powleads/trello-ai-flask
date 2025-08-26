@@ -74,10 +74,24 @@ class EnhancedTeamTracker:
             for comment in comments:
                 commenter_name = comment.get('memberCreator', {}).get('fullName', '').lower()
                 
-                # Check if this comment is from the assignee
-                if (assignee_lower in commenter_name or 
-                    commenter_name in assignee_lower or
-                    any(part in commenter_name for part in assignee_lower.split())):
+                # Enhanced name matching with variations
+                assignee_variations = [
+                    assignee_lower,
+                    assignee_lower.replace('ey', 'y'),  # Lancey -> Lancy
+                    assignee_lower.replace('y', 'ey'),  # Lancy -> Lancey
+                    assignee_lower.replace(' ', ''),    # Remove spaces
+                ]
+                
+                # Check if this comment is from the assignee using enhanced matching
+                is_assignee_comment = False
+                for variation in assignee_variations:
+                    if (variation in commenter_name or 
+                        commenter_name in variation or
+                        any(part in commenter_name for part in variation.split() if len(part) > 2)):
+                        is_assignee_comment = True
+                        break
+                
+                if is_assignee_comment:
                     
                     comment_date_str = comment.get('date', '')
                     if comment_date_str:

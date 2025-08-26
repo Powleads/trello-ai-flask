@@ -723,12 +723,14 @@ def get_card_checklists(card_id):
             checklist_name = checklist.get('name', '').lower()
             check_items = checklist.get('checkItems', [])
             
-            # Look for assignment-related checklists
-            if any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible']):
+            # Look for assignment-related checklists - prioritize "assigned" checklist specifically
+            if ('assigned' in checklist_name or 
+                any(keyword in checklist_name for keyword in ['assign', 'team', 'member', 'responsible'])):
                 print(f"  CHECKLISTS: Found assignment checklist: {checklist['name']}")
                 
                 for item in check_items:
                     item_text = item.get('name', '').lower()
+                    item_state = item.get('state', 'incomplete')
                     
                     # Check if item contains team member names
                     for team_member, whatsapp in TEAM_MEMBERS.items():
@@ -738,18 +740,34 @@ def get_card_checklists(card_id):
                         if member_lower in ['admin', 'criselle']:
                             continue
                         
+                        # Enhanced name matching - handle variations like Lancy vs Lancey
+                        name_variations = [
+                            member_lower,
+                            team_member.lower(),
+                            member_lower.replace('ey', 'y'),  # Lancey -> Lancy
+                            member_lower.replace('y', 'ey'),  # Lancy -> Lancey
+                        ]
+                        
                         # Check if member is mentioned in checklist item
-                        if (member_lower in item_text or 
+                        is_mentioned = (
+                            any(variation in item_text for variation in name_variations) or
                             f"@{member_lower}" in item_text or
-                            any(word in item_text for word in [member_lower, team_member.lower()])):
+                            any(f"@{variation}" in item_text for variation in name_variations)
+                        )
+                        
+                        if is_mentioned:
+                            # Higher confidence for "assigned" checklist and checked items
+                            confidence = 95 if 'assigned' in checklist_name else 90
+                            if item_state == 'complete':
+                                confidence += 5
                             
                             assigned_members.append({
                                 'name': team_member,
                                 'whatsapp': whatsapp,
-                                'source': f"Checklist: {checklist['name']} - {item['name']}",
-                                'confidence': 90
+                                'source': f"Checklist: {checklist['name']} - {item['name']} ({item_state})",
+                                'confidence': confidence
                             })
-                            print(f"  CHECKLISTS: Found {team_member} in checklist item: {item['name']}")
+                            print(f"  CHECKLISTS: Found {team_member} in checklist item: {item['name']} ({item_state})")
             
             # Also check regular checklists for team member mentions
             else:
@@ -3965,6 +3983,110 @@ def get_card_details(card_id):
             
     except Exception as e:
         print(f"Error getting card details: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/team-members', methods=['GET'])
+@login_required
+def get_team_members():
+    try:
+        members = []
+        for name, whatsapp in TEAM_MEMBERS.items():
+            members.append({
+                'name': name,
+                'whatsapp': whatsapp
+            })
+        
+        return jsonify({
+            'success': True,
+            'members': members
+        })
+        
+    except Exception as e:
+        print(f"Error getting team members: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/team-members', methods=['POST'])
+@login_required
+def add_team_member():
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        whatsapp = data.get('whatsapp', '').strip()
+        
+        if not name or not whatsapp:
+            return jsonify({'success': False, 'error': 'Name and WhatsApp number are required'})
+        
+        if name in TEAM_MEMBERS:
+            return jsonify({'success': False, 'error': 'Team member already exists'})
+        
+        # Add to TEAM_MEMBERS dictionary
+        TEAM_MEMBERS[name] = whatsapp
+        
+        # Update enhanced team tracker as well
+        enhanced_team_tracker.team_members[name] = whatsapp
+        
+        return jsonify({'success': True, 'message': 'Team member added successfully'})
+        
+    except Exception as e:
+        print(f"Error adding team member: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/team-members', methods=['PUT'])
+@login_required
+def update_team_member():
+    try:
+        data = request.get_json()
+        original_name = data.get('originalName', '').strip()
+        new_name = data.get('newName', '').strip()
+        whatsapp = data.get('whatsapp', '').strip()
+        
+        if not original_name or not new_name or not whatsapp:
+            return jsonify({'success': False, 'error': 'All fields are required'})
+        
+        if original_name not in TEAM_MEMBERS:
+            return jsonify({'success': False, 'error': 'Team member not found'})
+        
+        # Remove old entry
+        del TEAM_MEMBERS[original_name]
+        
+        # Add new entry
+        TEAM_MEMBERS[new_name] = whatsapp
+        
+        # Update enhanced team tracker as well
+        if original_name in enhanced_team_tracker.team_members:
+            del enhanced_team_tracker.team_members[original_name]
+        enhanced_team_tracker.team_members[new_name] = whatsapp
+        
+        return jsonify({'success': True, 'message': 'Team member updated successfully'})
+        
+    except Exception as e:
+        print(f"Error updating team member: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/team-tracker/team-members', methods=['DELETE'])
+@login_required
+def remove_team_member():
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        
+        if not name:
+            return jsonify({'success': False, 'error': 'Name is required'})
+        
+        if name not in TEAM_MEMBERS:
+            return jsonify({'success': False, 'error': 'Team member not found'})
+        
+        # Remove from TEAM_MEMBERS dictionary
+        del TEAM_MEMBERS[name]
+        
+        # Remove from enhanced team tracker as well
+        if name in enhanced_team_tracker.team_members:
+            del enhanced_team_tracker.team_members[name]
+        
+        return jsonify({'success': True, 'message': 'Team member removed successfully'})
+        
+    except Exception as e:
+        print(f"Error removing team member: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/team-tracker/stats', methods=['GET'])
