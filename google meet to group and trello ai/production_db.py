@@ -588,6 +588,125 @@ class ProductionDatabaseManager:
         except Exception as e:
             print(f"[DB] Error marking team tracker response: {e}")
             return False
+    
+    def get_team_members(self) -> Dict[str, str]:
+        """Get team members from database"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.is_production:
+                cursor.execute("SELECT name, whatsapp FROM team_members WHERE active = true")
+            else:
+                cursor.execute("SELECT name, whatsapp FROM team_members WHERE active = 1")
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            return {row[0]: row[1] for row in rows}
+        except Exception as e:
+            print(f"[DB] Error getting team members: {e}")
+            return {}
+    
+    def update_team_member(self, name: str, whatsapp: str, active: bool = True) -> bool:
+        """Update or insert team member"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.is_production:
+                cursor.execute("""
+                    INSERT INTO team_members (name, whatsapp, active, created_at, updated_at) 
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                    ON CONFLICT (name) DO UPDATE SET 
+                    whatsapp = EXCLUDED.whatsapp, 
+                    active = EXCLUDED.active,
+                    updated_at = NOW()
+                """, (name, whatsapp, active))
+            else:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO team_members (name, whatsapp, active, created_at, updated_at)
+                    VALUES (?, ?, ?, datetime('now'), datetime('now'))
+                """, (name, whatsapp, int(active)))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[DB] Error updating team member: {e}")
+            return False
+    
+    def delete_team_member(self, name: str) -> bool:
+        """Mark team member as inactive"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.is_production:
+                cursor.execute("UPDATE team_members SET active = false WHERE name = %s", (name,))
+            else:
+                cursor.execute("UPDATE team_members SET active = 0 WHERE name = ?", (name,))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[DB] Error deleting team member: {e}")
+            return False
+    
+    def init_team_members_table(self):
+        """Initialize team members table"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if self.is_production:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS team_members (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(100) UNIQUE NOT NULL,
+                        whatsapp VARCHAR(50) NOT NULL,
+                        active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+            else:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS team_members (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE NOT NULL,
+                        whatsapp TEXT NOT NULL,
+                        active INTEGER DEFAULT 1,
+                        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            
+            conn.commit()
+            conn.close()
+            print("[DB] Team members table initialized")
+        except Exception as e:
+            print(f"[DB] Error initializing team members table: {e}")
+    
+    def seed_team_members(self):
+        """Seed initial team members (current active team)"""
+        try:
+            initial_members = {
+                'Lancey': '639264438378@c.us',
+                'Levy': '237659250977@c.us', 
+                'Wendy': '237677079267@c.us',
+                'Forka': '237652275097@c.us',
+                'Brayan': '237676267420@c.us',
+                'Breyden': '13179979692@c.us'
+            }
+            
+            for name, whatsapp in initial_members.items():
+                self.update_team_member(name, whatsapp, True)
+            
+            print(f"[DB] Seeded {len(initial_members)} team members")
+        except Exception as e:
+            print(f"[DB] Error seeding team members: {e}")
 
 # Global instance
 production_db = None

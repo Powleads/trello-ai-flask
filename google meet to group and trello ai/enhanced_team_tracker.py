@@ -16,43 +16,65 @@ class EnhancedTeamTracker:
     
     def __init__(self):
         self.db = get_production_db()
+        # Initialize team members table and seed if needed
+        self.db.init_team_members_table()
         self.team_members = self._load_team_members()
         self.api_key = os.environ.get('TRELLO_API_KEY')
         self.token = os.environ.get('TRELLO_TOKEN')
         self.vegas_tz = pytz.timezone('America/Los_Angeles')
         
     def _load_team_members(self) -> Dict[str, str]:
-        """Load team members from environment variables or database"""
+        """Load team members - prioritize database over environment variables"""
         team_members = {}
         
-        # Load from environment variables (production)
+        # Priority 1: Database team members (overrides everything)
+        try:
+            db_team_members = self.db.get_team_members()
+            if db_team_members:
+                team_members = db_team_members
+                print(f"[ENHANCED] Using database team members: {len(team_members)} members")
+                
+                # Seed database if empty on first run
+                if not team_members:
+                    self.db.seed_team_members()
+                    team_members = self.db.get_team_members()
+                    print(f"[ENHANCED] Seeded database with {len(team_members)} team members")
+                    
+                return team_members
+        except Exception as e:
+            print(f"[ENHANCED] Error loading from database: {e}")
+        
+        # Priority 2: Environment variables (legacy support)  
         for key, value in os.environ.items():
             if key.startswith('TEAM_MEMBER_'):
                 name = key.replace('TEAM_MEMBER_', '').replace('_', ' ').title()
                 team_members[name] = value
         
-        # Fallback to global TEAM_MEMBERS from web_app if no env vars
-        if not team_members:
-            try:
-                from web_app import TEAM_MEMBERS
-                team_members = TEAM_MEMBERS.copy()
-                print(f"[ENHANCED] Using global TEAM_MEMBERS from web_app")
-            except ImportError:
-                # Ultimate fallback (updated without Ezechiel, with Lancey)
-                team_members = {
-                    'James Taylor': '19056064550@c.us',
-                    'Levy': '237659250977@c.us', 
-                    'Wendy': '237677079267@c.us',
-                    'Forka': '237652275097@c.us',
-                    'Brayan': '237676267420@c.us',
-                    'Lancey': '639264438378@c.us',  # Added Lancey
-                    # 'Ezechiel': '23754071907@c.us',  # Removed Ezechiel
-                    'Dustin Salinas': '19054251997@c.us',
-                    'Breyden': '13179979692@c.us'
-                }
-                print(f"[ENHANCED] Using fallback team members (updated)")
+        if team_members:
+            print(f"[ENHANCED] Using environment variables: {len(team_members)} members")
+            return team_members
         
-        print(f"[ENHANCED] Loaded {len(team_members)} team members")
+        # Priority 3: Global TEAM_MEMBERS from web_app
+        try:
+            from web_app import TEAM_MEMBERS
+            team_members = TEAM_MEMBERS.copy()
+            print(f"[ENHANCED] Using global TEAM_MEMBERS from web_app")
+            return team_members
+        except ImportError:
+            pass
+        
+        # Priority 4: Ultimate fallback (current active team only)
+        team_members = {
+            'Lancey': '639264438378@c.us',
+            'Levy': '237659250977@c.us', 
+            'Wendy': '237677079267@c.us',
+            'Forka': '237652275097@c.us',
+            'Brayan': '237676267420@c.us',
+            'Breyden': '13179979692@c.us'
+            # NOTE: Removed James Taylor, Dustin Salinas, Ezechiel per user request
+        }
+        print(f"[ENHANCED] Using fallback team members (active team only): {len(team_members)} members")
+        
         return team_members
     
     def get_board_members_mapping(self):

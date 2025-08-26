@@ -4162,12 +4162,21 @@ def get_card_details(card_id):
 @login_required
 def get_team_members():
     try:
+        # Get team members from database
+        db_members = enhanced_team_tracker.db.get_team_members()
+        
         members = []
-        for name, whatsapp in TEAM_MEMBERS.items():
+        for name, whatsapp in db_members.items():
             members.append({
                 'name': name,
                 'whatsapp': whatsapp
             })
+        
+        # If no database members, seed and return
+        if not members:
+            enhanced_team_tracker.db.seed_team_members()
+            db_members = enhanced_team_tracker.db.get_team_members()
+            members = [{'name': name, 'whatsapp': whatsapp} for name, whatsapp in db_members.items()]
         
         return jsonify({
             'success': True,
@@ -4189,14 +4198,13 @@ def add_team_member():
         if not name or not whatsapp:
             return jsonify({'success': False, 'error': 'Name and WhatsApp number are required'})
         
-        if name in TEAM_MEMBERS:
-            return jsonify({'success': False, 'error': 'Team member already exists'})
+        # Add to database
+        success = enhanced_team_tracker.db.update_team_member(name, whatsapp, True)
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to add team member to database'})
         
-        # Add to TEAM_MEMBERS dictionary
-        TEAM_MEMBERS[name] = whatsapp
-        
-        # Update enhanced team tracker as well
-        enhanced_team_tracker.team_members[name] = whatsapp
+        # Reload team members from database
+        enhanced_team_tracker.team_members = enhanced_team_tracker._load_team_members()
         
         return jsonify({'success': True, 'message': 'Team member added successfully'})
         
@@ -4216,19 +4224,17 @@ def update_team_member():
         if not original_name or not new_name or not whatsapp:
             return jsonify({'success': False, 'error': 'All fields are required'})
         
-        if original_name not in TEAM_MEMBERS:
-            return jsonify({'success': False, 'error': 'Team member not found'})
+        # If name changed, deactivate old and create new
+        if original_name != new_name:
+            enhanced_team_tracker.db.delete_team_member(original_name)
         
-        # Remove old entry
-        del TEAM_MEMBERS[original_name]
+        # Update/create new entry
+        success = enhanced_team_tracker.db.update_team_member(new_name, whatsapp, True)
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to update team member in database'})
         
-        # Add new entry
-        TEAM_MEMBERS[new_name] = whatsapp
-        
-        # Update enhanced team tracker as well
-        if original_name in enhanced_team_tracker.team_members:
-            del enhanced_team_tracker.team_members[original_name]
-        enhanced_team_tracker.team_members[new_name] = whatsapp
+        # Reload team members from database
+        enhanced_team_tracker.team_members = enhanced_team_tracker._load_team_members()
         
         return jsonify({'success': True, 'message': 'Team member updated successfully'})
         
@@ -4246,15 +4252,13 @@ def remove_team_member():
         if not name:
             return jsonify({'success': False, 'error': 'Name is required'})
         
-        if name not in TEAM_MEMBERS:
-            return jsonify({'success': False, 'error': 'Team member not found'})
+        # Remove from database
+        success = enhanced_team_tracker.db.delete_team_member(name)
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to remove team member from database'})
         
-        # Remove from TEAM_MEMBERS dictionary
-        del TEAM_MEMBERS[name]
-        
-        # Remove from enhanced team tracker as well
-        if name in enhanced_team_tracker.team_members:
-            del enhanced_team_tracker.team_members[name]
+        # Reload team members from database
+        enhanced_team_tracker.team_members = enhanced_team_tracker._load_team_members()
         
         return jsonify({'success': True, 'message': 'Team member removed successfully'})
         
