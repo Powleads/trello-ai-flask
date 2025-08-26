@@ -47,12 +47,92 @@ class EnhancedTeamTracker:
         print(f"[ENHANCED] Loaded {len(team_members)} team members")
         return team_members
     
+    def get_board_members_mapping(self):
+        """Get board member mapping for accurate ID matching."""
+        try:
+            board_id = os.environ.get('TRELLO_BOARD_ID')
+            
+            if not self.api_key or not self.token or not board_id:
+                print(f"[ENHANCED] Missing Trello credentials or board ID")
+                return {}
+            
+            # Get board members
+            url = f"https://api.trello.com/1/boards/{board_id}/members"
+            params = {
+                'key': self.api_key,
+                'token': self.token,
+                'fields': 'id,fullName,username'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                print(f"[ENHANCED] Failed to get board members: {response.status_code}")
+                return {}
+            
+            board_members = response.json()
+            member_mapping = {}
+            
+            # Create mapping from Trello member ID to team member info
+            for member in board_members:
+                member_name = member.get('fullName', '').strip()
+                member_id = member.get('id', '')
+                
+                if not member_name or not member_id:
+                    continue
+                    
+                # Match to our team members with name variations
+                for team_name, whatsapp in self.team_members.items():
+                    team_lower = team_name.lower()
+                    member_lower = member_name.lower()
+                    
+                    # Enhanced matching with variations
+                    name_variations = [
+                        team_lower,
+                        team_lower.replace('ey', 'y'),  # Lancey -> Lancy
+                        team_lower.replace('y', 'ey'),  # Lancy -> Lancey
+                        team_lower.replace(' ', ''),    # Remove spaces
+                    ]
+                    
+                    is_match = False
+                    for variation in name_variations:
+                        if (variation in member_lower or 
+                            member_lower in variation or
+                            any(part in member_lower for part in variation.split() if len(part) > 2)):
+                            is_match = True
+                            break
+                    
+                    if is_match:
+                        member_mapping[member_id] = {
+                            'team_name': team_name,
+                            'trello_name': member_name,
+                            'whatsapp': whatsapp
+                        }
+                        print(f"[ENHANCED] Mapped {member_name} ({member_id}) -> {team_name}")
+                        break
+            
+            return member_mapping
+            
+        except Exception as e:
+            print(f"[ENHANCED] Error getting board members: {e}")
+            return {}
+
     def get_assignee_last_comment_date(self, card_id: str, assignee_name: str) -> Optional[datetime]:
-        """Get the date of the last comment by the specific assignee"""
+        """Get the date of the last comment by the specific assignee using board member ID matching"""
         try:
             if not self.api_key or not self.token:
                 print(f"[ENHANCED] No Trello API credentials available")
                 return None
+            
+            # Get board member mapping for accurate matching
+            member_mapping = self.get_board_members_mapping()
+            
+            # Find the assignee's member ID
+            assignee_member_id = None
+            for member_id, member_info in member_mapping.items():
+                if member_info['team_name'].lower() == assignee_name.lower():
+                    assignee_member_id = member_id
+                    print(f"[ENHANCED] Found member ID for {assignee_name}: {member_id}")
+                    break
                 
             comments_url = f"https://api.trello.com/1/cards/{card_id}/actions"
             params = {
@@ -68,28 +148,39 @@ class EnhancedTeamTracker:
                 return None
                 
             comments = response.json()
-            assignee_lower = assignee_name.lower()
             
             # Find the most recent comment by the assignee
             for comment in comments:
+                commenter_id = comment.get('memberCreator', {}).get('id', '')
                 commenter_name = comment.get('memberCreator', {}).get('fullName', '').lower()
                 
-                # Enhanced name matching with variations
-                assignee_variations = [
-                    assignee_lower,
-                    assignee_lower.replace('ey', 'y'),  # Lancey -> Lancy
-                    assignee_lower.replace('y', 'ey'),  # Lancy -> Lancey
-                    assignee_lower.replace(' ', ''),    # Remove spaces
-                ]
+                # Skip admin comments
+                if 'admin' in commenter_name or 'criselle' in commenter_name:
+                    continue
                 
-                # Check if this comment is from the assignee using enhanced matching
-                is_assignee_comment = False
-                for variation in assignee_variations:
-                    if (variation in commenter_name or 
-                        commenter_name in variation or
-                        any(part in commenter_name for part in variation.split() if len(part) > 2)):
-                        is_assignee_comment = True
-                        break
+                # First try exact member ID match (most accurate)
+                if assignee_member_id and commenter_id == assignee_member_id:
+                    print(f"[ENHANCED] Found comment by {assignee_name} using member ID match")
+                    is_assignee_comment = True
+                else:
+                    # Fallback to enhanced name matching
+                    assignee_lower = assignee_name.lower()
+                    assignee_variations = [
+                        assignee_lower,
+                        assignee_lower.replace('ey', 'y'),  # Lancey -> Lancy
+                        assignee_lower.replace('y', 'ey'),  # Lancy -> Lancey
+                        assignee_lower.replace(' ', ''),    # Remove spaces
+                    ]
+                    
+                    # Check if this comment is from the assignee using enhanced matching
+                    is_assignee_comment = False
+                    for variation in assignee_variations:
+                        if (variation in commenter_name or 
+                            commenter_name in variation or
+                            any(part in commenter_name for part in variation.split() if len(part) > 2)):
+                            is_assignee_comment = True
+                            print(f"[ENHANCED] Found comment by {assignee_name} using name matching")
+                            break
                 
                 if is_assignee_comment:
                     

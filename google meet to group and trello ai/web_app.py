@@ -693,6 +693,77 @@ def get_google_doc_text(doc_id):
 
 # ===== ENHANCED ASSIGNMENT DETECTION SYSTEM =====
 
+def get_board_members_mapping():
+    """Get all board members and create mapping to team members."""
+    try:
+        api_key = os.environ.get('TRELLO_API_KEY')
+        token = os.environ.get('TRELLO_TOKEN')
+        board_id = os.environ.get('TRELLO_BOARD_ID')
+        
+        if not api_key or not token or not board_id:
+            print("  BOARD_MEMBERS: Missing Trello API credentials or board ID")
+            return {}
+        
+        # Get board members
+        url = f"https://api.trello.com/1/boards/{board_id}/members"
+        params = {
+            'key': api_key,
+            'token': token,
+            'fields': 'id,fullName,username'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code != 200:
+            print(f"  BOARD_MEMBERS: API error {response.status_code}")
+            return {}
+        
+        board_members = response.json()
+        member_mapping = {}
+        
+        # Create mapping from Trello member ID to team member info
+        for member in board_members:
+            member_name = member.get('fullName', '').strip()
+            member_id = member.get('id', '')
+            
+            if not member_name or not member_id:
+                continue
+                
+            # Match to our team members with name variations
+            for team_name, whatsapp in TEAM_MEMBERS.items():
+                team_lower = team_name.lower()
+                member_lower = member_name.lower()
+                
+                # Enhanced matching with variations
+                name_variations = [
+                    team_lower,
+                    team_lower.replace('ey', 'y'),  # Lancey -> Lancy
+                    team_lower.replace('y', 'ey'),  # Lancy -> Lancey
+                    team_lower.replace(' ', ''),    # Remove spaces
+                ]
+                
+                is_match = False
+                for variation in name_variations:
+                    if (variation in member_lower or 
+                        member_lower in variation or
+                        any(part in member_lower for part in variation.split() if len(part) > 2)):
+                        is_match = True
+                        break
+                
+                if is_match:
+                    member_mapping[member_id] = {
+                        'team_name': team_name,
+                        'trello_name': member_name,
+                        'whatsapp': whatsapp
+                    }
+                    print(f"  BOARD_MEMBERS: Mapped {member_name} ({member_id}) -> {team_name}")
+                    break
+        
+        return member_mapping
+        
+    except Exception as e:
+        print(f"Error getting board members: {e}")
+        return {}
+
 def get_card_checklists(card_id):
     """Read Trello card checklists to find assignments."""
     try:
@@ -702,6 +773,9 @@ def get_card_checklists(card_id):
         if not api_key or not token:
             print(f"  CHECKLISTS: Missing Trello API credentials")
             return []
+        
+        # Get board member mapping first
+        member_mapping = get_board_members_mapping()
         
         # Get checklists for the card
         url = f"https://api.trello.com/1/cards/{card_id}/checklists"
@@ -732,27 +806,31 @@ def get_card_checklists(card_id):
                     item_text = item.get('name', '').lower()
                     item_state = item.get('state', 'incomplete')
                     
-                    # Check if item contains team member names
-                    for team_member, whatsapp in TEAM_MEMBERS.items():
-                        member_lower = team_member.lower()
+                    # Check if item contains team member names using board member mapping
+                    for member_id, member_info in member_mapping.items():
+                        team_name = member_info['team_name']
+                        trello_name = member_info['trello_name']
+                        whatsapp = member_info['whatsapp']
                         
                         # Skip admin and criselle
-                        if member_lower in ['admin', 'criselle']:
+                        if team_name.lower() in ['admin', 'criselle']:
                             continue
                         
-                        # Enhanced name matching - handle variations like Lancy vs Lancey
+                        # Enhanced name matching - use both team name and Trello name variations
                         name_variations = [
-                            member_lower,
-                            team_member.lower(),
-                            member_lower.replace('ey', 'y'),  # Lancey -> Lancy
-                            member_lower.replace('y', 'ey'),  # Lancy -> Lancey
+                            team_name.lower(),
+                            trello_name.lower(),
+                            team_name.lower().replace('ey', 'y'),  # Lancey -> Lancy
+                            team_name.lower().replace('y', 'ey'),  # Lancy -> Lancey
+                            trello_name.lower().replace('ey', 'y'),
+                            trello_name.lower().replace('y', 'ey'),
                         ]
                         
                         # Check if member is mentioned in checklist item
                         is_mentioned = (
                             any(variation in item_text for variation in name_variations) or
-                            f"@{member_lower}" in item_text or
-                            any(f"@{variation}" in item_text for variation in name_variations)
+                            any(f"@{variation}" in item_text for variation in name_variations) or
+                            member_id in item_text  # Check for Trello member ID
                         )
                         
                         if is_mentioned:
@@ -762,12 +840,14 @@ def get_card_checklists(card_id):
                                 confidence += 5
                             
                             assigned_members.append({
-                                'name': team_member,
+                                'name': team_name,
                                 'whatsapp': whatsapp,
                                 'source': f"Checklist: {checklist['name']} - {item['name']} ({item_state})",
-                                'confidence': confidence
+                                'confidence': confidence,
+                                'member_id': member_id,
+                                'trello_name': trello_name
                             })
-                            print(f"  CHECKLISTS: Found {team_member} in checklist item: {item['name']} ({item_state})")
+                            print(f"  CHECKLISTS: Found {team_name} ({trello_name}) in checklist item: {item['name']} ({item_state})")
             
             # Also check regular checklists for team member mentions
             else:
@@ -814,11 +894,14 @@ def get_last_non_admin_commenter(card_id):
         if not api_key or not token:
             return None
         
+        # Get board member mapping first
+        member_mapping = get_board_members_mapping()
+        
         # Get recent comments
         url = f"https://api.trello.com/1/cards/{card_id}/actions"
         params = {
             'filter': 'commentCard',
-            'limit': 20,
+            'limit': 50,  # Increased limit to find more comments
             'key': api_key,
             'token': token
         }
@@ -830,22 +913,50 @@ def get_last_non_admin_commenter(card_id):
         comments = response.json()
         
         for comment in comments:
+            commenter_id = comment.get('memberCreator', {}).get('id', '')
             commenter_name = comment.get('memberCreator', {}).get('fullName', '').lower()
             
-            # Skip admin and criselle
+            # Skip admin and criselle by name
             if 'admin' in commenter_name or 'criselle' in commenter_name:
                 continue
             
-            # Check if commenter matches our team members
-            for team_member, whatsapp in TEAM_MEMBERS.items():
-                if (team_member.lower() in commenter_name or 
-                    commenter_name in team_member.lower()):
+            # First try to match by Trello member ID (most accurate)
+            if commenter_id in member_mapping:
+                member_info = member_mapping[commenter_id]
+                return {
+                    'name': member_info['team_name'],
+                    'whatsapp': member_info['whatsapp'],
+                    'source': f"Last commenter: {member_info['trello_name']} (ID matched)",
+                    'confidence': 95,  # High confidence for ID match
+                    'comment_date': comment.get('date', ''),
+                    'member_id': commenter_id,
+                    'trello_name': member_info['trello_name']
+                }
+            
+            # Fallback to name matching if ID not found
+            for member_id, member_info in member_mapping.items():
+                team_name = member_info['team_name']
+                trello_name = member_info['trello_name']
+                
+                name_variations = [
+                    team_name.lower(),
+                    trello_name.lower(),
+                    team_name.lower().replace('ey', 'y'),
+                    team_name.lower().replace('y', 'ey'),
+                    trello_name.lower().replace('ey', 'y'),
+                    trello_name.lower().replace('y', 'ey'),
+                ]
+                
+                if any(variation in commenter_name or commenter_name in variation 
+                       for variation in name_variations):
                     return {
-                        'name': team_member,
-                        'whatsapp': whatsapp,
-                        'source': f"Last commenter: {comment.get('memberCreator', {}).get('fullName', '')}",
-                        'confidence': 75,
-                        'comment_date': comment.get('date', '')
+                        'name': team_name,
+                        'whatsapp': member_info['whatsapp'],
+                        'source': f"Last commenter: {trello_name} (name matched)",
+                        'confidence': 80,  # Lower confidence for name match
+                        'comment_date': comment.get('date', ''),
+                        'member_id': commenter_id,
+                        'trello_name': trello_name
                     }
         
         return None
