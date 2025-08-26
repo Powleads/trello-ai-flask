@@ -431,7 +431,7 @@ def perform_automated_scan():
                         'assigned_user': assigned_user,
                         'reminder_count': reminder_status['reminder_count'],
                         'card_url': card['url'],
-                        'hours_since_update': card.get('hours_since_assigned_update', 0)
+                        'hours_since_update': card.get('hours_since_assigned_update', 0) or 0
                     })
                 else:
                     regular_cards.append(card)
@@ -3114,7 +3114,7 @@ def scan_cards():
                 'days_since_comment': round(assigned_user_last_update_hours / 24, 1) if assigned_user_last_update_hours is not None else 999,  # Based on assigned user
                 'needs_update': needs_update,  # AI-determined
                 'last_activity': card.date_last_activity,
-                'priority': 'high' if assigned_user_last_update_hours > 72 else 'medium' if assigned_user_last_update_hours > 24 else 'normal'
+                'priority': 'high' if assigned_user_last_update_hours is not None and assigned_user_last_update_hours > 72 else 'medium' if assigned_user_last_update_hours is not None and assigned_user_last_update_hours > 24 else 'normal'
             }
             
             all_cards.append(card_data)
@@ -3156,8 +3156,8 @@ def scan_cards():
                 del card['card']
         
         # Sort by hours since assigned user update (most urgent first)
-        all_cards.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
-        final_cards_needing_updates.sort(key=lambda x: x['hours_since_assigned_update'], reverse=True)
+        all_cards.sort(key=lambda x: x.get('hours_since_assigned_update', 0) or 0, reverse=True)
+        final_cards_needing_updates.sort(key=lambda x: x.get('hours_since_assigned_update', 0) or 0, reverse=True)
         
         # Store in app_data for other endpoints
         app_data['all_cards'] = all_cards
@@ -3231,7 +3231,7 @@ def preview_updates():
                 'id': card_data['id'],
                 'name': card_data['name'],
                 'url': card_data['url'],
-                'hours_since_update': card_data.get('hours_since_assigned_update', 0),
+                'hours_since_update': card_data.get('hours_since_assigned_update', 0) or 0,
                 'priority': card_data.get('priority', 'medium')
             })
         
@@ -3302,7 +3302,7 @@ def preview_updates():
                     'card_count': len(regular_cards),
                     'cards': regular_cards,
                     'message': message,
-                    'urgency': 'high' if any(c['hours_since_update'] > 72 for c in regular_cards) else 'medium',
+                    'urgency': 'high' if any((c.get('hours_since_update', 0) or 0) > 72 for c in regular_cards) else 'medium',
                     'message_type': 'regular'
                 }
                 
