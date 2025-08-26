@@ -22,12 +22,41 @@ class ProductionDatabaseManager:
     
     def __init__(self, db_path='gmail_tracker.db'):
         self.db_path = db_path
-        self.is_production = self._is_production_environment()
+        
+        # Try to use PostgreSQL database first
         self.db_url = os.getenv('DATABASE_URL')
         
-        if self.is_production and not POSTGRES_AVAILABLE:
-            print("[DB] WARNING: PostgreSQL not available, falling back to SQLite")
-            self.is_production = False  # Force SQLite fallback
+        # If no DATABASE_URL, use the specific PostgreSQL connection details
+        if not self.db_url and POSTGRES_AVAILABLE:
+            pg_host = 'dpg-d2mlsijuibrs73bihl8g-a.frankfurt-postgres.render.com'
+            pg_user = 'eesystem_database_for_ai_tools_user'
+            pg_pass = 'j5urZLu6RTcLnUPmUZE8AGv4sxJjyXc7'
+            pg_db = 'eesystem_database_for_ai_tools'
+            
+            self.db_url = f"postgresql://{pg_user}:{pg_pass}@{pg_host}/{pg_db}"
+            print("[DB] Using specific PostgreSQL connection details")
+        
+        # Test PostgreSQL connection
+        if self.db_url and POSTGRES_AVAILABLE:
+            try:
+                # Fix postgres:// to postgresql://
+                if self.db_url.startswith('postgres://'):
+                    self.db_url = self.db_url.replace('postgres://', 'postgresql://', 1)
+                
+                # Test connection
+                conn = psycopg2.connect(self.db_url)
+                conn.close()
+                self.is_production = True
+                print("[DB] PostgreSQL connection successful")
+            except Exception as e:
+                print(f"[DB] PostgreSQL connection failed: {e}")
+                print("[DB] Falling back to SQLite")
+                self.is_production = False
+                self.db_url = None
+        else:
+            self.is_production = False
+            if not POSTGRES_AVAILABLE:
+                print("[DB] PostgreSQL not available, using SQLite")
         
         self.init_database()
     
@@ -104,19 +133,33 @@ class ProductionDatabaseManager:
             )
         ''')
         
-        # Team members table
+        # Team members table (updated schema to match SQLite)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS team_members (
                 id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                phone TEXT NOT NULL,
-                categories JSONB,
-                role TEXT,
+                name TEXT UNIQUE NOT NULL,
+                whatsapp TEXT NOT NULL,
                 active BOOLEAN DEFAULT TRUE,
-                notification_settings JSONB DEFAULT '{}',
-                created_at TIMESTAMP DEFAULT NOW()
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
             )
         ''')
+        
+        # Migration: Check if we need to migrate from old schema (phone -> whatsapp)
+        try:
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'team_members'")
+            columns = [row[0] for row in cursor.fetchall()]
+            
+            if 'phone' in columns and 'whatsapp' not in columns:
+                print("[DB] PostgreSQL: Migrating team_members schema (phone -> whatsapp)")
+                cursor.execute("ALTER TABLE team_members RENAME COLUMN phone TO whatsapp")
+                print("[DB] PostgreSQL: Schema migration completed")
+            elif 'whatsapp' not in columns:
+                print("[DB] PostgreSQL: Adding whatsapp column")
+                cursor.execute("ALTER TABLE team_members ADD COLUMN whatsapp TEXT")
+        except Exception as e:
+            print(f"[DB] PostgreSQL migration warning: {e}")
+            # Continue anyway - table will be created fresh if needed
         
         # Team tracker card status
         cursor.execute('''
