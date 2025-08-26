@@ -81,8 +81,9 @@ class GmailOAuthHandler:
             
             authorization_url, state = flow.authorization_url(
                 access_type='offline',
-                include_granted_scopes='true',
-                prompt='consent'  # Force consent to get refresh token
+                include_granted_scopes='false',  # Don't include previously granted scopes
+                prompt='consent',  # Force fresh consent
+                approval_prompt='force'  # Force approval screen
             )
             
             # Store state in session for security
