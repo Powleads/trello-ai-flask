@@ -2884,19 +2884,19 @@ def scan_cards():
                         assigned_whatsapp = whatsapp_num
                         print(f"FOUND: Assigned user in card name: {member_name}")
                         break
-                
-                # Method 2: Check actual Trello card members
-                if not assigned_user:
-                    try:
-                        card_members = getattr(card, 'members', [])
-                        print(f"  MEMBERS: Found {len(card_members)} Trello members")
-                        
-                        for member in card_members:
-                            member_name_lower = member.full_name.lower()
-                            print(f"    Trello member: {member.full_name}")
+                    
+                    # Method 2: Check actual Trello card members
+                    if not assigned_user:
+                        try:
+                            card_members = getattr(card, 'members', [])
+                            print(f"  MEMBERS: Found {len(card_members)} Trello members")
                             
-                            # Skip admin and Criselle
-                            if 'admin' in member_name_lower or 'criselle' in member_name_lower:
+                            for member in card_members:
+                                member_name_lower = member.full_name.lower()
+                                print(f"    Trello member: {member.full_name}")
+                                
+                                # Skip admin and Criselle
+                                if 'admin' in member_name_lower or 'criselle' in member_name_lower:
                                 print(f"      SKIP: admin/criselle member")
                                 continue
                             
@@ -2911,56 +2911,56 @@ def scan_cards():
                                 break
                                 
                     except Exception as e:
-                        print(f"  MEMBERS: Could not access Trello members: {e}")
-                
-                # Method 2.5: Use enhanced tracker's sophisticated assignee detection
-                # Skip enhanced detection if we have too many cards to prevent timeouts
-                USE_ENHANCED_DETECTION = total_cards < 30  # Only use for smaller boards
-                
-                if not assigned_user and enhanced_team_tracker and USE_ENHANCED_DETECTION and card_needs_tracking:
-                    print(f"  ENHANCED DETECTION: Using sophisticated assignee detection for card ID: {card.id}")
-                    try:
-                        # Set a timeout for the enhanced detection
-                        import signal
-                        
-                        def timeout_handler(signum, frame):
-                            raise TimeoutError("Enhanced detection timed out")
-                        
-                        # Only on non-Windows systems
-                        if hasattr(signal, 'SIGALRM'):
-                            signal.signal(signal.SIGALRM, timeout_handler)
-                            signal.alarm(3)  # 3 second timeout
-                        
+                            print(f"  MEMBERS: Could not access Trello members: {e}")
+                    
+                    # Method 2.5: Use enhanced tracker's sophisticated assignee detection
+                    # Skip enhanced detection if we have too many cards to prevent timeouts
+                    USE_ENHANCED_DETECTION = total_cards < 30  # Only use for smaller boards
+                    
+                    if not assigned_user and enhanced_team_tracker and USE_ENHANCED_DETECTION and card_needs_tracking:
+                        print(f"  ENHANCED DETECTION: Using sophisticated assignee detection for card ID: {card.id}")
                         try:
-                            assignee_result = enhanced_team_tracker.get_assignee_for_card(card.id)
-                            if assignee_result:
-                                assigned_user = assignee_result['name']
-                                assigned_whatsapp = assignee_result['whatsapp']
-                                print(f"FOUND: Enhanced tracker detected assignee: {assigned_user}")
-                        finally:
+                            # Set a timeout for the enhanced detection
+                            import signal
+                            
+                            def timeout_handler(signum, frame):
+                                raise TimeoutError("Enhanced detection timed out")
+                            
+                            # Only on non-Windows systems
                             if hasattr(signal, 'SIGALRM'):
-                                signal.alarm(0)  # Cancel the alarm
-                                
-                    except TimeoutError:
-                        print(f"  ENHANCED DETECTION: Timed out after 3 seconds")
-                    except Exception as e:
-                        print(f"  ENHANCED DETECTION: Error: {e}")
+                                signal.signal(signal.SIGALRM, timeout_handler)
+                                signal.alarm(3)  # 3 second timeout
+                            
+                            try:
+                                assignee_result = enhanced_team_tracker.get_assignee_for_card(card.id)
+                                if assignee_result:
+                                    assigned_user = assignee_result['name']
+                                    assigned_whatsapp = assignee_result['whatsapp']
+                                    print(f"FOUND: Enhanced tracker detected assignee: {assigned_user}")
+                            finally:
+                                if hasattr(signal, 'SIGALRM'):
+                                    signal.alarm(0)  # Cancel the alarm
+                                    
+                        except TimeoutError:
+                            print(f"  ENHANCED DETECTION: Timed out after 3 seconds")
+                        except Exception as e:
+                            print(f"  ENHANCED DETECTION: Error: {e}")
 
-                # Method 3: Check comments for assignment mentions (recent comments only)
-                if not assigned_user:
-                    try:
-                        print(f"  COMMENT ASSIGNMENT: Checking recent comments for assignments...")
-                        api_key = os.environ.get('TRELLO_API_KEY')
-                        token = os.environ.get('TRELLO_TOKEN')
-                        
-                        if api_key and token:
-                            comments_url = f"https://api.trello.com/1/cards/{card.id}/actions"
-                            params = {
-                                'filter': 'commentCard',
-                                'limit': 10,  # Recent comments only
-                                'key': api_key,
-                                'token': token
-                            }
+                    # Method 3: Check comments for assignment mentions (recent comments only)
+                    if not assigned_user:
+                        try:
+                            print(f"  COMMENT ASSIGNMENT: Checking recent comments for assignments...")
+                            api_key = os.environ.get('TRELLO_API_KEY')
+                            token = os.environ.get('TRELLO_TOKEN')
+                            
+                            if api_key and token:
+                                comments_url = f"https://api.trello.com/1/cards/{card.id}/actions"
+                                params = {
+                                    'filter': 'commentCard',
+                                    'limit': 10,  # Recent comments only
+                                    'key': api_key,
+                                    'token': token
+                                }
                             response = requests.get(comments_url, params=params)
                             if response.status_code == 200:
                                 recent_comments = response.json()
