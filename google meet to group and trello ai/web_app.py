@@ -3046,7 +3046,7 @@ def scan_cards():
                 
                 if assigned_user:
                     try:
-                    print(f"AI ANALYSIS: Checking if {assigned_user} has provided updates...")
+                        print(f"AI ANALYSIS: Checking if {assigned_user} has provided updates...")
                     
                     # Get comments from the card using different methods
                     card_comments = []
@@ -3140,10 +3140,10 @@ def scan_cards():
                             needs_update = True
                             # Keep as None if no comments found
                     
-                except Exception as e:
-                    print(f"AI ANALYSIS ERROR for {card.name}: {e}")
-                    needs_update = True  # Default to needs update on error
-            
+                    except Exception as e:
+                        print(f"AI ANALYSIS ERROR for {card.name}: {e}")
+                        needs_update = True  # Default to needs update on error
+                
                 card_data = {
                     'id': card.id,
                     'name': card.name,
