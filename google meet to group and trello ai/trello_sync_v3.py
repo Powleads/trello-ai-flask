@@ -270,19 +270,19 @@ class TrelloSyncV3:
     def detect_assignment(self, card_id):
         """
         Detect assignment based on:
-        1. Explicit "assign {name}" in comments
+        1. Explicit "assign {name}" in comments (INCLUDING from admin)
         2. First non-admin commenter
         """
         
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
-        # Get all comments ordered by date
+        # Get all comments ordered by date DESC to get latest assignment first
         cursor.execute('''
             SELECT commenter_name, comment_text, comment_date
             FROM card_comments
             WHERE card_id = ?
-            ORDER BY comment_date ASC
+            ORDER BY comment_date DESC
         ''', (card_id,))
         
         comments = cursor.fetchall()
@@ -291,11 +291,12 @@ class TrelloSyncV3:
         if not comments:
             return None
         
-        # First check for explicit assignment
+        # First check for explicit assignment (INCLUDING admin comments)
+        # Check most recent first in case of reassignment
         for commenter_name, comment_text, comment_date in comments:
             comment_lower = comment_text.lower() if comment_text else ''
             
-            # Check for "assign {name}" pattern
+            # Check for "assign {name}" pattern - works even from admin
             assign_match = re.search(r'assign[s]?\s+(\w+)', comment_lower)
             if assign_match:
                 assigned_name = assign_match.group(1)
@@ -312,7 +313,8 @@ class TrelloSyncV3:
                         }
         
         # Then check for first non-admin commenter
-        for commenter_name, comment_text, comment_date in comments:
+        # Need to reverse the list since we got them DESC for assignment check
+        for commenter_name, comment_text, comment_date in reversed(comments):
             commenter_lower = commenter_name.lower() if commenter_name else ''
             
             # Skip admin comments

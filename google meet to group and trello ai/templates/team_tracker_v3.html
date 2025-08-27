@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Tracker V3 - Advanced Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar h1 {
+            font-size: 20px;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .nav-menu {
+            list-style: none;
+        }
+        
+        .nav-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .nav-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .nav-item.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        /* Main Content */
+        .main-content {
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .content-section {
+            display: none;
+        }
+        
+        .content-section.active {
+            display: block;
+        }
+        
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        /* Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .card-column {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .column-header {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-count {
+            background: #e0e0e0;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        
+        .card-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        
+        .card-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .card-item.needs-update {
+            border-left-color: #ff9800;
+        }
+        
+        .card-item.no-assignment {
+            border-left-color: #f44336;
+        }
+        
+        .card-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .card-meta {
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .card-assignee {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        
+        .time-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            background: #fff3e0;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+        }
+        
+        .modal-close:hover {
+            color: #333;
+        }
+        
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .modal-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .tab-button {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.3s;
+        }
+        
+        .tab-button.active {
+            color: #667eea;
+        }
+        
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e0e0e0;
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .timeline-date {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        
+        .timeline-content {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+        
+        /* Settings Table */
+        .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .settings-table th,
+        .settings-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .settings-table th {
+            font-weight: 600;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .switch input {
+            display: none;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            border-radius: 24px;
+            transition: .4s;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: .4s;
+        }
+        
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h1>📊 Team Tracker V3</h1>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-section="dashboard">Dashboard</li>
+                <li class="nav-item" data-section="team">Team Management</li>
+                <li class="nav-item" data-section="templates">WhatsApp Templates</li>
+                <li class="nav-item" data-section="automation">Automation Settings</li>
+                <li class="nav-item" data-section="escalation">Escalation Rules</li>
+            </ul>
+            
+            <div style="margin-top: auto; padding-top: 20px;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="syncCards()">
+                    🔄 Sync Cards
+                </button>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Dashboard Section -->
+            <div id="dashboard" class="content-section active">
+                <div class="stats-bar">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalCards">0</div>
+                        <div class="stat-label">Total Cards</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="needsUpdate">0</div>
+                        <div class="stat-label">Need Updates</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="unassigned">0</div>
+                        <div class="stat-label">Unassigned</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="ignored">0</div>
+                        <div class="stat-label">Ignored (24h+)</div>
+                    </div>
+                </div>
+                
+                <div id="cardsContainer" class="cards-grid">
+                    <!-- Cards will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- Team Management Section -->
+            <div id="team" class="content-section">
+                <h2 style="color: white; margin-bottom: 20px;">Team Management</h2>
+                <div id="teamContainer" style="background: white; border-radius: 12px; padding: 20px;">
+                    <!-- Team members will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- WhatsApp Templates Section -->
+            <div id="templates" class="content-section">
+                <h2 style="color: white; margin-bottom: 20px;">WhatsApp Templates</h2>
+                <div id="templatesContainer" style="background: white; border-radius: 12px; padding: 20px;">
+                    <!-- Templates will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- Automation Settings Section -->
+            <div id="automation" class="content-section">
+                <h2 style="color: white; margin-bottom: 20px;">Automation Settings</h2>
+                <div id="automationContainer" style="background: white; border-radius: 12px; padding: 20px;">
+                    <!-- Settings will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- Escalation Rules Section -->
+            <div id="escalation" class="content-section">
+                <h2 style="color: white; margin-bottom: 20px;">Escalation Rules</h2>
+                <div id="escalationContainer" style="background: white; border-radius: 12px; padding: 20px;">
+                    <!-- Rules will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card Detail Modal -->
+    <div id="cardModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalCardTitle">Card Details</h2>
+                <button class="modal-close" onclick="closeModal('cardModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <button class="tab-button active" data-tab="details">Details</button>
+                    <button class="tab-button" data-tab="comments">Comments</button>
+                    <button class="tab-button" data-tab="history">History</button>
+                    <button class="tab-button" data-tab="metrics">Metrics</button>
+                </div>
+                
+                <div id="details" class="tab-content active">
+                    <!-- Card details content -->
+                </div>
+                
+                <div id="comments" class="tab-content">
+                    <div class="timeline" id="commentsTimeline">
+                        <!-- Comments will be loaded here -->
+                    </div>
+                </div>
+                
+                <div id="history" class="tab-content">
+                    <div class="timeline" id="historyTimeline">
+                        <!-- History will be loaded here -->
+                    </div>
+                </div>
+                
+                <div id="metrics" class="tab-content">
+                    <div class="metrics-grid" id="metricsGrid">
+                        <!-- Metrics will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentData = {};
+        let currentCardId = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+            setupNavigation();
+            setupTabs();
+        });
+        
+        // Navigation
+        function setupNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    // Update active nav
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    
+                    // Show section
+                    const section = item.dataset.section;
+                    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+                    document.getElementById(section).classList.add('active');
+                    
+                    // Load section data
+                    if (section === 'team') loadTeamMembers();
+                    if (section === 'templates') loadTemplates();
+                    if (section === 'automation') loadAutomationSettings();
+                });
+            });
+        }
+        
+        // Tab switching
+        function setupTabs() {
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const tab = button.dataset.tab;
+                    
+                    // Update active tab
+                    button.parentElement.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Show tab content
+                    button.parentElement.nextElementSibling.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(tab).classList.add('active');
+                });
+            });
+        }
+        
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/v3/dashboard-data');
+                const data = await response.json();
+                currentData = data;
+                
+                displayCards(data.cards);
+                updateStats(data.cards);
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        // Display cards
+        function displayCards(cards) {
+            const container = document.getElementById('cardsContainer');
+            const lists = {};
+            
+            // Group cards by list
+            cards.forEach(card => {
+                if (!lists[card.list]) lists[card.list] = [];
+                lists[card.list].push(card);
+            });
+            
+            // Display by list
+            container.innerHTML = Object.entries(lists).map(([list, listCards]) => `
+                <div class="card-column">
+                    <div class="column-header">
+                        <span>${list}</span>
+                        <span class="card-count">${listCards.length}</span>
+                    </div>
+                    ${listCards.map(card => `
+                        <div class="card-item ${card.needs_update ? 'needs-update' : ''} ${card.assigned_to === 'Unassigned' ? 'no-assignment' : ''}"
+                             onclick="showCardDetails('${card.id}')">
+                            <div class="card-title">${card.name}</div>
+                            <div class="card-meta">
+                                ${card.latest_comment ? `💬 ${card.latest_comment.substring(0, 50)}...` : 'No comments'}
+                            </div>
+                            <div>
+                                <span class="card-assignee">${card.assigned_to}</span>
+                                ${card.hours_since_comment ? `<span class="time-badge">${Math.round(card.hours_since_comment)}h ago</span>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+        
+        // Update statistics
+        function updateStats(cards) {
+            document.getElementById('totalCards').textContent = cards.length;
+            document.getElementById('needsUpdate').textContent = cards.filter(c => c.needs_update).length;
+            document.getElementById('unassigned').textContent = cards.filter(c => c.assigned_to === 'Unassigned').length;
+            document.getElementById('ignored').textContent = cards.filter(c => c.hours_since_comment > 24).length;
+        }
+        
+        // Show card details modal
+        async function showCardDetails(cardId) {
+            currentCardId = cardId;
+            
+            try {
+                const response = await fetch(`/api/v3/card-details/${cardId}`);
+                const data = await response.json();
+                
+                // Update modal title
+                document.getElementById('modalCardTitle').textContent = data.card.name;
+                
+                // Show details tab
+                displayCardDetails(data);
+                displayComments(data.comments);
+                displayHistory(data);
+                displayMetrics(data.metrics);
+                
+                // Show modal
+                document.getElementById('cardModal').classList.add('show');
+            } catch (error) {
+                console.error('Error loading card details:', error);
+            }
+        }
+        
+        function displayCardDetails(data) {
+            const container = document.getElementById('details');
+            const currentAssignment = data.assignments.find(a => a.is_active);
+            
+            container.innerHTML = `
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px;">
+                        ${data.card.description || 'No description'}
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Current Assignment</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="reassignSelect" class="form-select" style="flex: 1;">
+                            <option value="">${currentAssignment ? currentAssignment.member : 'Unassigned'}</option>
+                            ${Object.keys(currentData.team_members || {}).map(member => 
+                                `<option value="${member}">${member}</option>`
+                            ).join('')}
+                        </select>
+                        <button class="btn btn-primary" onclick="reassignCard()">Reassign</button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Quick Actions</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" onclick="sendReminder()">Send Reminder</button>
+                        <button class="btn btn-danger" onclick="escalate()">Escalate</button>
+                        <a href="${data.card.url}" target="_blank" class="btn btn-secondary">Open in Trello</a>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function displayComments(comments) {
+            const container = document.getElementById('commentsTimeline');
+            
+            container.innerHTML = comments.map(comment => `
+                <div class="timeline-item">
+                    <div class="timeline-date">${new Date(comment.date).toLocaleString()}</div>
+                    <div class="timeline-content">
+                        <strong>${comment.commenter}</strong>
+                        ${comment.is_request ? '<span style="color: red; margin-left: 10px;">[Update Request]</span>' : ''}
+                        <div style="margin-top: 8px;">${comment.text}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function displayHistory(data) {
+            const container = document.getElementById('historyTimeline');
+            
+            // Combine assignments and list history
+            const history = [];
+            
+            data.assignments.forEach(a => {
+                history.push({
+                    type: 'assignment',
+                    date: a.date,
+                    content: `Assigned to ${a.member} (${a.method}, ${Math.round(a.confidence * 100)}% confidence)`
+                });
+            });
+            
+            data.list_history.forEach(h => {
+                history.push({
+                    type: 'movement',
+                    date: h.date,
+                    content: `Moved from ${h.from} to ${h.to}`
+                });
+            });
+            
+            // Sort by date
+            history.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            container.innerHTML = history.map(item => `
+                <div class="timeline-item">
+                    <div class="timeline-date">${new Date(item.date).toLocaleString()}</div>
+                    <div class="timeline-content">${item.content}</div>
+                </div>
+            `).join('');
+        }
+        
+        function displayMetrics(metrics) {
+            const container = document.getElementById('metricsGrid');
+            
+            container.innerHTML = `
+                <div class="metric-box">
+                    <div class="metric-label">Time in Current List</div>
+                    <div class="metric-value">${Math.round(metrics.time_in_list || 0)}h</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Times Ignored</div>
+                    <div class="metric-value">${metrics.ignored_count || 0}</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Escalation Level</div>
+                    <div class="metric-value">${metrics.escalation_level || 0}</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Last Response</div>
+                    <div class="metric-value">${metrics.last_response ? new Date(metrics.last_response).toLocaleDateString() : 'Never'}</div>
+                </div>
+            `;
+        }
+        
+        // Close modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+        
+        // Reassign card
+        async function reassignCard() {
+            const newMember = document.getElementById('reassignSelect').value;
+            if (!newMember || !currentCardId) return;
+            
+            try {
+                const response = await fetch('/api/v3/reassign-card', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        card_id: currentCardId,
+                        team_member: newMember
+                    })
+                });
+                
+                if (response.ok) {
+                    closeModal('cardModal');
+                    loadDashboard();
+                }
+            } catch (error) {
+                console.error('Error reassigning card:', error);
+            }
+        }
+        
+        // Load team members
+        async function loadTeamMembers() {
+            try {
+                const response = await fetch('/api/v3/team-members');
+                const data = await response.json();
+                
+                const container = document.getElementById('teamContainer');
+                container.innerHTML = `
+                    <table class="settings-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>WhatsApp</th>
+                                <th>Email</th>
+                                <th>Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.members.map(member => `
+                                <tr>
+                                    <td>${member.name}</td>
+                                    <td>
+                                        <input type="text" class="form-input" value="${member.whatsapp || ''}" 
+                                               id="whatsapp_${member.id}" style="width: 200px;">
+                                    </td>
+                                    <td>
+                                        <input type="email" class="form-input" value="${member.email || ''}" 
+                                               id="email_${member.id}" style="width: 200px;">
+                                    </td>
+                                    <td>
+                                        <label class="switch">
+                                            <input type="checkbox" ${member.is_active ? 'checked' : ''} 
+                                                   id="active_${member.id}">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-primary" onclick="updateTeamMember(${member.id})">Save</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Error loading team members:', error);
+            }
+        }
+        
+        // Update team member
+        async function updateTeamMember(memberId) {
+            const whatsapp = document.getElementById(`whatsapp_${memberId}`).value;
+            const email = document.getElementById(`email_${memberId}`).value;
+            const isActive = document.getElementById(`active_${memberId}`).checked;
+            
+            try {
+                const response = await fetch('/api/v3/update-team-member', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: memberId,
+                        whatsapp: whatsapp,
+                        email: email,
+                        is_active: isActive
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Team member updated successfully');
+                }
+            } catch (error) {
+                console.error('Error updating team member:', error);
+            }
+        }
+        
+        // Load templates
+        async function loadTemplates() {
+            try {
+                const response = await fetch('/api/v3/whatsapp-templates');
+                const data = await response.json();
+                
+                const container = document.getElementById('templatesContainer');
+                container.innerHTML = data.templates.map(template => `
+                    <div style="margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                        <h3>${template.name} (${template.type})</h3>
+                        <div class="form-group">
+                            <textarea class="form-textarea" id="template_${template.id}" rows="6">${template.text}</textarea>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <div style="color: #666; font-size: 13px;">
+                                Variables: ${template.variables.join(', ')}
+                            </div>
+                            <button class="btn btn-primary" onclick="updateTemplate(${template.id})">Save Template</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading templates:', error);
+            }
+        }
+        
+        // Update template
+        async function updateTemplate(templateId) {
+            const text = document.getElementById(`template_${templateId}`).value;
+            
+            try {
+                const response = await fetch('/api/v3/update-template', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: templateId,
+                        text: text
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Template updated successfully');
+                }
+            } catch (error) {
+                console.error('Error updating template:', error);
+            }
+        }
+        
+        // Load automation settings
+        async function loadAutomationSettings() {
+            try {
+                const response = await fetch('/api/v3/automation-settings');
+                const data = await response.json();
+                
+                const container = document.getElementById('automationContainer');
+                container.innerHTML = `
+                    <table class="settings-table">
+                        <thead>
+                            <tr>
+                                <th>Setting</th>
+                                <th>Value</th>
+                                <th>Enabled</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.settings.map(setting => `
+                                <tr>
+                                    <td>
+                                        <strong>${setting.name}</strong>
+                                        <div style="color: #666; font-size: 12px;">${setting.description}</div>
+                                    </td>
+                                    <td>
+                                        ${setting.type === 'boolean' ? 
+                                            `<label class="switch">
+                                                <input type="checkbox" ${setting.value === 'true' ? 'checked' : ''} 
+                                                       id="value_${setting.id}">
+                                                <span class="slider"></span>
+                                            </label>` :
+                                            `<input type="${setting.type === 'number' ? 'number' : 'text'}" 
+                                                    class="form-input" 
+                                                    value="${setting.value}" 
+                                                    id="value_${setting.id}" 
+                                                    style="width: 150px;">`
+                                        }
+                                    </td>
+                                    <td>
+                                        <label class="switch">
+                                            <input type="checkbox" ${setting.enabled ? 'checked' : ''} 
+                                                   id="enabled_${setting.id}">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-primary" onclick="updateSetting(${setting.id}, '${setting.type}')">Save</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+        
+        // Update setting
+        async function updateSetting(settingId, type) {
+            let value;
+            if (type === 'boolean') {
+                value = document.getElementById(`value_${settingId}`).checked ? 'true' : 'false';
+            } else {
+                value = document.getElementById(`value_${settingId}`).value;
+            }
+            
+            const enabled = document.getElementById(`enabled_${settingId}`).checked;
+            
+            try {
+                const response = await fetch('/api/v3/update-setting', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: settingId,
+                        value: value,
+                        enabled: enabled
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Setting updated successfully');
+                }
+            } catch (error) {
+                console.error('Error updating setting:', error);
+            }
+        }
+        
+        // Sync cards
+        async function syncCards() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Syncing...';
+            
+            try {
+                const response = await fetch('/api/sync-cards', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    loadDashboard();
+                    alert(`Sync complete: ${data.cards_synced} cards, ${data.comments_synced} comments`);
+                }
+            } catch (error) {
+                console.error('Error syncing:', error);
+            } finally {
+                button.disabled = false;
+                button.textContent = '🔄 Sync Cards';
+            }
+        }
+        
+        // Close modal on outside click
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>
