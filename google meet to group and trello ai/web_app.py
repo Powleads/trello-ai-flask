@@ -2897,18 +2897,18 @@ def scan_cards():
                                 
                                 # Skip admin and Criselle
                                 if 'admin' in member_name_lower or 'criselle' in member_name_lower:
-                                print(f"      SKIP: admin/criselle member")
-                                continue
-                            
-                            # Check if this member matches our team (partial matching)
-                            for team_member_name, whatsapp_num in current_team_members.items():
-                                if team_member_name.lower() in member_name_lower or member_name_lower in team_member_name.lower():
-                                    assigned_user = team_member_name
-                                    assigned_whatsapp = whatsapp_num
-                                    print(f"FOUND: Assigned user from Trello members: {team_member_name}")
+                                    print(f"      SKIP: admin/criselle member")
+                                    continue
+                                
+                                # Check if this member matches our team (partial matching)
+                                for team_member_name, whatsapp_num in current_team_members.items():
+                                    if team_member_name.lower() in member_name_lower or member_name_lower in team_member_name.lower():
+                                        assigned_user = team_member_name
+                                        assigned_whatsapp = whatsapp_num
+                                        print(f"FOUND: Assigned user from Trello members: {team_member_name}")
+                                        break
+                                if assigned_user:
                                     break
-                            if assigned_user:
-                                break
                                 
                     except Exception as e:
                             print(f"  MEMBERS: Could not access Trello members: {e}")
