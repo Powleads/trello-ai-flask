@@ -2998,7 +2998,7 @@ def scan_cards():
                                         if assigned_user:
                                             break
                                         
-                    except Exception as e:
+                        except Exception as e:
                             print(f"  COMMENT ASSIGNMENT: Could not check comments: {e}")
                     
                     # Method 4: Smart defaults based on card content/type
@@ -3046,98 +3046,98 @@ def scan_cards():
                 if assigned_user:
                     try:
                         print(f"AI ANALYSIS: Checking if {assigned_user} has provided updates...")
-                    
-                    # Get comments from the card using different methods
-                    card_comments = []
-                    try:
-                        # Try to get comments via API
-                        import requests
-                        api_key = os.environ.get('TRELLO_API_KEY')
-                        token = os.environ.get('TRELLO_TOKEN')
                         
-                        if api_key and token:
-                            comments_url = f"https://api.trello.com/1/cards/{card.id}/actions"
-                            params = {
-                                'filter': 'commentCard',
-                                'limit': 50,
-                                'key': api_key,
-                                'token': token
-                            }
-                            response = requests.get(comments_url, params=params)
-                            if response.status_code == 200:
-                                card_comments = response.json()
-                                print(f"  API: Retrieved {len(card_comments)} comments")
-                    except Exception as e:
-                        print(f"  API: Could not fetch comments via API: {e}")
-                    
-                    # Analyze comments using AI
-                    if card_comments:
-                        # Filter comments by assigned user
-                        assigned_user_comments = []
-                        admin_comments = []
-                        other_comments = []
-                        
-                        from datetime import datetime, timedelta
-                        now = datetime.now()
-                        
-                        for comment in card_comments:
-                            commenter_name = comment.get('memberCreator', {}).get('fullName', '').lower()
-                            comment_text = comment.get('data', {}).get('text', '')
-                            comment_date = comment.get('date', '')
+                        # Get comments from the card using different methods
+                        card_comments = []
+                        try:
+                            # Try to get comments via API
+                            import requests
+                            api_key = os.environ.get('TRELLO_API_KEY')
+                            token = os.environ.get('TRELLO_TOKEN')
                             
-                            # Parse comment date
-                            try:
-                                comment_datetime = datetime.fromisoformat(comment_date.replace('Z', '+00:00'))
-                                hours_ago = (now.replace(tzinfo=comment_datetime.tzinfo) - comment_datetime).total_seconds() / 3600
-                            except:
-                                hours_ago = 999
+                            if api_key and token:
+                                comments_url = f"https://api.trello.com/1/cards/{card.id}/actions"
+                                params = {
+                                    'filter': 'commentCard',
+                                    'limit': 50,
+                                    'key': api_key,
+                                    'token': token
+                                }
+                                response = requests.get(comments_url, params=params)
+                                if response.status_code == 200:
+                                    card_comments = response.json()
+                                    print(f"  API: Retrieved {len(card_comments)} comments")
+                        except Exception as e:
+                            print(f"  API: Could not fetch comments via API: {e}")
+                        
+                        # Analyze comments using AI
+                        if card_comments:
+                            # Filter comments by assigned user
+                            assigned_user_comments = []
+                            admin_comments = []
+                            other_comments = []
                             
-                            if assigned_user.lower() in commenter_name:
-                                assigned_user_comments.append({
-                                    'text': comment_text,
-                                    'hours_ago': hours_ago,
-                                    'date': comment_date
-                                })
-                            elif 'admin' in commenter_name or 'criselle' in commenter_name:
-                                admin_comments.append({
-                                    'text': comment_text,
-                                    'hours_ago': hours_ago,
-                                    'date': comment_date
-                                })
+                            from datetime import datetime, timedelta
+                            now = datetime.now()
+                            
+                            for comment in card_comments:
+                                commenter_name = comment.get('memberCreator', {}).get('fullName', '').lower()
+                                comment_text = comment.get('data', {}).get('text', '')
+                                comment_date = comment.get('date', '')
+                                
+                                # Parse comment date
+                                try:
+                                    comment_datetime = datetime.fromisoformat(comment_date.replace('Z', '+00:00'))
+                                    hours_ago = (now.replace(tzinfo=comment_datetime.tzinfo) - comment_datetime).total_seconds() / 3600
+                                except:
+                                    hours_ago = 999
+                                
+                                if assigned_user.lower() in commenter_name:
+                                    assigned_user_comments.append({
+                                        'text': comment_text,
+                                        'hours_ago': hours_ago,
+                                        'date': comment_date
+                                    })
+                                elif 'admin' in commenter_name or 'criselle' in commenter_name:
+                                    admin_comments.append({
+                                        'text': comment_text,
+                                        'hours_ago': hours_ago,
+                                        'date': comment_date
+                                    })
+                                else:
+                                    other_comments.append({
+                                        'text': comment_text,
+                                        'hours_ago': hours_ago,
+                                        'commenter': commenter_name
+                                    })
+                            
+                            print(f"  COMMENTS: {assigned_user}: {len(assigned_user_comments)}, Admin: {len(admin_comments)}, Others: {len(other_comments)}")
+                            
+                            # Use simple AI logic to determine if update is needed
+                            if assigned_user_comments:
+                                # Find most recent comment from assigned user
+                                most_recent = min(assigned_user_comments, key=lambda x: x['hours_ago'])
+                                assigned_user_last_update_hours = most_recent['hours_ago']
+                                
+                                # Simple AI analysis: Check if the comment contains meaningful update content
+                                recent_comment_text = most_recent['text'].lower()
+                                update_keywords = ['progress', 'completed', 'working on', 'finished', 'done', 'update', 'status', 'started', 'implementing', 'fixed', 'issue', 'blocker', 'challenge', 'estimate', 'timeline', 'percentage', '%']
+                                
+                                has_meaningful_update = any(keyword in recent_comment_text for keyword in update_keywords)
+                                
+                                if assigned_user_last_update_hours < 24 and has_meaningful_update:
+                                    needs_update = False
+                                    print(f"  AI: {assigned_user} provided meaningful update {assigned_user_last_update_hours:.1f}h ago - NO UPDATE NEEDED")
+                                elif assigned_user_last_update_hours < 24 and len(recent_comment_text) > 20:
+                                    needs_update = False  # Any substantial comment counts
+                                    print(f"  AI: {assigned_user} provided substantial comment {assigned_user_last_update_hours:.1f}h ago - NO UPDATE NEEDED")
+                                else:
+                                    needs_update = True
+                                    print(f"  AI: {assigned_user} last update {assigned_user_last_update_hours:.1f}h ago - NEEDS UPDATE")
                             else:
-                                other_comments.append({
-                                    'text': comment_text,
-                                    'hours_ago': hours_ago,
-                                    'commenter': commenter_name
-                                })
-                        
-                        print(f"  COMMENTS: {assigned_user}: {len(assigned_user_comments)}, Admin: {len(admin_comments)}, Others: {len(other_comments)}")
-                        
-                        # Use simple AI logic to determine if update is needed
-                        if assigned_user_comments:
-                            # Find most recent comment from assigned user
-                            most_recent = min(assigned_user_comments, key=lambda x: x['hours_ago'])
-                            assigned_user_last_update_hours = most_recent['hours_ago']
-                            
-                            # Simple AI analysis: Check if the comment contains meaningful update content
-                            recent_comment_text = most_recent['text'].lower()
-                            update_keywords = ['progress', 'completed', 'working on', 'finished', 'done', 'update', 'status', 'started', 'implementing', 'fixed', 'issue', 'blocker', 'challenge', 'estimate', 'timeline', 'percentage', '%']
-                            
-                            has_meaningful_update = any(keyword in recent_comment_text for keyword in update_keywords)
-                            
-                            if assigned_user_last_update_hours < 24 and has_meaningful_update:
-                                needs_update = False
-                                print(f"  AI: {assigned_user} provided meaningful update {assigned_user_last_update_hours:.1f}h ago - NO UPDATE NEEDED")
-                            elif assigned_user_last_update_hours < 24 and len(recent_comment_text) > 20:
-                                needs_update = False  # Any substantial comment counts
-                                print(f"  AI: {assigned_user} provided substantial comment {assigned_user_last_update_hours:.1f}h ago - NO UPDATE NEEDED")
-                            else:
+                                print(f"  AI: {assigned_user} has NO comments - NEEDS UPDATE")
                                 needs_update = True
-                                print(f"  AI: {assigned_user} last update {assigned_user_last_update_hours:.1f}h ago - NEEDS UPDATE")
-                        else:
-                            print(f"  AI: {assigned_user} has NO comments - NEEDS UPDATE")
-                            needs_update = True
-                            # Keep as None if no comments found
+                                # Keep as None if no comments found
                     
                     except Exception as e:
                         print(f"AI ANALYSIS ERROR for {card.name}: {e}")
