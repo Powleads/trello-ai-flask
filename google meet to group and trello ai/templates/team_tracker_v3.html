@@ -1,109 +1,97 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Tracker V3 - Advanced Dashboard</title>
-    <style>
+{% extends "base.html" %}
+{% block title %}Team Tracker V3{% endblock %}
+{% block extra_head %}
+<style>
         * {
-            margin: 0;
-            padding: 0;
             box-sizing: border-box;
         }
         
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        
-        .dashboard {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            height: 100vh;
-        }
-        
-        /* Sidebar */
-        .sidebar {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+        .tracker-container {
+            max-width: 1200px;
+            margin: 0 auto;
             padding: 20px;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
         }
         
-        .sidebar h1 {
-            font-size: 20px;
-            margin-bottom: 30px;
-            color: #333;
+        /* Tab Navigation */
+        .tracker-tabs {
+            display: flex;
+            background: white;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        .nav-menu {
-            list-style: none;
-        }
-        
-        .nav-item {
+        .tracker-tab {
+            flex: 1;
             padding: 12px 16px;
-            margin-bottom: 8px;
+            text-align: center;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s;
+            font-weight: 500;
+            color: #666;
         }
         
-        .nav-item:hover {
-            background: #f0f0f0;
+        .tracker-tab:hover {
+            background: #f8f9fa;
         }
         
-        .nav-item.active {
-            background: #667eea;
+        .tracker-tab.active {
+            background: #4f46e5;
             color: white;
         }
         
-        /* Main Content */
-        .main-content {
-            padding: 20px;
-            overflow-y: auto;
-        }
-        
-        .content-section {
+        /* Content Sections */
+        .tracker-section {
             display: none;
         }
         
-        .content-section.active {
+        .tracker-section.active {
             display: block;
         }
+        
         
         /* Stats Bar */
         .stats-bar {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
         
         .stat-card {
             background: white;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
         }
         
         .stat-value {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
-            color: #333;
+            color: #1f2937;
         }
         
         .stat-label {
-            color: #666;
+            color: #6b7280;
             font-size: 14px;
             margin-top: 5px;
+            font-weight: 500;
         }
+        
         
         /* Cards Grid */
         .cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 20px;
+            margin-bottom: 30px;
         }
         
         .card-column {
@@ -181,6 +169,88 @@
             border-radius: 4px;
             font-size: 11px;
             margin-left: 8px;
+        }
+        
+        /* Kanban Board Layout */
+        .kanban-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+            min-height: 600px;
+        }
+        
+        @media (max-width: 1200px) {
+            .kanban-board {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .kanban-board {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .kanban-column {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 16px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .kanban-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f3f4f6;
+        }
+        
+        .kanban-title {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .kanban-count {
+            background: #6b7280;
+            color: white;
+            border-radius: 12px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .cards-hidden {
+            display: none;
+        }
+        
+        .show-more-btn {
+            width: 100%;
+            padding: 10px;
+            background: #f9fafb;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+            text-align: center;
+        }
+        
+        .show-more-btn:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            color: #4b5563;
+            transform: translateY(-1px);
         }
         
         /* Modal Styles */
@@ -552,7 +622,7 @@
                     </div>
                 </div>
                 
-                <div id="cardsContainer" class="cards-grid">
+                <div id="cardsContainer" class="kanban-board">
                     <!-- Cards will be loaded here -->
                 </div>
             </div>
@@ -587,9 +657,8 @@
                 <div id="escalationContainer" style="background: white; border-radius: 12px; padding: 20px;">
                     <!-- Rules will be loaded here -->
                 </div>
-            </div>
         </div>
-    </div>
+</div>
     
     <!-- Card Detail Modal -->
     <div id="cardModal" class="modal">
@@ -644,15 +713,15 @@
         
         // Navigation
         function setupNavigation() {
-            document.querySelectorAll('.nav-item').forEach(item => {
+            document.querySelectorAll('.tracker-tab').forEach(item => {
                 item.addEventListener('click', () => {
-                    // Update active nav
-                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    // Update active tab
+                    document.querySelectorAll('.tracker-tab').forEach(i => i.classList.remove('active'));
                     item.classList.add('active');
                     
                     // Show section
                     const section = item.dataset.section;
-                    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+                    document.querySelectorAll('.tracker-section').forEach(s => s.classList.remove('active'));
                     document.getElementById(section).classList.add('active');
                     
                     // Load section data
@@ -706,27 +775,68 @@
             });
             
             // Display by list
-            container.innerHTML = Object.entries(lists).map(([list, listCards]) => `
-                <div class="card-column">
-                    <div class="column-header">
-                        <span>${list}</span>
-                        <span class="card-count">${listCards.length}</span>
-                    </div>
-                    ${listCards.map(card => `
-                        <div class="card-item ${card.needs_update ? 'needs-update' : ''} ${card.assigned_to === 'Unassigned' ? 'no-assignment' : ''}"
-                             onclick="showCardDetails('${card.id}')">
-                            <div class="card-title">${card.name}</div>
-                            <div class="card-meta">
-                                ${card.latest_comment ? `💬 ${card.latest_comment.substring(0, 50)}...` : 'No comments'}
-                            </div>
-                            <div>
-                                <span class="card-assignee">${card.assigned_to}</span>
-                                ${card.hours_since_comment ? `<span class="time-badge">${Math.round(card.hours_since_comment)}h ago</span>` : ''}
-                            </div>
+            // Define list order
+            const listOrder = ['DOING - IN PROGRESS', 'NEW TASKS', 'REVIEW - APPROVAL', 'FOREVER TASKS'];
+            
+            // Display by list in specific order
+            container.innerHTML = listOrder.map(listName => {
+                const listCards = lists[listName] || [];
+                const maxVisible = 4; // Show first 4 cards
+                const visibleCards = listCards.slice(0, maxVisible);
+                const hiddenCards = listCards.slice(maxVisible);
+                
+                return `
+                    <div class="kanban-column">
+                        <div class="kanban-header">
+                            <span class="kanban-title">${listName}</span>
+                            <span class="kanban-count">${listCards.length}</span>
                         </div>
-                    `).join('')}
+                        <div class="kanban-cards">
+                            ${visibleCards.map(card => createCardHTML(card)).join('')}
+                            ${hiddenCards.length > 0 ? `
+                                <div class="cards-hidden" id="hidden-${listName.replace(/[^a-zA-Z0-9]/g, '-')}">
+                                    ${hiddenCards.map(card => createCardHTML(card)).join('')}
+                                </div>
+                                <button class="show-more-btn" onclick="toggleCards('${listName.replace(/[^a-zA-Z0-9]/g, '-')}', this)">
+                                    📂 Show ${hiddenCards.length} more cards
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Create card HTML
+        function createCardHTML(card) {
+            return `
+                <div class="card-item ${card.needs_update ? 'needs-update' : ''} ${card.assigned_to === 'Unassigned' ? 'no-assignment' : ''}"
+                     onclick="showCardDetails('${card.id}')">
+                    <div class="card-title">${card.name}</div>
+                    <div class="card-meta">
+                        ${card.latest_comment ? `💬 ${card.latest_comment.substring(0, 45)}...` : 'No comments'}
+                    </div>
+                    <div>
+                        <span class="card-assignee">${card.assigned_to}</span>
+                        ${card.hours_since_comment ? `<span class="time-badge">${Math.round(card.hours_since_comment)}h ago</span>` : ''}
+                    </div>
                 </div>
-            `).join('');
+            `;
+        }
+        
+        // Toggle show/hide cards
+        function toggleCards(listId, button) {
+            const hiddenContainer = document.getElementById(`hidden-${listId}`);
+            const isHidden = hiddenContainer.classList.contains('cards-hidden');
+            
+            if (isHidden) {
+                hiddenContainer.classList.remove('cards-hidden');
+                button.innerHTML = '📁 Show less cards';
+            } else {
+                hiddenContainer.classList.add('cards-hidden');
+                const hiddenCount = hiddenContainer.children.length;
+                button.innerHTML = `📂 Show ${hiddenCount} more cards`;
+            }
         }
         
         // Update statistics
@@ -1141,5 +1251,4 @@
             }
         }
     </script>
-</body>
-</html>
+{% endblock %}

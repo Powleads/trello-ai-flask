@@ -54,18 +54,18 @@ class ProductionDatabaseManager:
                 self.is_production = True
                 print("[DB] ✅ PostgreSQL connection successful - using PostgreSQL database")
             except Exception as e:
-                print(f"[DB] ❌ PostgreSQL connection failed: {e}")
+                print(f"[DB] PostgreSQL connection failed: {e}")
                 print("[DB] Falling back to SQLite")
                 self.is_production = False
                 self.db_url = None
         else:
             self.is_production = False
             if not POSTGRES_AVAILABLE:
-                print("[DB] ❌ psycopg2 not available, using SQLite")
+                print("[DB] psycopg2 not available, using SQLite")
             elif not self.db_url:
-                print("[DB] ❌ No database URL configured, using SQLite")
+                print("[DB] No database URL configured, using SQLite")
             else:
-                print("[DB] ❌ Unknown issue, using SQLite")
+                print("[DB] Unknown issue, using SQLite")
         
         self.init_database()
     
