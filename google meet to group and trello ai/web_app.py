@@ -2828,18 +2828,18 @@ def scan_cards():
                 # Extract assigned user from checklists and comments using enhanced tracker
                 assigned_user = None
                 assigned_whatsapp = None
-            
-            try:
-                print(f"SEARCH: Looking for assigned user for card: {card.name}")
                 
-                # Get current team members from enhanced tracker (database-first)
-                current_team_members = {}
-                if enhanced_team_tracker:
-                    current_team_members = enhanced_team_tracker.team_members
-                    print(f"  ENHANCED TRACKER: Using {len(current_team_members)} database team members: {list(current_team_members.keys())}")
-                else:
-                    current_team_members = TEAM_MEMBERS
-                    print(f"  FALLBACK: Using {len(current_team_members)} environment team members: {list(current_team_members.keys())}")
+                try:
+                    print(f"SEARCH: Looking for assigned user for card: {card.name}")
+                    
+                    # Get current team members from enhanced tracker (database-first)
+                    current_team_members = {}
+                    if enhanced_team_tracker:
+                        current_team_members = enhanced_team_tracker.team_members
+                        print(f"  ENHANCED TRACKER: Using {len(current_team_members)} database team members: {list(current_team_members.keys())}")
+                    else:
+                        current_team_members = TEAM_MEMBERS
+                        print(f"  FALLBACK: Using {len(current_team_members)} environment team members: {list(current_team_members.keys())}")
                 
                 # Method 1: Check card description for team member names and @mentions
                 card_description = (card.description or '').lower()
@@ -3037,8 +3037,12 @@ def scan_cards():
                 continue
             else:
                 print(f"SUCCESS: Assigned user found: {assigned_user} -> {assigned_whatsapp}")
-            
-            # AI-powered analysis to determine if assigned user has provided updates
+                
+                except Exception as e:
+                    print(f"ERROR: Failed to detect assigned user for card {card.name}: {e}")
+                    # Continue with no assigned user
+                
+                # AI-powered analysis to determine if assigned user has provided updates
             assigned_user_last_update_hours = None  # Start with None, will be set if found
             # Only mark as needing update if in active list
             needs_update = card_needs_tracking  # Only active cards need updates
