@@ -2910,7 +2910,7 @@ def scan_cards():
                                 if assigned_user:
                                     break
                                 
-                    except Exception as e:
+                        except Exception as e:
                             print(f"  MEMBERS: Could not access Trello members: {e}")
                     
                     # Method 2.5: Use enhanced tracker's sophisticated assignee detection
@@ -2961,43 +2961,43 @@ def scan_cards():
                                     'key': api_key,
                                     'token': token
                                 }
-                            response = requests.get(comments_url, params=params)
-                            if response.status_code == 200:
-                                recent_comments = response.json()
-                                
-                                for comment in recent_comments[:5]:  # Check last 5 comments
-                                    comment_text = comment.get('data', {}).get('text', '').lower()
-                                    commenter = comment.get('memberCreator', {}).get('fullName', '').lower()
+                                response = requests.get(comments_url, params=params)
+                                if response.status_code == 200:
+                                        recent_comments = response.json()
                                     
-                                    # Look for assignment patterns in comments
-                                    for team_member_name, whatsapp_num in current_team_members.items():
-                                        member_lower = team_member_name.lower()
+                                    for comment in recent_comments[:5]:  # Check last 5 comments
+                                        comment_text = comment.get('data', {}).get('text', '').lower()
+                                        commenter = comment.get('memberCreator', {}).get('fullName', '').lower()
                                         
-                                        if member_lower in ['admin', 'criselle']:
-                                            continue
-                                        
-                                        assignment_patterns = [
-                                            f"@{member_lower}",
-                                            f"assign this to {member_lower}",
-                                            f"assigned to {member_lower}",
-                                            f"{member_lower} please",
-                                            f"{member_lower} can you",
-                                            f"{member_lower} take this",
-                                            f"{member_lower} handle this",
-                                        ]
-                                        
-                                        for pattern in assignment_patterns:
-                                            if pattern in comment_text:
-                                                assigned_user = team_member_name
-                                                assigned_whatsapp = whatsapp_num
-                                                print(f"FOUND: Assignment in comment '{pattern}': {team_member_name}")
+                                        # Look for assignment patterns in comments
+                                        for team_member_name, whatsapp_num in current_team_members.items():
+                                            member_lower = team_member_name.lower()
+                                            
+                                            if member_lower in ['admin', 'criselle']:
+                                                continue
+                                            
+                                            assignment_patterns = [
+                                                f"@{member_lower}",
+                                                f"assign this to {member_lower}",
+                                                f"assigned to {member_lower}",
+                                                f"{member_lower} please",
+                                                f"{member_lower} can you",
+                                                f"{member_lower} take this",
+                                                f"{member_lower} handle this",
+                                            ]
+                                            
+                                            for pattern in assignment_patterns:
+                                                if pattern in comment_text:
+                                                    assigned_user = team_member_name
+                                                    assigned_whatsapp = whatsapp_num
+                                                    print(f"FOUND: Assignment in comment '{pattern}': {team_member_name}")
+                                                    break
+                                            
+                                            if assigned_user:
                                                 break
-                                        
+                                    
                                         if assigned_user:
                                             break
-                                    
-                                    if assigned_user:
-                                        break
                                         
                     except Exception as e:
                             print(f"  COMMENT ASSIGNMENT: Could not check comments: {e}")
