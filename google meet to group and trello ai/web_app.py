@@ -3000,40 +3000,37 @@ def scan_cards():
                                         break
                                         
                     except Exception as e:
-                        print(f"  COMMENT ASSIGNMENT: Could not check comments: {e}")
-                
-                # Method 4: Smart defaults based on card content/type
-                if not assigned_user:
-                    print(f"  SMART DEFAULTS: Attempting to assign based on card content...")
-                    card_content = f"{card.name.lower()} {card_description}".lower()
+                            print(f"  COMMENT ASSIGNMENT: Could not check comments: {e}")
                     
-                    # Content-based assignments (only if team members exist in current team)
-                    if any(keyword in card_content for keyword in ['mobile', 'app', 'ios', 'android']):
-                        if 'Wendy' in current_team_members:
-                            assigned_user = 'Wendy'
-                            assigned_whatsapp = current_team_members.get('Wendy')
-                            print(f"FOUND: Mobile/App content assigned to Wendy")
-                    elif any(keyword in card_content for keyword in ['website', 'web', 'wordpress', 'landing', 'page']):
-                        if 'Lancey' in current_team_members:
-                            assigned_user = 'Lancey'
-                            assigned_whatsapp = current_team_members.get('Lancey')
-                            print(f"FOUND: Website content assigned to Lancey")
-                    elif any(keyword in card_content for keyword in ['design', 'logo', 'brand', 'graphics']):
-                        if 'Breyden' in current_team_members:
-                            assigned_user = 'Breyden'
-                            assigned_whatsapp = current_team_members.get('Breyden')
-                            print(f"FOUND: Design content assigned to Breyden")
-                    elif any(keyword in card_content for keyword in ['automation', 'integration', 'api', 'webhook']):
-                        # Skip Ezechiel as he's been removed from team
-                        print(f"SKIP: Automation content (Ezechiel no longer in team)")
+                    # Method 4: Smart defaults based on card content/type
+                    if not assigned_user:
+                        print(f"  SMART DEFAULTS: Attempting to assign based on card content...")
+                        card_content = f"{card.name.lower()} {card_description}".lower()
+                        
+                        # Content-based assignments (only if team members exist in current team)
+                        if any(keyword in card_content for keyword in ['mobile', 'app', 'ios', 'android']):
+                            if 'Wendy' in current_team_members:
+                                assigned_user = 'Wendy'
+                                assigned_whatsapp = current_team_members.get('Wendy')
+                                print(f"FOUND: Mobile/App content assigned to Wendy")
+                        elif any(keyword in card_content for keyword in ['website', 'web', 'wordpress', 'landing', 'page']):
+                            if 'Lancey' in current_team_members:
+                                assigned_user = 'Lancey'
+                                assigned_whatsapp = current_team_members.get('Lancey')
+                                print(f"FOUND: Website content assigned to Lancey")
+                        elif any(keyword in card_content for keyword in ['design', 'logo', 'brand', 'graphics']):
+                            if 'Breyden' in current_team_members:
+                                assigned_user = 'Breyden'
+                                assigned_whatsapp = current_team_members.get('Breyden')
+                                print(f"FOUND: Design content assigned to Breyden")
+                        elif any(keyword in card_content for keyword in ['automation', 'integration', 'api', 'webhook']):
+                            # Skip Ezechiel as he's been removed from team
+                            print(f"SKIP: Automation content (Ezechiel no longer in team)")
                     
-            except Exception as e:
-                print(f"Error extracting assigned user for card {card.name}: {e}")
-            
-            # If no assigned user found, skip this card for updates
+                    # Check if we found an assigned user
                     if not assigned_user:
                         print(f"ERROR: No assigned user found for card: {card.name}")
-                        print(f"   Available team members: {list(TEAM_MEMBERS.keys())}")
+                        print(f"   Available team members: {list(current_team_members.keys())}")
                         continue
                     else:
                         print(f"SUCCESS: Assigned user found: {assigned_user} -> {assigned_whatsapp}")
