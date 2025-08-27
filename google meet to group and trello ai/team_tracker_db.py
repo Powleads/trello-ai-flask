@@ -171,151 +171,22 @@ def team_tracker_v2():
         }), 500
 
 @team_tracker_bp.route('/api/sync-cards', methods=['POST'])
-def sync_cards():
-    """Trigger manual card sync - only specific lists on EEInteractive board"""
+def sync_cards_v3():
+    """Trigger manual card sync using V3 sync with proper assignment detection"""
     try:
-        from custom_trello import CustomTrelloClient
-        import sqlite3
-        from datetime import datetime
-        import requests
-        import os
+        from trello_sync_v3 import TrelloSyncV3
         
-        # Lists to sync
-        TARGET_LISTS = [
-            'NEW TASKS',
-            'DOING - IN PROGRESS', 
-            'BLOCKED',
-            'REVIEW - APPROVAL',
-            'FOREVER TASKS'
-        ]
-        
-        client = CustomTrelloClient()
-        boards = client.list_boards()
-        
-        # Find the EEInteractive board
-        target_board = None
-        for board in boards:
-            if 'eeinteractive' in board.name.lower():
-                target_board = board
-                break
-        
-        if not target_board:
-            return jsonify({'success': False, 'error': 'EEInteractive board not found'}), 404
-        
-        # Get all lists and filter to our targets
-        lists = target_board.get_lists()
-        target_list_ids = {}
-        for lst in lists:
-            if lst.name in TARGET_LISTS:
-                target_list_ids[lst.id] = lst.name
-        
-        # Get all cards from the board
-        all_cards = target_board.list_cards()
-        
-        # Filter cards to only those in target lists
-        cards_to_sync = []
-        for card in all_cards:
-            if card.list_id in target_list_ids:
-                cards_to_sync.append((card, target_list_ids[card.list_id]))
-        
-        # Connect to database
-        conn = sqlite3.connect('team_tracker_v2.db')
-        cursor = conn.cursor()
-        
-        # Start sync record
-        cursor.execute('''
-            INSERT INTO sync_history (sync_type, started_at, status)
-            VALUES (?, ?, ?)
-        ''', ('targeted', datetime.now(), 'running'))
-        sync_id = cursor.lastrowid
-        conn.commit()
-        
-        cards_synced = 0
-        comments_synced = 0
-        
-        # Sync each card
-        for card, list_name in cards_to_sync:
-            try:
-                # Store card in database
-                cursor.execute('''
-                    INSERT OR REPLACE INTO trello_cards (
-                        card_id, name, description, list_id, list_name,
-                        board_id, closed, url, last_synced
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    card.id,
-                    card.name,
-                    card.desc,
-                    card.list_id,
-                    list_name,
-                    target_board.id,
-                    card.closed,
-                    card.url,
-                    datetime.now()
-                ))
-                cards_synced += 1
-                
-                # Get last few comments for this card
-                try:
-                    api_key = os.environ.get('TRELLO_API_KEY')
-                    token = os.environ.get('TRELLO_TOKEN')
-                    
-                    url = f"https://api.trello.com/1/cards/{card.id}/actions"
-                    params = {
-                        'filter': 'commentCard',
-                        'limit': 10,
-                        'key': api_key,
-                        'token': token
-                    }
-                    
-                    response = requests.get(url, params=params, timeout=5)
-                    if response.status_code == 200:
-                        comments = response.json()
-                        
-                        for comment in comments:
-                            comment_id = comment.get('id')
-                            comment_text = comment.get('data', {}).get('text', '')
-                            commenter_name = comment.get('memberCreator', {}).get('fullName', '')
-                            comment_date_str = comment.get('date', '')
-                            
-                            # Parse date
-                            comment_date = None
-                            if comment_date_str:
-                                comment_date = datetime.fromisoformat(comment_date_str.replace('Z', '+00:00'))
-                            
-                            # Store comment
-                            cursor.execute('''
-                                INSERT OR REPLACE INTO card_comments (
-                                    card_id, comment_id, commenter_name,
-                                    comment_text, comment_date
-                                ) VALUES (?, ?, ?, ?, ?)
-                            ''', (
-                                card.id, comment_id, commenter_name,
-                                comment_text, comment_date
-                            ))
-                            comments_synced += 1
-                except:
-                    pass  # Skip comment sync errors
-                    
-            except Exception as e:
-                print(f"Error syncing card {card.name}: {e}")
-        
-        # Update sync history
-        cursor.execute('''
-            UPDATE sync_history 
-            SET completed_at = ?, cards_synced = ?, comments_synced = ?, status = ?
-            WHERE id = ?
-        ''', (datetime.now(), cards_synced, comments_synced, 'completed', sync_id))
-        
-        conn.commit()
-        conn.close()
+        # Run the V3 sync
+        sync = TrelloSyncV3()
+        stats = sync.sync_board()
         
         return jsonify({
             'success': True,
-            'cards_synced': cards_synced,
-            'comments_synced': comments_synced,
-            'lists_synced': list(target_list_ids.values()),
-            'message': f'Synced {cards_synced} cards from {len(target_list_ids)} lists'
+            'cards_synced': stats.get('new_cards', 0) + stats.get('updated_cards', 0),
+            'comments_synced': stats.get('new_comments', 0),
+            'assignments_detected': stats.get('new_assignments', 0),
+            'list_changes': stats.get('list_changes', 0),
+            'message': 'Sync completed successfully with V3 assignment detection'
         })
         
     except Exception as e:
