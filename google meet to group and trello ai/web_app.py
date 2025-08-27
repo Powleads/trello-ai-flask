@@ -2963,7 +2963,7 @@ def scan_cards():
                                 }
                                 response = requests.get(comments_url, params=params)
                                 if response.status_code == 200:
-                                        recent_comments = response.json()
+                                    recent_comments = response.json()
                                     
                                     for comment in recent_comments[:5]:  # Check last 5 comments
                                         comment_text = comment.get('data', {}).get('text', '').lower()
