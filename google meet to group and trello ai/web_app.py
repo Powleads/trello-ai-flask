@@ -132,6 +132,13 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 app.register_blueprint(google_meet_analytics)
 app.register_blueprint(team_tracker_bp)
 
+# Initialize team tracker database if needed
+try:
+    from init_team_tracker import init_database
+    init_database()
+except Exception as e:
+    print(f"Warning: Could not initialize team tracker database: {e}")
+
 # Initialize message tracker and Gmail tracker
 message_tracker = MessageTracker("message_tracker.db")
 # Initialize Gmail tracker with production support

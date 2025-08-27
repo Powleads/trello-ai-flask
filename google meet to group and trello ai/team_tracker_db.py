@@ -20,8 +20,27 @@ def get_db_connection():
 def team_tracker_v2():
     """Enhanced team tracker using database"""
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+    except Exception as e:
+        # If database doesn't exist or is corrupted, show error page
+        return f"""
+        <html>
+        <head><title>Team Tracker Setup Required</title></head>
+        <body style="font-family: sans-serif; padding: 40px; max-width: 800px; margin: 0 auto;">
+            <h1>Team Tracker v2 - Setup Required</h1>
+            <p style="color: red;">Database not initialized: {str(e)}</p>
+            <h2>To set up the Team Tracker:</h2>
+            <ol>
+                <li>Run: <code>python database_schema_v2.py</code></li>
+                <li>Run: <code>python trello_sync_simple.py</code></li>
+                <li>Refresh this page</li>
+            </ol>
+            <p><a href="/team-tracker">Use original team tracker</a></p>
+        </body>
+        </html>
+        """, 500
     
     # Get all active cards with assignments and latest comments
     query = '''
@@ -131,13 +150,23 @@ def team_tracker_v2():
     
     conn.close()
     
-    return render_template('team_tracker_v2.html',
+    try:
+        return render_template('team_tracker_v2.html',
                          cards_by_list=cards_by_list,
                          needs_update=needs_update,
                          no_assignment=no_assignment,
                          sync_status=sync_status,
                          team_members=team_members,
                          total_cards=len(cards))
+    except Exception as e:
+        # Template not found or other rendering error
+        return jsonify({
+            'error': 'Template rendering failed',
+            'message': str(e),
+            'cards_found': len(cards),
+            'sync_status': sync_status,
+            'suggestion': 'The database is working but the template may be missing'
+        }), 500
 
 @team_tracker_bp.route('/api/sync-cards', methods=['POST'])
 def sync_cards():
@@ -279,7 +308,23 @@ def send_reminders():
         if hours_since is None or hours_since > 24:
             try:
                 # Send WhatsApp message
-                from whatsapp_integration import send_whatsapp_message
+                try:
+                    from whatsapp_integration import send_whatsapp_message
+                except ImportError:
+                    # Fallback to direct API call
+                    def send_whatsapp_message(phone, msg):
+                        import os
+                        import requests
+                        url = f"https://api.greenapi.com/waInstance{os.environ.get('GREEN_API_INSTANCE')}/sendMessage/{os.environ.get('GREEN_API_TOKEN')}"
+                        payload = {
+                            "chatId": phone,
+                            "message": msg
+                        }
+                        try:
+                            response = requests.post(url, json=payload, timeout=10)
+                            return response.status_code == 200
+                        except:
+                            return False
                 
                 message = f"Hi {team_member}! 👋\\n\\n"
                 message += f"Please provide an update on:\\n*{card_name}*\\n\\n"
