@@ -2840,20 +2840,20 @@ def scan_cards():
                     else:
                         current_team_members = TEAM_MEMBERS
                         print(f"  FALLBACK: Using {len(current_team_members)} environment team members: {list(current_team_members.keys())}")
-                
-                # Method 1: Check card description for team member names and @mentions
-                card_description = (card.description or '').lower()
-                card_name_lower = card.name.lower()
-                print(f"  DESCRIPTION: '{card_description[:100]}...'")
-                print(f"  CARD NAME: '{card_name_lower}'")
-                
-                # Check for @mentions and direct name references
-                for member_name, whatsapp_num in current_team_members.items():
-                    member_lower = member_name.lower()
                     
-                    # Skip admin and criselle from being assigned tasks
-                    if member_lower in ['admin', 'criselle']:
-                        continue
+                    # Method 1: Check card description for team member names and @mentions
+                    card_description = (card.description or '').lower()
+                    card_name_lower = card.name.lower()
+                    print(f"  DESCRIPTION: '{card_description[:100]}...'")
+                    print(f"  CARD NAME: '{card_name_lower}'")
+                    
+                    # Check for @mentions and direct name references
+                    for member_name, whatsapp_num in current_team_members.items():
+                        member_lower = member_name.lower()
+                        
+                        # Skip admin and criselle from being assigned tasks
+                        if member_lower in ['admin', 'criselle']:
+                            continue
                     
                     # Check various patterns:
                     patterns_to_check = [
@@ -3031,24 +3031,24 @@ def scan_cards():
                 print(f"Error extracting assigned user for card {card.name}: {e}")
             
             # If no assigned user found, skip this card for updates
-            if not assigned_user:
-                print(f"ERROR: No assigned user found for card: {card.name}")
-                print(f"   Available team members: {list(TEAM_MEMBERS.keys())}")
-                continue
-            else:
-                print(f"SUCCESS: Assigned user found: {assigned_user} -> {assigned_whatsapp}")
-                
+                    if not assigned_user:
+                        print(f"ERROR: No assigned user found for card: {card.name}")
+                        print(f"   Available team members: {list(TEAM_MEMBERS.keys())}")
+                        continue
+                    else:
+                        print(f"SUCCESS: Assigned user found: {assigned_user} -> {assigned_whatsapp}")
+                    
                 except Exception as e:
                     print(f"ERROR: Failed to detect assigned user for card {card.name}: {e}")
                     # Continue with no assigned user
                 
                 # AI-powered analysis to determine if assigned user has provided updates
-            assigned_user_last_update_hours = None  # Start with None, will be set if found
-            # Only mark as needing update if in active list
-            needs_update = card_needs_tracking  # Only active cards need updates
-            
-            if assigned_user:
-                try:
+                assigned_user_last_update_hours = None  # Start with None, will be set if found
+                # Only mark as needing update if in active list
+                needs_update = card_needs_tracking  # Only active cards need updates
+                
+                if assigned_user:
+                    try:
                     print(f"AI ANALYSIS: Checking if {assigned_user} has provided updates...")
                     
                     # Get comments from the card using different methods
