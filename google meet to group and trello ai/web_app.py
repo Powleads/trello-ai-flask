@@ -27,6 +27,7 @@ from gmail_oauth import gmail_oauth
 from production_db import get_production_db
 from google_meet_analytics import google_meet_analytics
 from enhanced_team_tracker import enhanced_team_tracker
+from team_tracker_db import team_tracker_bp
 
 # Import AI modules
 try:
@@ -129,6 +130,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
 # Register blueprints
 app.register_blueprint(google_meet_analytics)
+app.register_blueprint(team_tracker_bp)
 
 # Initialize message tracker and Gmail tracker
 message_tracker = MessageTracker("message_tracker.db")

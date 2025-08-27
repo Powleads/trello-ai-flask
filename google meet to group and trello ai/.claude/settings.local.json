@@ -35,7 +35,8 @@
       "Bash(git push:*)",
       "Bash(start http://localhost:5000/gmail-tracker)",
       "Bash(sqlite3:*)",
-      "Bash(del gmail_tracker.db)"
+      "Bash(del gmail_tracker.db)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []

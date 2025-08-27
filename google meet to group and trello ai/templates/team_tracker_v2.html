@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Tracker v2 - Database Powered</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .sync-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .sync-info {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .sync-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .sync-button:hover {
+            background: #45a049;
+        }
+        
+        .sync-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .alerts-section {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .alerts-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-card {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .alert-card.urgent {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+        
+        .alert-info {
+            flex: 1;
+        }
+        
+        .alert-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .alert-meta {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .assign-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .lists-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .list-column {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .list-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .list-count {
+            background: #e0e0e0;
+            color: #666;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .card-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        
+        .card-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .card-item.needs-update {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .card-item.no-assignment {
+            border-left: 4px solid #dc3545;
+        }
+        
+        .card-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .card-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .card-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .assignment-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .confidence-high {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .confidence-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .confidence-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .latest-comment {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #555;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .send-reminders-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 20px 0;
+            display: block;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        
+        .send-reminders-btn:hover {
+            background: #f57c00;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 16px;
+            width: 500px;
+            max-width: 90%;
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .team-member-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Team Tracker v2 - Database Powered</h1>
+            <div class="sync-status">
+                <div class="sync-info">
+                    {% if sync_status.last_sync %}
+                        <strong>Last Sync:</strong> {{ sync_status.last_sync.strftime('%Y-%m-%d %H:%M') }}<br>
+                        <strong>Cards:</strong> {{ sync_status.cards_synced }} | 
+                        <strong>Comments:</strong> {{ sync_status.comments_synced }}
+                    {% else %}
+                        <strong>Status:</strong> Never synced
+                    {% endif %}
+                </div>
+                <button class="sync-button" onclick="syncCards()">🔄 Sync Now</button>
+            </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Cards</h3>
+                <div class="stat-value">{{ total_cards }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Need Updates</h3>
+                <div class="stat-value" style="color: #ff9800;">{{ needs_update|length }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Unassigned</h3>
+                <div class="stat-value" style="color: #dc3545;">{{ no_assignment|length }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Team Members</h3>
+                <div class="stat-value" style="color: #4CAF50;">{{ team_members|length }}</div>
+            </div>
+        </div>
+        
+        <!-- Alerts Section -->
+        {% if needs_update or no_assignment %}
+        <div class="alerts-section">
+            <h2>⚠️ Attention Required</h2>
+            
+            {% if no_assignment %}
+                <h3 style="color: #dc3545; margin: 20px 0;">Unassigned Cards:</h3>
+                {% for card in no_assignment %}
+                <div class="alert-card urgent">
+                    <div class="alert-info">
+                        <div class="alert-title">{{ card.name }}</div>
+                        <div class="alert-meta">List: {{ card.list }} | No team member assigned</div>
+                    </div>
+                    <button class="assign-button" onclick="assignCard('{{ card.id }}', '{{ card.name }}')">
+                        Assign Member
+                    </button>
+                </div>
+                {% endfor %}
+            {% endif %}
+            
+            {% if needs_update %}
+                <h3 style="color: #ff9800; margin: 20px 0;">Cards Needing Updates (24h+):</h3>
+                {% for card in needs_update %}
+                <div class="alert-card">
+                    <div class="alert-info">
+                        <div class="alert-title">{{ card.name }}</div>
+                        <div class="alert-meta">
+                            Assigned to: {{ card.assigned_to }} | 
+                            Last update: {{ card.hours_since_update|round|int }}h ago
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <button class="send-reminders-btn" onclick="sendReminders()">
+                    📱 Send WhatsApp Reminders
+                </button>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- Cards by List -->
+        <div class="lists-container">
+            {% for list_name, cards in cards_by_list.items() %}
+            <div class="list-column">
+                <div class="list-header">
+                    <div class="list-title">{{ list_name }}</div>
+                    <div class="list-count">{{ cards|length }}</div>
+                </div>
+                
+                {% for card in cards %}
+                <div class="card-item {% if card.needs_update %}needs-update{% endif %} {% if card.assigned_to == 'Unassigned' %}no-assignment{% endif %}"
+                     onclick="showCardDetails('{{ card.id }}')">
+                    <div class="card-title">{{ card.name }}</div>
+                    <div class="card-meta">
+                        <div class="card-meta-item">
+                            <strong>Assigned:</strong> {{ card.assigned_to }}
+                            {% if card.confidence != 'N/A' %}
+                            <span class="assignment-badge 
+                                {% if card.confidence|int >= 80 %}confidence-high
+                                {% elif card.confidence|int >= 50 %}confidence-medium
+                                {% else %}confidence-low{% endif %}">
+                                {{ card.confidence }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if card.assignment_method %}
+                        <div class="card-meta-item">
+                            <small>Method: {{ card.assignment_method }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if card.latest_comment != 'No comments' %}
+                    <div class="latest-comment">
+                        💬 {{ card.latest_comment[:100] }}...
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Assignment Modal -->
+    <div id="assignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Assign Team Member</h2>
+                <p id="modalCardName" style="color: #666; margin-top: 10px;"></p>
+            </div>
+            
+            <select id="teamMemberSelect" class="team-member-select">
+                <option value="">Select a team member...</option>
+                {% for member, whatsapp in team_members.items() %}
+                <option value="{{ member }}">{{ member }}</option>
+                {% endfor %}
+            </select>
+            
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="confirmAssignment()">Assign</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentCardId = null;
+        
+        function syncCards() {
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Syncing...';
+            
+            fetch('/api/sync-cards', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Sync complete!\nCards: ${data.cards_synced}\nComments: ${data.comments_synced}`);
+                    location.reload();
+                } else {
+                    alert('Sync failed: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Sync error: ' + error);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = '🔄 Sync Now';
+            });
+        }
+        
+        function assignCard(cardId, cardName) {
+            currentCardId = cardId;
+            document.getElementById('modalCardName').textContent = cardName;
+            document.getElementById('assignModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('assignModal').style.display = 'none';
+            currentCardId = null;
+        }
+        
+        function confirmAssignment() {
+            const teamMember = document.getElementById('teamMemberSelect').value;
+            if (!teamMember) {
+                alert('Please select a team member');
+                return;
+            }
+            
+            fetch('/api/update-assignment', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    card_id: currentCardId,
+                    team_member: teamMember
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Assignment updated successfully');
+                    location.reload();
+                } else {
+                    alert('Failed to update assignment: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+            
+            closeModal();
+        }
+        
+        function showCardDetails(cardId) {
+            fetch(`/api/card-history/${cardId}`)
+            .then(response => response.json())
+            .then(data => {
+                let commentHtml = '<h3>Recent Comments:</h3>';
+                data.comments.forEach(comment => {
+                    commentHtml += `<div style="margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 5px;">`;
+                    commentHtml += `<strong>${comment.commenter}</strong> (${comment.hours_ago}h ago)`;
+                    if (comment.is_request) {
+                        commentHtml += ' <span style="color: red;">[Update Request]</span>';
+                    }
+                    commentHtml += `<br>${comment.text}`;
+                    commentHtml += `</div>`;
+                });
+                
+                // For now, show in alert - could be improved with a modal
+                console.log(data.comments);
+            });
+        }
+        
+        function sendReminders() {
+            if (!confirm('Send WhatsApp reminders to all team members who haven\'t updated in 24h?')) {
+                return;
+            }
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> Sending...';
+            
+            fetch('/api/send-reminders', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`Reminders sent: ${data.sent}\n${data.errors.length > 0 ? 'Errors: ' + data.errors.join(', ') : ''}`);
+                } else {
+                    alert('Failed to send reminders');
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = '📱 Send WhatsApp Reminders';
+            });
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('assignModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
