@@ -313,108 +313,136 @@ def get_dashboard_data():
 def get_card_details(card_id):
     """Get detailed information for a specific card"""
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
     
-    # Initialize V3 tables if they don't exist
-    initialize_v3_tables(cursor, conn)
-    
-    # Get card info
-    cursor.execute('''
-        SELECT name, description, list_name, url, created_at, last_synced
-        FROM trello_cards WHERE card_id = ?
-    ''', (card_id,))
-    
-    card_row = cursor.fetchone()
-    if not card_row:
-        return jsonify({'error': 'Card not found'}), 404
-    
-    card_data = {
-        'name': card_row[0],
-        'description': card_row[1],
-        'list': card_row[2],
-        'url': card_row[3],
-        'created_at': card_row[4].isoformat() if card_row[4] else None,
-        'last_synced': card_row[5].isoformat() if isinstance(card_row[5], datetime) else card_row[5]
-    }
-    
-    # Get assignment history
-    cursor.execute('''
-        SELECT team_member, assignment_method, confidence_score, assigned_at, is_active
-        FROM card_assignments
-        WHERE card_id = ?
-        ORDER BY assigned_at DESC
-    ''', (card_id,))
-    
-    assignments = []
-    for row in cursor.fetchall():
-        assignments.append({
-            'member': row[0],
-            'method': row[1],
-            'confidence': row[2],
-            'date': row[3].isoformat() if row[3] else None,
-            'is_active': row[4]
+        # Get card info
+        cursor.execute('''
+            SELECT name, description, list_name, url, created_at, last_synced
+            FROM trello_cards WHERE card_id = ?
+        ''', (card_id,))
+        
+        card_row = cursor.fetchone()
+        if not card_row:
+            return jsonify({'error': 'Card not found'}), 404
+        
+        card_data = {
+            'name': card_row[0],
+            'description': card_row[1],
+            'list': card_row[2],
+            'url': card_row[3],
+            'created_at': card_row[4].isoformat() if card_row[4] else None,
+            'last_synced': card_row[5].isoformat() if isinstance(card_row[5], datetime) else card_row[5]
+        }
+        
+        # Get assignment history
+        try:
+            cursor.execute('''
+                SELECT team_member, assignment_method, confidence_score, assigned_at, is_active
+                FROM card_assignments
+                WHERE card_id = ?
+                ORDER BY assigned_at DESC
+            ''', (card_id,))
+            
+            assignments = []
+            for row in cursor.fetchall():
+                assignments.append({
+                    'member': row[0],
+                    'method': row[1],
+                    'confidence': row[2],
+                    'date': row[3].isoformat() if row[3] else None,
+                    'is_active': row[4]
+                })
+        except Exception as e:
+            print(f"[V3] Error getting assignments for {card_id}: {e}")
+            assignments = []
+        
+        # Get comments
+        try:
+            cursor.execute('''
+                SELECT commenter_name, comment_text, comment_date, is_update_request
+                FROM card_comments
+                WHERE card_id = ?
+                ORDER BY comment_date DESC
+                LIMIT 50
+            ''', (card_id,))
+            
+            comments = []
+            for row in cursor.fetchall():
+                comments.append({
+                    'commenter': row[0],
+                    'text': row[1],
+                    'date': row[2].isoformat() if row[2] else None,
+                    'is_request': row[3]
+                })
+        except Exception as e:
+            print(f"[V3] Error getting comments for {card_id}: {e}")
+            comments = []
+        
+        # Get list history
+        try:
+            cursor.execute('''
+                SELECT from_list, to_list, transition_date
+                FROM list_history
+                WHERE card_id = ?
+                ORDER BY transition_date DESC
+                LIMIT 10
+            ''', (card_id,))
+            
+            list_history = []
+            for row in cursor.fetchall():
+                list_history.append({
+                    'from': row[0],
+                    'to': row[1],
+                    'date': row[2].isoformat() if row[2] else None
+                })
+        except Exception as e:
+            print(f"[V3] Error getting list history for {card_id}: {e}")
+            list_history = []
+        
+        # Get metrics
+        try:
+            cursor.execute('''
+                SELECT time_in_list_hours, total_ignored_count, last_response_date, escalation_level
+                FROM card_metrics
+                WHERE card_id = ?
+            ''', (card_id,))
+            
+            metrics_row = cursor.fetchone()
+            metrics = {
+                'time_in_list': metrics_row[0] if metrics_row else 0,
+                'ignored_count': metrics_row[1] if metrics_row else 0,
+                'last_response': metrics_row[2].isoformat() if metrics_row and metrics_row[2] else None,
+                'escalation_level': metrics_row[3] if metrics_row else 0
+            }
+        except Exception as e:
+            print(f"[V3] Error getting metrics for {card_id}: {e}")
+            metrics = {
+                'time_in_list': 0,
+                'ignored_count': 0,
+                'last_response': None,
+                'escalation_level': 0
+            }
+        
+        return jsonify({
+            'card': card_data,
+            'assignments': assignments,
+            'comments': comments,
+            'list_history': list_history,
+            'metrics': metrics
         })
-    
-    # Get comments
-    cursor.execute('''
-        SELECT commenter_name, comment_text, comment_date, is_update_request
-        FROM card_comments
-        WHERE card_id = ?
-        ORDER BY comment_date DESC
-        LIMIT 50
-    ''', (card_id,))
-    
-    comments = []
-    for row in cursor.fetchall():
-        comments.append({
-            'commenter': row[0],
-            'text': row[1],
-            'date': row[2].isoformat() if row[2] else None,
-            'is_request': row[3]
-        })
-    
-    # Get list history
-    cursor.execute('''
-        SELECT from_list, to_list, transition_date
-        FROM list_history
-        WHERE card_id = ?
-        ORDER BY transition_date DESC
-        LIMIT 10
-    ''', (card_id,))
-    
-    list_history = []
-    for row in cursor.fetchall():
-        list_history.append({
-            'from': row[0],
-            'to': row[1],
-            'date': row[2].isoformat() if row[2] else None
-        })
-    
-    # Get metrics
-    cursor.execute('''
-        SELECT time_in_list_hours, total_ignored_count, last_response_date, escalation_level
-        FROM card_metrics
-        WHERE card_id = ?
-    ''', (card_id,))
-    
-    metrics_row = cursor.fetchone()
-    metrics = {
-        'time_in_list': metrics_row[0] if metrics_row else 0,
-        'ignored_count': metrics_row[1] if metrics_row else 0,
-        'last_response': metrics_row[2].isoformat() if metrics_row and metrics_row[2] else None,
-        'escalation_level': metrics_row[3] if metrics_row else 0
-    }
-    
-    conn.close()
-    
-    return jsonify({
-        'card': card_data,
-        'assignments': assignments,
-        'comments': comments,
-        'list_history': list_history,
-        'metrics': metrics
-    })
+        
+    except Exception as e:
+        print(f"[V3] Error in card-details for {card_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @team_tracker_v3_bp.route('/api/v3/reassign-card', methods=['POST'])
 def reassign_card():
@@ -696,6 +724,10 @@ def scan_cards():
             
             cards_synced = 0
             comments_synced = 0
+            assignments_created = 0
+            
+            # Define admin users (modify as needed)
+            admin_users = ['james', 'admin', 'powleads']
             
             for trello_list in active_lists:
                 list_id = trello_list['id']
@@ -710,20 +742,132 @@ def scan_cards():
                 for card in cards:
                     if card['closed']:
                         continue
-                        
-                    # Store/update card in database
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO trello_cards 
-                        (card_id, name, description, list_id, list_name, board_id, board_name, 
-                         due_date, labels, closed, url, created_at, updated_at, last_synced)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        card['id'], card['name'], card.get('desc', ''),
-                        list_id, list_name, board_id, eeinteractive_board['name'],
-                        card.get('due'), str(card.get('labels', [])),
-                        0, card['url'], datetime.now(), datetime.now(), datetime.now()
-                    ))
+                    
+                    card_id = card['id']
+                    
+                    # Store/update card in database (preserve existing data on update)
+                    cursor.execute('SELECT card_id FROM trello_cards WHERE card_id = ?', (card_id,))
+                    existing_card = cursor.fetchone()
+                    
+                    if existing_card:
+                        # Update existing card but preserve tracked data
+                        cursor.execute('''
+                            UPDATE trello_cards 
+                            SET name = ?, description = ?, list_id = ?, list_name = ?, 
+                                board_id = ?, board_name = ?, due_date = ?, labels = ?, 
+                                url = ?, updated_at = ?, last_synced = ?
+                            WHERE card_id = ?
+                        ''', (
+                            card['name'], card.get('desc', ''), list_id, list_name, 
+                            board_id, eeinteractive_board['name'], card.get('due'), 
+                            str(card.get('labels', [])), card['url'], datetime.now(), 
+                            datetime.now(), card_id
+                        ))
+                    else:
+                        # Insert new card
+                        cursor.execute('''
+                            INSERT INTO trello_cards 
+                            (card_id, name, description, list_id, list_name, board_id, board_name, 
+                             due_date, labels, closed, url, created_at, updated_at, last_synced)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            card_id, card['name'], card.get('desc', ''),
+                            list_id, list_name, board_id, eeinteractive_board['name'],
+                            card.get('due'), str(card.get('labels', [])),
+                            0, card['url'], datetime.now(), datetime.now(), datetime.now()
+                        ))
+                    
                     cards_synced += 1
+                    
+                    # Get and sync comments for this card
+                    try:
+                        comments_url = f"https://api.trello.com/1/cards/{card_id}/actions?filter=commentCard&key={tracker.api_key}&token={tracker.token}"
+                        comments_response = requests.get(comments_url, timeout=30)
+                        comments_response.raise_for_status()
+                        comments = comments_response.json()
+                        
+                        # Process comments for assignment logic
+                        assigned_member = None
+                        assignment_method = None
+                        assignment_confidence = 0.0
+                        
+                        # Sort comments by date (oldest first) for proper assignment logic
+                        comments_sorted = sorted(comments, key=lambda x: x['date'])
+                        
+                        for comment in comments_sorted:
+                            comment_id = comment['id']
+                            comment_text = comment['data']['text']
+                            commenter_name = comment['memberCreator']['fullName']
+                            commenter_username = comment['memberCreator']['username']
+                            comment_date = datetime.fromisoformat(comment['date'].replace('Z', '+00:00'))
+                            
+                            # Store comment in database
+                            cursor.execute('''
+                                INSERT OR REPLACE INTO card_comments 
+                                (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ''', (
+                                card_id, comment_id, comment_text, commenter_name,
+                                commenter_username, comment_date, 0
+                            ))
+                            comments_synced += 1
+                            
+                            # Assignment logic
+                            comment_lower = comment_text.lower()
+                            
+                            # Check for explicit assignment (e.g., "assign: lancey" or "assign lancey")
+                            import re
+                            assign_match = re.search(r'assign[:\s]+(\w+)', comment_lower)
+                            if assign_match:
+                                assigned_name = assign_match.group(1).title()
+                                # Check if this is a valid team member
+                                cursor.execute('SELECT name FROM team_members_cache WHERE LOWER(name) = ?', (assigned_name.lower(),))
+                                if cursor.fetchone():
+                                    assigned_member = assigned_name
+                                    assignment_method = 'explicit_assignment'
+                                    assignment_confidence = 1.0
+                                    print(f"[V3] Explicit assignment found: {assigned_name} for card {card['name']}")
+                            
+                            # If no explicit assignment and commenter is not admin, this is the assignee
+                            elif not assigned_member and commenter_username.lower() not in admin_users:
+                                # Check if commenter is a team member
+                                cursor.execute('SELECT name FROM team_members_cache WHERE LOWER(name) = ? OR LOWER(trello_username) = ?', 
+                                             (commenter_name.lower(), commenter_username.lower()))
+                                team_member = cursor.fetchone()
+                                if team_member:
+                                    assigned_member = team_member[0]
+                                    assignment_method = 'first_comment'
+                                    assignment_confidence = 0.8
+                                    print(f"[V3] First comment assignment: {assigned_member} for card {card['name']}")
+                        
+                        # Create/update assignment if found
+                        if assigned_member:
+                            # Get WhatsApp number
+                            cursor.execute('SELECT whatsapp_number FROM team_members_cache WHERE name = ?', (assigned_member,))
+                            whatsapp_result = cursor.fetchone()
+                            whatsapp_number = whatsapp_result[0] if whatsapp_result else None
+                            
+                            # Deactivate old assignments
+                            cursor.execute('UPDATE card_assignments SET is_active = 0 WHERE card_id = ?', (card_id,))
+                            
+                            # Create new assignment
+                            cursor.execute('''
+                                INSERT INTO card_assignments 
+                                (card_id, team_member, whatsapp_number, assignment_method, confidence_score, assigned_by)
+                                VALUES (?, ?, ?, ?, ?, 'auto_scan')
+                            ''', (card_id, assigned_member, whatsapp_number, assignment_method, assignment_confidence))
+                            assignments_created += 1
+                            
+                            # Initialize metrics for this card
+                            cursor.execute('''
+                                INSERT OR IGNORE INTO card_metrics 
+                                (card_id, time_in_list_hours, total_ignored_count, escalation_level)
+                                VALUES (?, 0, 0, 0)
+                            ''', (card_id,))
+                    
+                    except Exception as comment_error:
+                        print(f"[V3] Error syncing comments for card {card_id}: {comment_error}")
+                        continue
                 
                 print(f"[V3] Synced {len([c for c in cards if not c['closed']])} cards from {list_name}")
             
@@ -741,6 +885,8 @@ def scan_cards():
                 'message': f'EEInteractive board sync completed! Found {total_cards} active cards',
                 'board_name': eeinteractive_board['name'],
                 'cards_synced': cards_synced,
+                'comments_synced': comments_synced,
+                'assignments_created': assignments_created,
                 'lists_scanned': len(active_lists),
                 'excluded_lists': ['COMPLETED']
             })
