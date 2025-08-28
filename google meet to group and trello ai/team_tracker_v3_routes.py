@@ -352,13 +352,14 @@ def get_dashboard_data():
                 SELECT comment_date
                 FROM card_comments cc2
                 WHERE cc2.card_id = c.card_id
+                  AND cc2.commenter_name = a.team_member
                 ORDER BY comment_date DESC
                 LIMIT 1
             ) as latest_comment_date
         FROM trello_cards c
-        LEFT JOIN card_assignments a ON c.card_id = a.card_id AND a.is_active = 1
+        LEFT JOIN card_assignments a ON c.card_id = a.card_id AND a.is_active = TRUE
         LEFT JOIN card_metrics m ON c.card_id = m.card_id
-        WHERE c.closed = 0
+        WHERE c.closed = FALSE
           AND c.list_name IN ('NEW TASKS', 'DOING - IN PROGRESS', 'BLOCKED', 'REVIEW - APPROVAL', 'FOREVER TASKS')
           AND (m.escalation_level IS NULL OR m.escalation_level != -1)
         ORDER BY 
