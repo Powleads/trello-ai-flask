@@ -742,16 +742,11 @@ Please check your email and respond as needed.
             if emails_by_assignee:
                 notifications_sent = self.send_batched_notifications(emails_by_assignee)
             
-            processed_count += 1
-            category = result.get('category', 'other')
+            # Count categories for summary
+            for assignee_emails in emails_by_assignee.values():
+                for email_item in assignee_emails:
+                    category = email_item['analysis']['category']
                     category_counts[category] = category_counts.get(category, 0) + 1
-                    
-                    # Count assignees for notifications
-                    assignees = result.get('assigned_to', [])
-                    if isinstance(assignees, list):
-                        notifications_sent += len(assignees)
-                    elif assignees and assignees != 'Unassigned':
-                        notifications_sent += 1
             
             # Send rule-based summary
             self.send_rule_based_summary(processed_count, notifications_sent, category_counts, len(watch_rules))
