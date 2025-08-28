@@ -706,8 +706,17 @@ let emailHistory = [];
 
 // Load email history on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Ensure history section is visible and populated
     refreshHistory();
     checkGmailAuth();
+    
+    // Initialize empty history display if needed
+    setTimeout(() => {
+        const historyContainer = document.getElementById('emailHistory');
+        if (!historyContainer.children.length || historyContainer.children.length === 0) {
+            displayEmailHistory();
+        }
+    }, 1000);
 });
 
 // Check Gmail authentication status
