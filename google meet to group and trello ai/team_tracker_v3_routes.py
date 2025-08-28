@@ -246,6 +246,7 @@ def get_dashboard_data():
         LEFT JOIN card_metrics m ON c.card_id = m.card_id
         WHERE c.closed = 0
           AND c.list_name IN ('NEW TASKS', 'DOING - IN PROGRESS', 'BLOCKED', 'REVIEW - APPROVAL', 'FOREVER TASKS')
+          AND (m.escalation_level IS NULL OR m.escalation_level != -1)
         ORDER BY 
             CASE c.list_name
                 WHEN 'DOING - IN PROGRESS' THEN 1
@@ -372,14 +373,18 @@ def get_card_details(card_id):
                 LIMIT 50
             ''', (card_id,))
             
+            comment_rows = cursor.fetchall()
+            print(f"[V3] Found {len(comment_rows)} comments for card {card_id}")
+            
             comments = []
-            for row in cursor.fetchall():
+            for row in comment_rows:
                 comments.append({
                     'commenter': row[0],
                     'text': row[1],
                     'date': row[2].isoformat() if isinstance(row[2], datetime) else row[2],
                     'is_request': row[3]
                 })
+                print(f"[V3] Comment: {row[0]} - {row[1][:50]}...")
         except Exception as e:
             print(f"[V3] Error getting comments for {card_id}: {e}")
             comments = []
@@ -813,6 +818,7 @@ def scan_cards():
                                 commenter_username, comment_date, 0
                             ))
                             comments_synced += 1
+                            print(f"[V3] 💬 Saved comment by {commenter_name}: {comment_text[:30]}...")
                             
                             # Assignment logic
                             comment_lower = comment_text.lower()
@@ -1008,6 +1014,61 @@ def add_team_member():
         return jsonify({
             'success': False,
             'error': f'Failed to add team member: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/toggle-ignore-card', methods=['POST'])
+def toggle_ignore_card():
+    """Toggle ignore status for a card"""
+    
+    data = request.json
+    card_id = data.get('card_id')
+    
+    if not card_id:
+        return jsonify({'error': 'Card ID is required'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
+        
+        # Check current ignore status
+        cursor.execute('SELECT * FROM card_metrics WHERE card_id = ?', (card_id,))
+        metrics = cursor.fetchone()
+        
+        if metrics:
+            # Toggle ignore status (we'll use escalation_level = -1 to indicate ignored)
+            current_ignored = metrics[4] == -1  # escalation_level column
+            new_ignored = not current_ignored
+            
+            cursor.execute('''
+                UPDATE card_metrics 
+                SET escalation_level = ?, updated_at = ?
+                WHERE card_id = ?
+            ''', (-1 if new_ignored else 0, datetime.now(), card_id))
+        else:
+            # Create new metrics record with ignored status
+            cursor.execute('''
+                INSERT INTO card_metrics 
+                (card_id, time_in_list_hours, total_ignored_count, escalation_level, updated_at)
+                VALUES (?, 0, 0, -1, ?)
+            ''', (card_id, datetime.now()))
+            new_ignored = True
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'ignored': new_ignored,
+            'message': 'Card ignored' if new_ignored else 'Card un-ignored'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to toggle ignore: {str(e)}'
         }), 500
 
 @team_tracker_v3_bp.route('/api/v3/delete-team-member', methods=['POST'])

@@ -724,6 +724,7 @@
 <script>
         let currentData = {};
         let currentCardId = null;
+        let globalTeamMembers = {};
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -738,6 +739,7 @@
                 const data = await response.json();
                 
                 currentData = data;
+                globalTeamMembers = data.team_members || {};
                 displayCards(data.cards);
                 updateStats(data.cards);
                 
@@ -794,6 +796,10 @@
         
         // Create card HTML
         function createCardHTML(card) {
+            const teamMemberOptions = Object.keys(globalTeamMembers || {}).map(member => 
+                `<option value="${member}" ${card.assigned_to === member ? 'selected' : ''}>${member}</option>`
+            ).join('');
+            
             return `
                 <div class="card-item ${card.needs_update ? 'needs-update' : ''} ${card.assigned_to === 'Unassigned' ? 'no-assignment' : ''}"
                      onclick="showCardDetails('${card.id}')">
@@ -801,9 +807,19 @@
                     <div class="card-meta">
                         ${card.latest_comment ? `💬 ${card.latest_comment.substring(0, 45)}...` : 'No comments'}
                     </div>
-                    <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span class="card-assignee">${card.assigned_to}</span>
-                        ${card.hours_since_comment ? `<span class="time-badge">${Math.round(card.hours_since_comment)}h ago</span>` : ''}
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${card.hours_since_comment ? `<span class="time-badge">${Math.round(card.hours_since_comment)}h ago</span>` : ''}
+                            <select class="reassign-select" onchange="reassignCard('${card.id}', this.value)" onclick="event.stopPropagation()" 
+                                   style="font-size: 11px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 3px; background: white;">
+                                <option value="">Reassign...</option>
+                                ${teamMemberOptions}
+                            </select>
+                            <button class="ignore-btn" onclick="toggleIgnoreCard('${card.id}', event)" 
+                                   style="background: none; border: none; font-size: 14px; cursor: pointer; opacity: 0.6;"
+                                   title="Ignore this card">❌</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1109,6 +1125,83 @@
             document.querySelectorAll('.modal').forEach(modal => {
                 modal.classList.remove('show');
             });
+        }
+        
+        // Reassign card to different team member
+        async function reassignCard(cardId, newAssignee) {
+            if (!newAssignee) return;
+            
+            try {
+                const response = await fetch('/api/v3/reassign-card', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        card_id: cardId,
+                        team_member: newAssignee
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Refresh the dashboard
+                    loadDashboard();
+                    showNotification(`Card reassigned to ${newAssignee}`, 'success');
+                } else {
+                    showNotification(`Failed to reassign: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error reassigning card:', error);
+                showNotification('Failed to reassign card', 'error');
+            }
+        }
+        
+        // Toggle ignore status for a card
+        async function toggleIgnoreCard(cardId, event) {
+            event.stopPropagation();
+            
+            try {
+                const response = await fetch('/api/v3/toggle-ignore-card', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        card_id: cardId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadDashboard();
+                    showNotification(result.ignored ? 'Card ignored' : 'Card un-ignored', 'success');
+                } else {
+                    showNotification(`Failed to toggle ignore: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling ignore:', error);
+                showNotification('Failed to toggle ignore', 'error');
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 20px; right: 20px; z-index: 10000;
+                padding: 12px 20px; border-radius: 5px; color: white; font-weight: bold;
+                background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 3000);
         }
         
         // Close modal on outside click
