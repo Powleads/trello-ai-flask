@@ -501,6 +501,89 @@ class ProductionDatabaseManager:
             print(f"[DB] Error getting email history: {e}")
             return []
     
+    def is_email_sent_today(self, email_id: str) -> bool:
+        """Check if email notification was already sent today"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            today = datetime.now().date()
+            
+            if self.is_production:
+                # PostgreSQL
+                cursor.execute('''
+                    SELECT COUNT(*) FROM email_notifications_sent 
+                    WHERE email_id = %s AND sent_date = %s
+                ''', (email_id, today))
+            else:
+                # SQLite
+                cursor.execute('''
+                    SELECT COUNT(*) FROM email_notifications_sent 
+                    WHERE email_id = ? AND sent_date = ?
+                ''', (email_id, today))
+            
+            count = cursor.fetchone()[0]
+            conn.close()
+            
+            return count > 0
+            
+        except Exception as e:
+            print(f"[DB] Error checking email sent status: {e}")
+            return False
+    
+    def mark_email_sent_today(self, email_id: str) -> bool:
+        """Mark email as having notification sent today"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            today = datetime.now().date()
+            now = datetime.now()
+            
+            if self.is_production:
+                # PostgreSQL - Create table if it doesn't exist
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS email_notifications_sent (
+                        id SERIAL PRIMARY KEY,
+                        email_id TEXT NOT NULL,
+                        sent_date DATE NOT NULL,
+                        sent_at TIMESTAMP NOT NULL,
+                        UNIQUE(email_id, sent_date)
+                    )
+                ''')
+                
+                # Insert or update the record
+                cursor.execute('''
+                    INSERT INTO email_notifications_sent (email_id, sent_date, sent_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT(email_id, sent_date) DO UPDATE SET sent_at = %s
+                ''', (email_id, today, now, now))
+            else:
+                # SQLite
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS email_notifications_sent (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email_id TEXT NOT NULL,
+                        sent_date DATE NOT NULL,
+                        sent_at TIMESTAMP NOT NULL,
+                        UNIQUE(email_id, sent_date)
+                    )
+                ''')
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO email_notifications_sent (email_id, sent_date, sent_at)
+                    VALUES (?, ?, ?)
+                ''', (email_id, today, now))
+            
+            conn.commit()
+            conn.close()
+            
+            return True
+            
+        except Exception as e:
+            print(f"[DB] Error marking email as sent: {e}")
+            return False
+    
     def update_team_tracker_card(self, card_id: str, card_name: str, assignee_name: str, 
                                  assignee_phone: str, last_comment_date: str = None) -> bool:
         """Update or create team tracker card record"""

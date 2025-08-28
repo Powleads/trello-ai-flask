@@ -71,6 +71,89 @@ class GmailTracker:
         print(f"[GMAIL] Loaded {len(team_members)} team members")
         return team_members
     
+    def scan_emails_only(self, hours_back=24) -> List[Dict]:
+        """Scan emails without sending notifications - for manual review"""
+        if not self.gmail_service:
+            print("[GMAIL] Gmail service not available")
+            return []
+        
+        # Get watch rules from production database  
+        watch_rules_data = self.db.get_watch_rules()
+        watch_rules = watch_rules_data.get('watchRules', []) if watch_rules_data else []
+        
+        if not watch_rules:
+            print("[GMAIL] No watch rules configured")
+            return []
+        
+        processed_emails = []
+        since = datetime.now(timezone.utc) - timedelta(hours=hours_back)
+        
+        try:
+            # Process each watch rule
+            for rule_index, rule in enumerate(watch_rules):
+                subject_filter = rule.get('subject', '')
+                sender_filter = rule.get('sender', '')
+                body_filter = rule.get('body', '')
+                
+                # Skip empty rules
+                if not subject_filter and not sender_filter and not body_filter:
+                    continue
+                
+                # Build Gmail search query for this rule
+                query_parts = [f'after:{since.strftime("%Y/%m/%d")}']
+                
+                if subject_filter:
+                    query_parts.append(f'subject:"{subject_filter}"')
+                    
+                if sender_filter:
+                    query_parts.append(f'from:"{sender_filter}"')
+                    
+                # Note: Gmail API doesn't support body search in basic queries
+                # Body filtering will be done post-fetch
+                
+                query = ' '.join(query_parts)
+                
+                print(f"[GMAIL] SCAN-ONLY Rule {rule_index + 1}: '{subject_filter or 'Any subject'}' from '{sender_filter or 'Any sender'}' -> {rule.get('category', 'unknown')}")
+                
+                try:
+                    results = self.gmail_service.users().messages().list(
+                        userId='me',
+                        q=query,
+                        maxResults=50
+                    ).execute()
+                    
+                    messages = results.get('messages', [])
+                    print(f"[GMAIL] SCAN-ONLY Found {len(messages)} emails matching rule: '{subject_filter or 'Any subject'}'")
+                    
+                    for message in messages:
+                        try:
+                            # Extract email data
+                            email_data = self.extract_email_data(message)
+                            if not email_data:
+                                continue
+                            
+                            # Add rule context
+                            email_data['matched_rule'] = rule
+                            email_data['rule_category'] = rule.get('category', 'other')
+                            email_data['rule_assignees'] = rule.get('assignees', [])
+                            
+                            # Check for duplicate
+                            if not any(e['id'] == email_data['id'] for e in processed_emails):
+                                processed_emails.append(email_data)
+                                print(f"[GMAIL] SCAN-ONLY Email queued: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
+                                
+                        except Exception as e:
+                            print(f"Error processing message {message['id']}: {e}")
+                            
+                except Exception as e:
+                    print(f"Error processing rule {rule_index + 1}: {e}")
+                    
+        except Exception as e:
+            print(f"[GMAIL] Error in scan_emails_only: {e}")
+            
+        print(f"[GMAIL] SCAN-ONLY Complete: Found {len(processed_emails)} total emails for review")
+        return processed_emails
+    
     def setup_production_gmail_service(self):
         """Set up Gmail service using production OAuth handler"""
         try:
@@ -372,8 +455,17 @@ class GmailTracker:
         try:
             headers = message['payload'].get('headers', [])
             
-            # Extract headers
-            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+            # Extract headers with better fallbacks
+            subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
+            if not subject.strip():
+                # Try different subject header variations
+                subject = next((h['value'] for h in headers if h['name'].lower() in ['subject', 'subj']), '')
+                if not subject.strip():
+                    # Generate a better title from sender or content
+                    sender_part = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+                    sender_name = sender_part.split('<')[0].strip() if '<' in sender_part else sender_part.split('@')[0]
+                    subject = f"Message from {sender_name}"
+            
             sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
             recipient = next((h['value'] for h in headers if h['name'] == 'To'), '')
             date = next((h['value'] for h in headers if h['name'] == 'Date'), '')

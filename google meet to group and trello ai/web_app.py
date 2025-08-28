@@ -358,6 +358,80 @@ def gmail_tracker_app():
 def onboarding_analysis_app():
     return render_template('onboarding_analysis.html')
 
+@app.route('/api/send-selected-emails', methods=['POST'])
+@login_required
+def send_selected_emails():
+    """Send WhatsApp notifications for selected emails with duplicate tracking"""
+    try:
+        data = request.get_json()
+        selected_emails = data.get('emails', [])
+        
+        if not selected_emails:
+            return jsonify({'success': False, 'error': 'No emails provided'})
+        
+        if not gmail_tracker:
+            return jsonify({'success': False, 'error': 'Gmail tracker not initialized'})
+        
+        sent_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for email in selected_emails:
+            try:
+                email_id = email.get('id')
+                if not email_id:
+                    continue
+                
+                # Check if already sent today
+                if production_db.is_email_sent_today(email_id):
+                    print(f"[MANUAL] Skipping email {email_id} - already sent today")
+                    skipped_count += 1
+                    continue
+                
+                # Process and send the email
+                analysis = gmail_tracker.categorize_email_with_ai(
+                    email['subject'],
+                    email.get('content', ''),
+                    email['sender'],
+                    email
+                )
+                
+                # Send WhatsApp notifications
+                success = gmail_tracker.send_whatsapp_notifications(email, analysis)
+                
+                if success:
+                    # Mark as sent today
+                    production_db.mark_email_sent_today(email_id)
+                    sent_count += 1
+                    print(f"[MANUAL] Successfully sent WhatsApp for email: {email['subject'][:50]}...")
+                else:
+                    errors.append(f"Failed to send WhatsApp for: {email['subject'][:30]}...")
+                    
+            except Exception as e:
+                errors.append(f"Error processing email {email.get('subject', 'Unknown')[:30]}...: {str(e)}")
+                print(f"[MANUAL] Error processing email: {e}")
+        
+        result = {
+            'success': True,
+            'sent_count': sent_count,
+            'skipped_count': skipped_count,
+            'total_processed': len(selected_emails)
+        }
+        
+        if errors:
+            result['errors'] = errors
+            result['message'] = f'Sent {sent_count}, skipped {skipped_count}, {len(errors)} errors'
+        else:
+            result['message'] = f'Successfully sent {sent_count} notifications' + (f', skipped {skipped_count} already sent today' if skipped_count > 0 else '')
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[MANUAL] ERROR in send_selected_emails: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
 # ===== AUTOMATED SCHEDULER =====
 
 import threading
@@ -4015,11 +4089,11 @@ def manual_gmail_scan():
         for i, rule in enumerate(watch_rules):
             print(f"[MANUAL] Rule {i+1}: '{rule.get('subject', '')}' -> {rule.get('category', '')} -> {rule.get('assignees', [])}")
         
-        print("[MANUAL] Calling gmail_tracker.run_automated_scan()...")
-        # Run scan with current settings
-        gmail_tracker.run_automated_scan(hours_back=24)
-        print("[MANUAL] ===== MANUAL GMAIL SCAN COMPLETE =====")
-        return jsonify({'success': True, 'message': 'Gmail scan completed - check console for details'})
+        print("[MANUAL] Calling gmail_tracker.scan_only_mode()...")
+        # Run scan WITHOUT sending notifications (scan-only mode)
+        emails_found = gmail_tracker.scan_emails_only(hours_back=24)
+        print(f"[MANUAL] ===== MANUAL GMAIL SCAN COMPLETE - FOUND {len(emails_found)} EMAILS =====")
+        return jsonify({'success': True, 'message': 'Gmail scan completed - check email processing section below', 'emails_found': len(emails_found), 'emails': emails_found})
     except Exception as e:
         print(f"[MANUAL] ERROR in manual Gmail scan: {e}")
         import traceback
