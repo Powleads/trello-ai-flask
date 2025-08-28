@@ -710,29 +710,41 @@ def update_team_member():
 def get_templates():
     """Get all WhatsApp templates"""
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT id, template_name, template_type, template_text, variables, is_active
-        FROM whatsapp_templates
-        ORDER BY template_type, template_name
-    ''')
-    
-    templates = []
-    for row in cursor.fetchall():
-        templates.append({
-            'id': row[0],
-            'name': row[1],
-            'type': row[2],
-            'text': row[3],
-            'variables': json.loads(row[4]) if row[4] else [],
-            'is_active': row[5]
-        })
-    
-    conn.close()
-    
-    return jsonify({'templates': templates})
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
+        
+        cursor.execute('''
+            SELECT id, template_name, template_type, template_text, variables, is_active
+            FROM whatsapp_templates
+            ORDER BY template_type, template_name
+        ''')
+        
+        templates = []
+        for row in cursor.fetchall():
+            templates.append({
+                'id': row[0],
+                'name': row[1],
+                'type': row[2],
+                'text': row[3],
+                'variables': json.loads(row[4]) if row[4] else [],
+                'is_active': row[5]
+            })
+        
+        return jsonify({'templates': templates})
+        
+    except Exception as e:
+        print(f"[V3] Error in get_templates: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'templates': []}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @team_tracker_v3_bp.route('/api/v3/update-template', methods=['POST'])
 def update_template():
@@ -762,29 +774,41 @@ def update_template():
 def get_automation_settings():
     """Get automation settings"""
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT id, setting_name, setting_value, setting_type, description, is_enabled
-        FROM automation_settings
-        ORDER BY setting_name
-    ''')
-    
-    settings = []
-    for row in cursor.fetchall():
-        settings.append({
-            'id': row[0],
-            'name': row[1],
-            'value': row[2],
-            'type': row[3],
-            'description': row[4],
-            'enabled': row[5]
-        })
-    
-    conn.close()
-    
-    return jsonify({'settings': settings})
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
+        
+        cursor.execute('''
+            SELECT id, setting_name, setting_value, setting_type, description, is_enabled
+            FROM automation_settings
+            ORDER BY setting_name
+        ''')
+        
+        settings = []
+        for row in cursor.fetchall():
+            settings.append({
+                'id': row[0],
+                'name': row[1],
+                'value': row[2],
+                'type': row[3],
+                'description': row[4],
+                'enabled': row[5]
+            })
+        
+        return jsonify({'settings': settings})
+        
+    except Exception as e:
+        print(f"[V3] Error in get_automation_settings: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'settings': []}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @team_tracker_v3_bp.route('/api/v3/update-setting', methods=['POST'])
 def update_setting():
@@ -883,7 +907,7 @@ def scan_cards():
                     card_id = card['id']
                     
                     # Store/update card in database (preserve existing data on update)
-                    cursor.execute('SELECT card_id FROM trello_cards WHERE card_id = ?', (card_id,))
+                    cursor.execute(f'SELECT card_id FROM trello_cards WHERE card_id = {get_param_placeholder()}', (card_id,))
                     existing_card = cursor.fetchone()
                     
                     if existing_card:
