@@ -800,6 +800,9 @@
                 `<option value="${member}" ${card.assigned_to === member ? 'selected' : ''}>${member}</option>`
             ).join('');
             
+            // Show assign request button for unassigned NEW TASKS
+            const showAssignRequestBtn = (card.list === 'NEW TASKS' && card.assigned_to === 'Unassigned');
+            
             return `
                 <div class="card-item ${card.needs_update ? 'needs-update' : ''} ${card.assigned_to === 'Unassigned' ? 'no-assignment' : ''}"
                      onclick="showCardDetails('${card.id}')">
@@ -811,6 +814,13 @@
                         <span class="card-assignee">${card.assigned_to}</span>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             ${card.hours_since_comment ? `<span class="time-badge">${Math.round(card.hours_since_comment)}h ago</span>` : ''}
+                            
+                            ${showAssignRequestBtn ? `
+                                <button onclick="sendAssignRequest('${card.id}', '${card.name.replace(/'/g, "\\'")}', '${card.url}'); event.stopPropagation();" 
+                                       style="background: #f59e0b; color: white; border: none; padding: 4px 8px; border-radius: 3px; font-size: 10px; cursor: pointer;"
+                                       title="Request assignment from group">📢 Assign?</button>
+                            ` : ''}
+                            
                             <select class="reassign-select" onchange="reassignCard('${card.id}', this.value)" onclick="event.stopPropagation()" 
                                    style="font-size: 11px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 3px; background: white;">
                                 <option value="">Reassign...</option>
@@ -893,6 +903,7 @@
         
         // Display card details
         function displayCardDetails(data) {
+            // Details tab content
             const detailsContainer = document.getElementById('cardDetails');
             detailsContainer.innerHTML = `
                 <div style="margin-bottom: 20px;">
@@ -916,34 +927,21 @@
                         '<p>No assignments found</p>'
                     }
                 </div>
-
-                <div style="margin-bottom: 20px;">
-                    <h3>📈 Metrics</h3>
-                    <p><strong>Time in Current List:</strong> ${Math.round(data.metrics.time_in_list)} hours</p>
-                    <p><strong>Messages Sent:</strong> ${data.metrics.ignored_count}</p>
-                    <p><strong>Last Response:</strong> ${data.metrics.last_response || 'No responses yet'}</p>
-                    <p><strong>Escalation Level:</strong> ${data.metrics.escalation_level === -1 ? 'Ignored' : data.metrics.escalation_level}</p>
-                </div>
-
-                <div style="margin-bottom: 20px;">
-                    <h3>🗂️ List History</h3>
-                    ${data.list_history.length > 0 ? `
-                        <div style="max-height: 200px; overflow-y: auto;">
-                            ${data.list_history.map(h => `
-                                <div style="padding: 8px; border-bottom: 1px solid #eee; font-size: 13px;">
-                                    <strong>${h.from}</strong> → <strong>${h.to}</strong>
-                                    <br><small style="color: #666;">${h.date || 'Unknown date'}</small>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : '<p>No list movements found</p>'}
-                </div>
-
+            `;
+            
+            // Comments tab content (filter out admin messages)
+            const commentsContainer = document.getElementById('comments');
+            const adminUsers = ['admin', 'user42824574', 'james', 'powleads'];
+            const filteredComments = data.comments.filter(c => 
+                !adminUsers.some(admin => c.commenter.toLowerCase().includes(admin.toLowerCase()))
+            );
+            
+            commentsContainer.innerHTML = `
                 <div>
-                    <h3>💬 Comments</h3>
-                    ${data.comments.length > 0 ? `
-                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
-                            ${data.comments.map(c => `
+                    <h3>💬 Comments (${filteredComments.length})</h3>
+                    ${filteredComments.length > 0 ? `
+                        <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
+                            ${filteredComments.map(c => `
                                 <div style="padding: 12px; border-bottom: 1px solid #eee; background: ${c.is_request ? '#fff3cd' : 'white'};">
                                     <div style="font-weight: bold; color: #333; margin-bottom: 5px;">
                                         ${c.commenter}
@@ -955,7 +953,56 @@
                                 </div>
                             `).join('')}
                         </div>
-                    ` : '<p>No comments found</p>'}
+                    ` : '<p>No user comments found (admin messages are hidden)</p>'}
+                </div>
+            `;
+            
+            // History tab content
+            const historyContainer = document.getElementById('history');
+            historyContainer.innerHTML = `
+                <div>
+                    <h3>🗂️ List Movement History</h3>
+                    ${data.list_history.length > 0 ? `
+                        <div style="max-height: 400px; overflow-y: auto;">
+                            ${data.list_history.map(h => `
+                                <div style="padding: 12px; border-bottom: 1px solid #eee; font-size: 14px;">
+                                    <div style="font-weight: bold; color: #333;">
+                                        <strong>${h.from}</strong> → <strong>${h.to}</strong>
+                                    </div>
+                                    <small style="color: #666;">${h.date || 'Unknown date'}</small>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p>No list movements found</p>'}
+                </div>
+            `;
+            
+            // Metrics tab content
+            const metricsContainer = document.getElementById('metrics');
+            const assignedMember = data.assignments.find(a => a.is_active)?.member;
+            
+            metricsContainer.innerHTML = `
+                <div>
+                    <h3>📈 Card Metrics & Actions</h3>
+                    <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px;">
+                        <p><strong>Time in Current List:</strong> ${Math.round(data.metrics.time_in_list)} hours</p>
+                        <p><strong>Messages Sent:</strong> ${data.metrics.ignored_count}</p>
+                        <p><strong>Last Response:</strong> ${data.metrics.last_response || 'No responses yet'}</p>
+                        <p><strong>Escalation Level:</strong> ${data.metrics.escalation_level === -1 ? 'Ignored' : data.metrics.escalation_level}</p>
+                    </div>
+                    
+                    ${assignedMember ? `
+                        <div style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+                            <h4>📱 Send Manual WhatsApp Message</h4>
+                            <p>Send a custom message to <strong>${assignedMember}</strong></p>
+                            <textarea id="customMessage" placeholder="Type your custom message here..." 
+                                     style="width: 100%; height: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin: 10px 0;"></textarea>
+                            <button onclick="sendCustomWhatsApp('${currentCardId}', '${assignedMember}')" 
+                                   style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                                Send Message
+                            </button>
+                        </div>
+                    ` : '<p>No assigned member to send messages to</p>'}
                 </div>
             `;
         }
@@ -1247,6 +1294,70 @@
             setTimeout(() => {
                 document.body.removeChild(notification);
             }, 3000);
+        }
+        
+        // Send custom WhatsApp message
+        async function sendCustomWhatsApp(cardId, memberName) {
+            const messageText = document.getElementById('customMessage').value.trim();
+            
+            if (!messageText) {
+                showNotification('Please enter a message', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v3/send-custom-whatsapp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        card_id: cardId,
+                        member_name: memberName,
+                        message: messageText
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(`Message sent to ${memberName}`, 'success');
+                    document.getElementById('customMessage').value = '';
+                } else {
+                    showNotification(`Failed to send: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error sending WhatsApp:', error);
+                showNotification('Failed to send message', 'error');
+            }
+        }
+        
+        // Send assign request to group
+        async function sendAssignRequest(cardId, cardName, cardUrl) {
+            try {
+                const response = await fetch('/api/v3/send-assign-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        card_id: cardId,
+                        card_name: cardName,
+                        card_url: cardUrl
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Assign request sent to group', 'success');
+                } else {
+                    showNotification(`Failed to send request: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error sending assign request:', error);
+                showNotification('Failed to send assign request', 'error');
+            }
         }
         
         // Close modal on outside click

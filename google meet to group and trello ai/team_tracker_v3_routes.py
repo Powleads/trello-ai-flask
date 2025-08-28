@@ -163,6 +163,53 @@ def initialize_v3_tables(cursor, conn):
             )
         ''')
         
+        # Seed WhatsApp templates if table is empty
+        cursor.execute('SELECT COUNT(*) FROM whatsapp_templates')
+        template_count = cursor.fetchone()[0]
+        
+        if template_count == 0:
+            # Insert default WhatsApp templates
+            default_templates = [
+                (
+                    'Individual Member message 1',
+                    'individual',
+                    'Hi [name], its been 24 hours since you wrote a comment on the trello card "[card_name]"\n\ncan you go here [card_url] and quickly right a comment, even just "working on it" or the system will message again\n\nmake sure its in the right list! if you are not the one working on it comment "assign [members name]"',
+                    '["name", "card_name", "card_url"]'
+                ),
+                (
+                    'Individual Member message 2',
+                    'individual',
+                    'Hey its been 48 hours now since you commented on the trello card "[card_name]" go here [card_url] and add a comment\nif you are not the one working on it comment "assign [members name]"',
+                    '["name", "card_name", "card_url"]'
+                ),
+                (
+                    'Individual Member message 3 FINAL WARNING',
+                    'individual',
+                    'LAST WARNING! Hey its been 72 hours now since you commented on the trello card "[card_name]"\n\nif there is no comment in the next 24 hours a message in the main group will be sent and you will get aa strike\n\ngo here now and comment with an update or move the card to the right area.\n[card_url]',
+                    '["name", "card_name", "card_url"]'
+                ),
+                (
+                    'Group Daily Report',
+                    'group',
+                    'Quick report on tasks:\nNew tasks made today: [new_tasks]\nNumber of tasks needing an update: [needs_update]\nNumber of cards in review needed: [review_count]\nNumber of tasks in blocked: [blocked_count]\nNumber of notifications sent to members: [notifications_sent]',
+                    '["new_tasks", "needs_update", "review_count", "blocked_count", "notifications_sent"]'
+                ),
+                (
+                    'Group Escalation',
+                    'group',
+                    '[member_name] has not updated their Trello task in 4 days!\n\ncard name: [card_name]\ncard url: [card_url]\n\nplease explain why this has happened?\nif the assigned is wrong then someone comment "assign (name)" so the system reassigns',
+                    '["member_name", "card_name", "card_url"]'
+                )
+            ]
+            
+            for name, template_type, text, variables in default_templates:
+                cursor.execute('''
+                    INSERT INTO whatsapp_templates (template_name, template_type, template_text, variables, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                ''', (name, template_type, text, variables))
+                
+            print(f"[V3] Seeded {len(default_templates)} WhatsApp templates")
+
         # Seed automation settings if table is empty
         cursor.execute('SELECT COUNT(*) FROM automation_settings')
         settings_count = cursor.fetchone()[0]
@@ -177,7 +224,8 @@ def initialize_v3_tables(cursor, conn):
                 ('daily_reports', 'false', 'boolean', 'Send daily progress reports to team', 0),
                 ('sync_frequency_minutes', '30', 'number', 'How often to sync Trello data (minutes)', 1),
                 ('message_timing_hours', '24', 'number', 'Hours between automated reminder messages', 1),
-                ('combine_messages', 'true', 'boolean', 'Combine multiple WhatsApp messages into one', 1)
+                ('combine_messages', 'true', 'boolean', 'Combine multiple WhatsApp messages into one', 1),
+                ('automation_lists', 'DOING - IN PROGRESS', 'text', 'Lists where automated WhatsApp messages apply (comma separated)', 1)
             ]
             
             for name, value, setting_type, description, enabled in default_settings:
@@ -1069,6 +1117,134 @@ def toggle_ignore_card():
         return jsonify({
             'success': False,
             'error': f'Failed to toggle ignore: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/send-custom-whatsapp', methods=['POST'])
+def send_custom_whatsapp():
+    """Send custom WhatsApp message to assigned member"""
+    
+    data = request.json
+    card_id = data.get('card_id')
+    member_name = data.get('member_name')
+    message = data.get('message')
+    
+    if not all([card_id, member_name, message]):
+        return jsonify({'error': 'Missing required parameters'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
+        
+        # Get member's WhatsApp number
+        cursor.execute('SELECT whatsapp_number FROM team_members_cache WHERE name = ?', (member_name,))
+        result = cursor.fetchone()
+        
+        if not result or not result[0]:
+            return jsonify({'error': f'WhatsApp number not found for {member_name}'}), 404
+        
+        whatsapp_number = result[0]
+        
+        # Get card details for context
+        cursor.execute('SELECT name, url FROM trello_cards WHERE card_id = ?', (card_id,))
+        card_result = cursor.fetchone()
+        
+        if not card_result:
+            return jsonify({'error': 'Card not found'}), 404
+        
+        card_name, card_url = card_result
+        
+        # Log the message send attempt
+        cursor.execute('''
+            INSERT INTO card_comments 
+            (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            card_id, f'manual_whatsapp_{datetime.now().isoformat()}', 
+            f'Manual WhatsApp sent: {message}', 'System', 'system',
+            datetime.now(), 0
+        ))
+        
+        # Update metrics
+        cursor.execute('''
+            UPDATE card_metrics 
+            SET total_ignored_count = total_ignored_count + 1, updated_at = ?
+            WHERE card_id = ?
+        ''', (datetime.now(), card_id))
+        
+        conn.commit()
+        conn.close()
+        
+        # Here you would integrate with your WhatsApp API
+        # For now, we'll just log it and return success
+        print(f"[V3] 📱 Custom WhatsApp to {member_name} ({whatsapp_number}): {message}")
+        print(f"[V3] Card context: {card_name} - {card_url}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Custom message sent to {member_name}',
+            'whatsapp_number': whatsapp_number
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to send message: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/send-assign-request', methods=['POST'])
+def send_assign_request():
+    """Send assignment request message to group"""
+    
+    data = request.json
+    card_id = data.get('card_id')
+    card_name = data.get('card_name')
+    card_url = data.get('card_url')
+    
+    if not all([card_id, card_name, card_url]):
+        return jsonify({'error': 'Missing required parameters'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
+        
+        # Create the group message
+        group_message = f'Can someone assign this new task by going to {card_url} and commenting "assign (persons name)", thanks'
+        
+        # Log the assign request
+        cursor.execute('''
+            INSERT INTO card_comments 
+            (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            card_id, f'assign_request_{datetime.now().isoformat()}', 
+            f'Assignment request sent to group: {group_message}', 'System', 'system',
+            datetime.now(), 1
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        # Here you would send to your group WhatsApp
+        # For now, we'll just log it
+        print(f"[V3] 📢 Group assign request for card: {card_name}")
+        print(f"[V3] Message: {group_message}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Assignment request sent to group',
+            'group_message': group_message
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to send assign request: {str(e)}'
         }), 500
 
 @team_tracker_v3_bp.route('/api/v3/delete-team-member', methods=['POST'])
