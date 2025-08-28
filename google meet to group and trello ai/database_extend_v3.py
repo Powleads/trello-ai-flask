@@ -15,8 +15,8 @@ def extend_database():
         cursor = conn.cursor()
         
         print("[V3] Extending database with V3 tables...")
-    
-    # 1. Card Metrics Table
+        
+        # 1. Card Metrics Table
         # Use SERIAL for PostgreSQL compatibility
         id_type = "SERIAL PRIMARY KEY" if db.is_postgres() else "INTEGER PRIMARY KEY AUTOINCREMENT"
         
@@ -172,19 +172,23 @@ def extend_database():
             VALUES (?, ?, ?, ?, ?)
         ''', (rule_name, hours, action, target, template_id))
     
-    conn.commit()
-    conn.close()
-    
-    print("[OK] Database extended with V3 features")
-    print("[INFO] New tables created:")
-    print("  - card_metrics: Track card performance metrics")
-    print("  - list_history: Track card movements")
-    print("  - whatsapp_templates: Customizable message templates")
-    print("  - automation_settings: Control automation behavior")
-    print("  - escalation_rules: Define escalation triggers")
-    print("  - response_tracking: Track response times")
-    
-    return True
+        conn.commit()
+        conn.close()
+        
+        print("[OK] Database extended with V3 features")
+        print("[INFO] New tables created:")
+        print("  - card_metrics: Track card performance metrics")
+        print("  - list_history: Track card movements")
+        print("  - whatsapp_templates: Customizable message templates")
+        print("  - automation_settings: Control automation behavior")
+        print("  - escalation_rules: Define escalation triggers")
+        print("  - response_tracking: Track response times")
+        
+        return True
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to extend database: {e}")
+        return False
 
 if __name__ == '__main__':
     extend_database()
