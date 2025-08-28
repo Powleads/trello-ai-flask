@@ -131,42 +131,42 @@ def get_dashboard_data():
                 WHEN 'REVIEW - APPROVAL' THEN 4
                 WHEN 'FOREVER TASKS' THEN 5
             END
-    ''')
-    
-    cards = []
-    for row in cursor.fetchall():
-        # Calculate hours since last comment
-        hours_since_comment = None
-        if row[13]:  # latest_comment_date
-            if isinstance(row[13], str):
-                comment_date = datetime.fromisoformat(row[13].replace('Z', '+00:00').replace('+00:00', ''))
-            else:
-                comment_date = row[13]
-            hours_since_comment = (datetime.now() - comment_date).total_seconds() / 3600
+        ''')
         
-        cards.append({
-            'id': row[0],
-            'name': row[1],
-            'description': row[2][:200] if row[2] else '',
-            'list': row[3],
-            'url': row[4],
-            'assigned_to': row[6] or 'Unassigned',
-            'assignment_method': row[7],
-            'confidence': row[8],
-            'time_in_list': row[9] or 0,
-            'ignored_count': row[10] or 0,
-            'latest_comment': row[12],
-            'hours_since_comment': round(hours_since_comment, 1) if hours_since_comment else None,
-            'needs_update': hours_since_comment > 24 if hours_since_comment else False
-        })
-    
-    # Get team members
-    cursor.execute('SELECT name, whatsapp_number FROM team_members_cache WHERE is_active = 1')
-    team_members = {row[0]: row[1] for row in cursor.fetchall()}
-    
-    # Get automation settings
-    cursor.execute('SELECT setting_name, setting_value FROM automation_settings')
-    settings = {row[0]: row[1] for row in cursor.fetchall()}
+        cards = []
+        for row in cursor.fetchall():
+            # Calculate hours since last comment
+            hours_since_comment = None
+            if row[13]:  # latest_comment_date
+                if isinstance(row[13], str):
+                    comment_date = datetime.fromisoformat(row[13].replace('Z', '+00:00').replace('+00:00', ''))
+                else:
+                    comment_date = row[13]
+                hours_since_comment = (datetime.now() - comment_date).total_seconds() / 3600
+            
+            cards.append({
+                'id': row[0],
+                'name': row[1],
+                'description': row[2][:200] if row[2] else '',
+                'list': row[3],
+                'url': row[4],
+                'assigned_to': row[6] or 'Unassigned',
+                'assignment_method': row[7],
+                'confidence': row[8],
+                'time_in_list': row[9] or 0,
+                'ignored_count': row[10] or 0,
+                'latest_comment': row[12],
+                'hours_since_comment': round(hours_since_comment, 1) if hours_since_comment else None,
+                'needs_update': hours_since_comment > 24 if hours_since_comment else False
+            })
+        
+        # Get team members
+        cursor.execute('SELECT name, whatsapp_number FROM team_members_cache WHERE is_active = 1')
+        team_members = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        # Get automation settings
+        cursor.execute('SELECT setting_name, setting_value FROM automation_settings')
+        settings = {row[0]: row[1] for row in cursor.fetchall()}
     
         return jsonify({
             'cards': cards,
