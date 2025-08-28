@@ -92,6 +92,77 @@ def initialize_v3_tables(cursor, conn):
             )
         ''')
         
+        # Create core Trello tables that V3 depends on
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS trello_cards (
+                id {id_field},
+                card_id TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                list_id TEXT,
+                list_name TEXT,
+                board_id TEXT,
+                board_name TEXT,
+                due_date TIMESTAMP,
+                labels TEXT,
+                closed {bool_field} DEFAULT 0,
+                url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS card_comments (
+                id {id_field},
+                card_id TEXT NOT NULL,
+                comment_id TEXT UNIQUE NOT NULL,
+                comment_text TEXT,
+                commenter_name TEXT,
+                commenter_id TEXT,
+                comment_date TIMESTAMP,
+                is_update_request {bool_field} DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS card_assignments (
+                id {id_field},
+                card_id TEXT NOT NULL,
+                team_member TEXT NOT NULL,
+                whatsapp_number TEXT,
+                assignment_method TEXT,
+                confidence_score REAL,
+                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                assigned_by TEXT,
+                is_active {bool_field} DEFAULT 1
+            )
+        ''')
+        
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS card_metrics (
+                id {id_field},
+                card_id TEXT UNIQUE NOT NULL,
+                time_in_list_hours REAL DEFAULT 0,
+                total_ignored_count INTEGER DEFAULT 0,
+                last_response_date TIMESTAMP,
+                escalation_level INTEGER DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS list_history (
+                id {id_field},
+                card_id TEXT NOT NULL,
+                from_list TEXT,
+                to_list TEXT,
+                transition_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Seed automation settings if table is empty
         cursor.execute('SELECT COUNT(*) FROM automation_settings')
         settings_count = cursor.fetchone()[0]
@@ -133,11 +204,12 @@ def team_tracker_v3():
 def get_dashboard_data():
     """Get all data for dashboard"""
     
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Initialize V3 tables if they don't exist
+        # Initialize V3 tables if they don't exist - CRITICAL: Must be called first
         initialize_v3_tables(cursor, conn)
         
         # Get cards with assignments and metrics
@@ -243,6 +315,9 @@ def get_card_details(card_id):
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Initialize V3 tables if they don't exist
+    initialize_v3_tables(cursor, conn)
     
     # Get card info
     cursor.execute('''
@@ -355,6 +430,9 @@ def reassign_card():
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Initialize V3 tables if they don't exist
+    initialize_v3_tables(cursor, conn)
+    
     # Get team member's WhatsApp
     cursor.execute('SELECT whatsapp_number FROM team_members_cache WHERE name = ?', (new_member,))
     result = cursor.fetchone()
@@ -392,6 +470,9 @@ def get_team_members():
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Initialize V3 tables if they don't exist
+    initialize_v3_tables(cursor, conn)
     
     cursor.execute('''
         SELECT id, name, whatsapp_number, email, trello_username, is_active
@@ -566,21 +647,76 @@ def update_setting():
 
 @team_tracker_v3_bp.route('/api/v3/scan-cards', methods=['POST'])
 def scan_cards():
-    """Trigger card scanning/syncing with Trello"""
+    """Trigger card scanning/syncing with real Trello data"""
     try:
-        # For now, return a success message until enhanced_ai integration is properly set up
-        # TODO: Integrate with enhanced_ai.py once import issues are resolved
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        return jsonify({
-            'success': True,
-            'message': 'Card scanning triggered - enhanced_ai integration pending',
-            'cards_found': 0
-        })
+        # Initialize tables first
+        initialize_v3_tables(cursor, conn)
+        
+        # Import and run the existing enhanced AI system
+        try:
+            from enhanced_ai import EnhancedTeamTracker
+            tracker = EnhancedTeamTracker()
+            
+            # Run the full card scanning and assignment process
+            result = tracker.run_daily_process()
+            
+            # Count cards in database after sync
+            cursor.execute('SELECT COUNT(*) FROM trello_cards WHERE closed = 0')
+            total_cards = cursor.fetchone()[0]
+            
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Trello sync completed! Found {total_cards} active cards',
+                'cards_found': total_cards,
+                'sync_result': result
+            })
+            
+        except ImportError as e:
+            # Fallback: Call the existing sync endpoint internally
+            import requests
+            import os
+            
+            # Get the current server URL
+            base_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:5000')
+            
+            try:
+                response = requests.post(f'{base_url}/api/sync-cards', 
+                                       headers={'Content-Type': 'application/json'},
+                                       timeout=30)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Count cards after sync
+                    cursor.execute('SELECT COUNT(*) FROM trello_cards WHERE closed = 0')
+                    total_cards = cursor.fetchone()[0]
+                    
+                    conn.close()
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': f'Trello sync completed via API! Found {total_cards} active cards',
+                        'cards_found': total_cards,
+                        'cards_synced': data.get('cards_synced', 0),
+                        'comments_synced': data.get('comments_synced', 0)
+                    })
+                else:
+                    raise Exception(f'Sync API returned status {response.status_code}')
+                    
+            except Exception as api_error:
+                print(f"[V3] API sync failed: {api_error}")
+                raise Exception(f'Both direct import and API sync failed: {str(e)}, {str(api_error)}')
         
     except Exception as e:
+        print(f"[V3] Card scanning error: {e}")
         return jsonify({
             'success': False,
-            'error': f'Card scanning failed: {str(e)}'
+            'error': f'Card scanning failed: {str(e)}. Please check if Trello API credentials are configured.'
         }), 500
 
 @team_tracker_v3_bp.route('/api/v3/add-team-member', methods=['POST'])
