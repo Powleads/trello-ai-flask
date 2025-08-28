@@ -8,6 +8,14 @@ import json
 import sqlite3
 from urllib.parse import urlparse
 from typing import Optional, List, Dict, Any
+from datetime import datetime
+
+# Load environment variables if running standalone
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available, skip
 
 try:
     import psycopg2
@@ -26,15 +34,11 @@ class ProductionDatabaseManager:
         # Try to use PostgreSQL database first
         self.db_url = os.getenv('DATABASE_URL')
         
-        # If no DATABASE_URL, use the specific PostgreSQL connection details
+        # If no DATABASE_URL, use the specific PostgreSQL connection details for Render
         if not self.db_url and POSTGRES_AVAILABLE:
-            pg_host = 'dpg-d2mlsijuibrs73bihl8g-a.frankfurt-postgres.render.com'
-            pg_user = 'eesystem_database_for_ai_tools_user'
-            pg_pass = 'j5urZLu6RTcLnUPmUZE8AGv4sxJjyXc7'
-            pg_db = 'eesystem_database_for_ai_tools'
-            
-            self.db_url = f"postgresql://{pg_user}:{pg_pass}@{pg_host}/{pg_db}"
-            print("[DB] Using specific PostgreSQL connection details")
+            # Use the correct external connection URL for "eesystem database for ai tools"
+            self.db_url = "postgresql://eesystem_database_for_ai_tools_user:j5urZLu6RTcLnUPmUZE8AGv4sxJjyXc7@dpg-d2mlsijuibrs73bihl8g-a.frankfurt-postgres.render.com/eesystem_database_for_ai_tools"
+            print("[DB] Using Render PostgreSQL connection details for 'eesystem database for ai tools'")
         
         # Test PostgreSQL connection
         print(f"[DB] POSTGRES_AVAILABLE: {POSTGRES_AVAILABLE}")
@@ -52,7 +56,7 @@ class ProductionDatabaseManager:
                 conn = psycopg2.connect(self.db_url)
                 conn.close()
                 self.is_production = True
-                print("[DB] ✅ PostgreSQL connection successful - using PostgreSQL database")
+                print("[DB] PostgreSQL connection successful - using PostgreSQL database")
             except Exception as e:
                 print(f"[DB] PostgreSQL connection failed: {e}")
                 print("[DB] Falling back to SQLite")
@@ -345,13 +349,13 @@ class ProductionDatabaseManager:
             token_json = json.dumps(token_data)
             
             if self.is_production:
-                # PostgreSQL
+                # PostgreSQL - use JSONB for PostgreSQL
                 cursor.execute('''
                     INSERT INTO gmail_tokens (token_type, token_data, updated_at) 
                     VALUES (%s, %s, NOW()) 
                     ON CONFLICT (token_type) DO UPDATE SET 
                     token_data = EXCLUDED.token_data, updated_at = NOW()
-                ''', ('gmail_oauth', token_json))
+                ''', ('gmail_oauth', json.dumps(token_data)))
             else:
                 # SQLite
                 cursor.execute('''
@@ -377,7 +381,14 @@ class ProductionDatabaseManager:
             conn.close()
             
             if result:
-                return json.loads(result[0])
+                token_data = result[0]
+                # Handle both JSON string (SQLite) and dict (PostgreSQL JSONB)
+                if isinstance(token_data, str):
+                    return json.loads(token_data)
+                elif isinstance(token_data, dict):
+                    return token_data
+                else:
+                    return json.loads(str(token_data))
             return None
         except Exception as e:
             print(f"[DB] Error retrieving Gmail token: {e}")
@@ -419,12 +430,23 @@ class ProductionDatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
             
-            cursor.execute('SELECT rule_data FROM watch_rules WHERE active = TRUE ORDER BY updated_at DESC LIMIT 1')
+            if self.is_production:
+                cursor.execute('SELECT rule_data FROM watch_rules WHERE active = TRUE ORDER BY updated_at DESC LIMIT 1')
+            else:
+                cursor.execute('SELECT rule_data FROM watch_rules WHERE active = 1 ORDER BY updated_at DESC LIMIT 1')
+            
             result = cursor.fetchone()
             conn.close()
             
             if result:
-                return json.loads(result[0])
+                rule_data = result[0]
+                # Handle both JSON string (SQLite) and dict (PostgreSQL JSONB)
+                if isinstance(rule_data, str):
+                    return json.loads(rule_data)
+                elif isinstance(rule_data, dict):
+                    return rule_data
+                else:
+                    return json.loads(str(rule_data))
             return {}
         except Exception as e:
             print(f"[DB] Error retrieving watch rules: {e}")
