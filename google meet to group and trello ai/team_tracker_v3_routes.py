@@ -1125,15 +1125,19 @@ def toggle_ignore_card():
 def send_custom_whatsapp():
     """Send custom WhatsApp message to assigned member"""
     
-    data = request.json
-    card_id = data.get('card_id')
-    member_name = data.get('member_name')
-    message = data.get('message')
-    
-    if not all([card_id, member_name, message]):
-        return jsonify({'error': 'Missing required parameters'}), 400
-    
     try:
+        data = request.json
+        print(f"[V3] 📥 Custom WhatsApp request data: {data}")
+        
+        card_id = data.get('card_id')
+        member_name = data.get('member_name')
+        message = data.get('message')
+        
+        print(f"[V3] 📋 Parsed parameters: card_id={card_id}, member_name={member_name}, message_length={len(message) if message else 0}")
+        
+        if not all([card_id, member_name, message]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -1367,15 +1371,19 @@ def delete_team_member():
 def update_whatsapp_template(template_id):
     """Update WhatsApp template"""
     
-    data = request.json
-    name = data.get('name')
-    template_type = data.get('type')
-    text = data.get('text')
-    
-    if not all([name, template_type, text]):
-        return jsonify({'error': 'Missing required parameters'}), 400
-    
     try:
+        data = request.json
+        print(f"[V3] 📝 Template update request: template_id={template_id}, data={data}")
+        
+        name = data.get('name')
+        template_type = data.get('type')
+        text = data.get('text')
+        
+        print(f"[V3] 📋 Parsed template data: name={name}, type={template_type}, text_length={len(text) if text else 0}")
+        
+        if not all([name, template_type, text]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -1390,9 +1398,12 @@ def update_whatsapp_template(template_id):
         # Update the template
         cursor.execute('''
             UPDATE whatsapp_templates 
-            SET name = ?, type = ?, text = ?, updated_at = ?
+            SET template_name = ?, template_type = ?, template_text = ?, updated_at = ?
             WHERE id = ?
         ''', (name, template_type, text, datetime.now(), template_id))
+        
+        rows_affected = cursor.rowcount
+        print(f"[V3] 📝 Template update completed: rows_affected={rows_affected}")
         
         conn.commit()
         conn.close()
@@ -1417,7 +1428,7 @@ def delete_whatsapp_template(template_id):
         cursor = conn.cursor()
         
         # Check if template exists
-        cursor.execute('SELECT name FROM whatsapp_templates WHERE id = ?', (template_id,))
+        cursor.execute('SELECT template_name FROM whatsapp_templates WHERE id = ?', (template_id,))
         result = cursor.fetchone()
         
         if not result:
