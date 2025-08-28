@@ -655,25 +655,94 @@ def scan_cards():
         # Initialize tables first
         initialize_v3_tables(cursor, conn)
         
-        # Import and run the existing enhanced AI system
+        # Import and run the existing enhanced team tracker
         try:
-            from enhanced_ai import EnhancedTeamTracker
+            from enhanced_team_tracker import EnhancedTeamTracker
+            import requests
+            
             tracker = EnhancedTeamTracker()
             
-            # Run the full card scanning and assignment process
-            result = tracker.run_daily_process()
+            # Get EEInteractive board cards only, excluding COMPLETED list
+            if not (tracker.api_key and tracker.token):
+                raise Exception('Trello API credentials not configured')
             
-            # Count cards in database after sync
-            cursor.execute('SELECT COUNT(*) FROM trello_cards WHERE closed = 0')
+            # First, find the EEInteractive board ID
+            boards_url = f"https://api.trello.com/1/members/me/boards?key={tracker.api_key}&token={tracker.token}"
+            boards_response = requests.get(boards_url, timeout=30)
+            boards_response.raise_for_status()
+            boards = boards_response.json()
+            
+            eeinteractive_board = None
+            for board in boards:
+                if 'eeinteractive' in board['name'].lower():
+                    eeinteractive_board = board
+                    break
+            
+            if not eeinteractive_board:
+                raise Exception('EEInteractive board not found')
+            
+            board_id = eeinteractive_board['id']
+            print(f"[V3] Found EEInteractive board: {eeinteractive_board['name']} ({board_id})")
+            
+            # Get lists from EEInteractive board
+            lists_url = f"https://api.trello.com/1/boards/{board_id}/lists?key={tracker.api_key}&token={tracker.token}"
+            lists_response = requests.get(lists_url, timeout=30)
+            lists_response.raise_for_status()
+            lists = lists_response.json()
+            
+            # Filter out COMPLETED list
+            active_lists = [l for l in lists if 'COMPLETED' not in l['name'].upper()]
+            print(f"[V3] Scanning {len(active_lists)} lists (excluding COMPLETED)")
+            
+            cards_synced = 0
+            comments_synced = 0
+            
+            for trello_list in active_lists:
+                list_id = trello_list['id']
+                list_name = trello_list['name']
+                
+                # Get cards from this list
+                cards_url = f"https://api.trello.com/1/lists/{list_id}/cards?key={tracker.api_key}&token={tracker.token}"
+                cards_response = requests.get(cards_url, timeout=30)
+                cards_response.raise_for_status()
+                cards = cards_response.json()
+                
+                for card in cards:
+                    if card['closed']:
+                        continue
+                        
+                    # Store/update card in database
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO trello_cards 
+                        (card_id, name, description, list_id, list_name, board_id, board_name, 
+                         due_date, labels, closed, url, created_at, updated_at, last_synced)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        card['id'], card['name'], card.get('desc', ''),
+                        list_id, list_name, board_id, eeinteractive_board['name'],
+                        card.get('due'), str(card.get('labels', [])),
+                        0, card['url'], datetime.now(), datetime.now(), datetime.now()
+                    ))
+                    cards_synced += 1
+                
+                print(f"[V3] Synced {len([c for c in cards if not c['closed']])} cards from {list_name}")
+            
+            conn.commit()
+            
+            # Count final cards
+            cursor.execute('SELECT COUNT(*) FROM trello_cards WHERE closed = 0 AND board_name LIKE ?', 
+                          (f'%{eeinteractive_board["name"]}%',))
             total_cards = cursor.fetchone()[0]
             
             conn.close()
             
             return jsonify({
                 'success': True,
-                'message': f'Trello sync completed! Found {total_cards} active cards',
-                'cards_found': total_cards,
-                'sync_result': result
+                'message': f'EEInteractive board sync completed! Found {total_cards} active cards',
+                'board_name': eeinteractive_board['name'],
+                'cards_synced': cards_synced,
+                'lists_scanned': len(active_lists),
+                'excluded_lists': ['COMPLETED']
             })
             
         except ImportError as e:
