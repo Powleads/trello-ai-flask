@@ -1646,7 +1646,7 @@
         function editTemplate(templateId) {
             // Show the edit form for this template
             const viewDiv = document.getElementById(`template-view-${templateId}`);
-            const editDiv = document.getElementById(`template-edit-${templateId}`);
+            const editDiv = document.getElementById(`edit-template-form-${templateId}`);
             if (viewDiv) viewDiv.style.display = 'none';
             if (editDiv) editDiv.style.display = 'block';
         }
@@ -1699,7 +1699,7 @@
         // Cancel editing template
         function cancelEditTemplate(templateId) {
             const viewDiv = document.getElementById(`template-view-${templateId}`);
-            const editDiv = document.getElementById(`template-edit-${templateId}`);
+            const editDiv = document.getElementById(`edit-template-form-${templateId}`);
             if (viewDiv) viewDiv.style.display = 'block';
             if (editDiv) editDiv.style.display = 'none';
         }

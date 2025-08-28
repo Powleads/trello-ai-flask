@@ -22,8 +22,15 @@ class GreenAPIClient:
         self.api_token = api_token or os.environ.get('GREEN_API_TOKEN')
         self.base_url = f"https://api.green-api.com/waInstance{self.instance_id}"
         
+        print(f"[GREEN_API] Initializing with instance_id: {self.instance_id}")
+        print(f"[GREEN_API] Token present: {'Yes' if self.api_token else 'No'}")
+        print(f"[GREEN_API] Token length: {len(self.api_token) if self.api_token else 0}")
+        
         if not self.api_token:
             raise ValueError("GREEN_API_TOKEN environment variable is required")
+        
+        if self.api_token == "your_green_api_token_here":
+            raise ValueError("GREEN_API_TOKEN is still set to default placeholder value")
     
     def send_message(self, chat_id: str, message: str, quote_message_id: str = None) -> Dict:
         """
@@ -49,11 +56,21 @@ class GreenAPIClient:
             payload["quotedMessageId"] = quote_message_id
         
         try:
+            print(f"[GREEN_API] Sending request to: {url}")
+            print(f"[GREEN_API] Payload: {json.dumps(payload, indent=2)}")
+            
             response = requests.post(url, json=payload, timeout=30)
+            
+            print(f"[GREEN_API] Response status: {response.status_code}")
+            print(f"[GREEN_API] Response headers: {dict(response.headers)}")
+            
+            if response.status_code != 200:
+                print(f"[GREEN_API] Response text: {response.text}")
+            
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error sending WhatsApp message: {e}")
+            print(f"[GREEN_API] Error sending WhatsApp message: {e}")
             return {"error": str(e)}
     
     def send_bulk_messages(self, messages: List[Dict]) -> List[Dict]:

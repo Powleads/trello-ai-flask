@@ -1162,13 +1162,14 @@ def send_custom_whatsapp():
         try:
             green_api = GreenAPIClient()
             
-            # Format phone number for WhatsApp (ensure it has country code)
-            if not whatsapp_number.startswith('+'):
-                whatsapp_number = f'+{whatsapp_number}'
+            # Format phone number for Green API (remove any + or @ symbols, keep only digits)
+            clean_number = ''.join(filter(str.isdigit, whatsapp_number))
+            chat_id = f"{clean_number}@c.us"
             
-            # Remove any non-digit characters except +
-            clean_number = '+' + ''.join(filter(str.isdigit, whatsapp_number))
-            chat_id = f"{clean_number[1:]}@c.us"  # Remove + and add @c.us
+            print(f"[V3] 📱 Attempting WhatsApp send to {member_name}")
+            print(f"[V3] Original number: {whatsapp_number}")
+            print(f"[V3] Formatted chat_id: {chat_id}")
+            print(f"[V3] Message: {message}")
             
             # Send the actual WhatsApp message
             send_result = green_api.send_message(chat_id, message)
@@ -1218,12 +1219,12 @@ def send_custom_whatsapp():
         conn.close()
         
         if 'error' not in send_result:
-            print(f"[V3] ✅ WhatsApp sent to {member_name} ({clean_number}): {message}")
+            print(f"[V3] ✅ WhatsApp sent to {member_name} ({chat_id}): {message}")
             print(f"[V3] Card context: {card_name} - {card_url}")
             return jsonify({
                 'success': True,
                 'message': f'WhatsApp message sent to {member_name}',
-                'whatsapp_number': clean_number
+                'whatsapp_number': chat_id
             })
         else:
             print(f"[V3] ❌ WhatsApp failed to {member_name}: {send_result.get('error')}")
