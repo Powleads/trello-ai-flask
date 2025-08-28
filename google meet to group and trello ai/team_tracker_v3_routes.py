@@ -88,9 +88,9 @@ def get_dashboard_data():
         
         # Initialize V3 tables if they don't exist
         initialize_v3_tables(cursor)
-    
-    # Get cards with assignments and metrics
-    cursor.execute('''
+        
+        # Get cards with assignments and metrics
+        cursor.execute('''
         SELECT 
             c.card_id,
             c.name,
@@ -167,8 +167,6 @@ def get_dashboard_data():
     # Get automation settings
     cursor.execute('SELECT setting_name, setting_value FROM automation_settings')
     settings = {row[0]: row[1] for row in cursor.fetchall()}
-    
-    conn.close()
     
         return jsonify({
             'cards': cards,
