@@ -3,19 +3,26 @@ Database Schema Extensions for Team Tracker V3
 Adds metrics, settings, templates, and history tables
 """
 
-import sqlite3
 from datetime import datetime
+from production_db import get_production_db
 
 def extend_database():
     """Add new tables and columns for V3 features"""
     
-    conn = sqlite3.connect('team_tracker_v2.db')
-    cursor = conn.cursor()
+    try:
+        db = get_production_db()
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        
+        print("[V3] Extending database with V3 tables...")
     
     # 1. Card Metrics Table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS card_metrics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        # Use SERIAL for PostgreSQL compatibility
+        id_type = "SERIAL PRIMARY KEY" if db.is_postgres() else "INTEGER PRIMARY KEY AUTOINCREMENT"
+        
+        cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS card_metrics (
+            id {id_type},
         card_id TEXT UNIQUE NOT NULL,
         current_list TEXT,
         list_entry_date TIMESTAMP,

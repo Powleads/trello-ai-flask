@@ -223,6 +223,14 @@ TEAM_MEMBERS = {}  # Empty - will be populated from database
 # Initialize database
 db = DatabaseManager() if DatabaseManager else None
 
+# Initialize V3 database tables
+try:
+    from database_extend_v3 import extend_database
+    extend_database()
+    print("[V3] Database tables initialized successfully")
+except Exception as e:
+    print(f"[V3] Warning: Could not initialize V3 database tables: {e}")
+
 # Global data storage
 app_data = {
     'cards_needing_updates': [],

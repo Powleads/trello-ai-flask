@@ -3,16 +3,75 @@ Team Tracker V3 - Enhanced Routes with Modal Support
 """
 
 from flask import Blueprint, render_template, jsonify, request
-import sqlite3
 from datetime import datetime, timedelta
 import json
 import re
+from production_db import get_production_db
 
 team_tracker_v3_bp = Blueprint('team_tracker_v3', __name__)
 
-def get_db():
-    return sqlite3.connect('team_tracker_v2.db', 
-                          detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+def get_db_connection():
+    """Get database connection using production database manager"""
+    db = get_production_db()
+    return db.get_connection()
+
+def initialize_v3_tables(cursor):
+    """Initialize V3 tables if they don't exist"""
+    try:
+        # Check if we can determine database type
+        from production_db import get_production_db
+        db = get_production_db()
+        
+        # Use appropriate primary key syntax
+        if hasattr(db, 'is_postgres') and db.is_postgres():
+            id_field = "SERIAL PRIMARY KEY"
+            bool_field = "BOOLEAN"
+        else:
+            id_field = "INTEGER PRIMARY KEY AUTOINCREMENT"
+            bool_field = "INTEGER"
+        
+        # Create tables with compatible syntax
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS team_members_cache (
+                id {id_field},
+                name TEXT NOT NULL,
+                whatsapp_number TEXT,
+                email TEXT,
+                trello_username TEXT,
+                is_active {bool_field} DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS whatsapp_templates (
+                id {id_field},
+                template_name TEXT UNIQUE NOT NULL,
+                template_type TEXT NOT NULL,
+                template_text TEXT NOT NULL,
+                variables TEXT,
+                is_active {bool_field} DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS automation_settings (
+                id {id_field},
+                setting_name TEXT UNIQUE NOT NULL,
+                setting_value TEXT,
+                setting_type TEXT,
+                description TEXT,
+                is_enabled {bool_field} DEFAULT 1,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+    except Exception as e:
+        print(f"[V3] Warning: Could not create some tables: {e}")
+        pass
 
 @team_tracker_v3_bp.route('/team-tracker-v3')
 def team_tracker_v3():
@@ -23,8 +82,12 @@ def team_tracker_v3():
 def get_dashboard_data():
     """Get all data for dashboard"""
     
-    conn = get_db()
-    cursor = conn.cursor()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor)
     
     # Get cards with assignments and metrics
     cursor.execute('''
@@ -107,17 +170,29 @@ def get_dashboard_data():
     
     conn.close()
     
-    return jsonify({
-        'cards': cards,
-        'team_members': team_members,
-        'settings': settings
-    })
+        return jsonify({
+            'cards': cards,
+            'team_members': team_members,
+            'settings': settings
+        })
+        
+    except Exception as e:
+        print(f"[V3] Error in dashboard-data: {e}")
+        # Return empty data structure on error
+        return jsonify({
+            'cards': [],
+            'team_members': {},
+            'settings': {}
+        })
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 @team_tracker_v3_bp.route('/api/v3/card-details/<card_id>')
 def get_card_details(card_id):
     """Get detailed information for a specific card"""
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Get card info
@@ -228,7 +303,7 @@ def reassign_card():
     if not card_id or not new_member:
         return jsonify({'error': 'Missing parameters'}), 400
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Get team member's WhatsApp
@@ -266,7 +341,7 @@ def reassign_card():
 def get_team_members():
     """Get all team members"""
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -300,7 +375,7 @@ def update_team_member():
     if not member_id:
         return jsonify({'error': 'Member ID required'}), 400
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Build update query dynamically
@@ -336,7 +411,7 @@ def update_team_member():
 def get_templates():
     """Get all WhatsApp templates"""
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -370,7 +445,7 @@ def update_template():
     if not template_id:
         return jsonify({'error': 'Template ID required'}), 400
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -388,7 +463,7 @@ def update_template():
 def get_automation_settings():
     """Get automation settings"""
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -422,7 +497,7 @@ def update_setting():
     if not setting_id:
         return jsonify({'error': 'Setting ID required'}), 400
     
-    conn = get_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
