@@ -52,13 +52,14 @@ def initialize_v3_tables(cursor, conn):
         
         if count == 0:
             # Insert the known team members
+            # Personal WhatsApp numbers from .env.example (correct format)
             team_members = [
-                ('Lancey', '120363177796803705@g.us', 'lancey@example.com', 'lancey'),
-                ('Levy', '120363240508968970@g.us', 'levy@example.com', 'levy'),
-                ('Wendy', '120363177796803702@g.us', 'wendy@example.com', 'wendy'),
-                ('Forka', '120363177796803701@g.us', 'forka@example.com', 'forka'),
-                ('Brayan', '120363177796803704@g.us', 'brayan@example.com', 'brayan'),
-                ('Breyden', '120363177796803703@g.us', 'breyden@example.com', 'breyden')
+                ('Lancey', '639264438378@c.us', 'lancey@example.com', 'lancey'),
+                ('Levy', '237659250977@c.us', 'levy@example.com', 'levy'), 
+                ('Wendy', '237677079267@c.us', 'wendy@example.com', 'wendy'),
+                ('Forka', '237652275097@c.us', 'forka@example.com', 'forka'),
+                ('Brayan', '237676267420@c.us', 'brayan@example.com', 'brayan'),
+                ('Breyden', '13179979692@c.us', 'breyden@example.com', 'breyden')
             ]
             
             for name, whatsapp, email, trello_username in team_members:
@@ -68,6 +69,36 @@ def initialize_v3_tables(cursor, conn):
                 ''', (name, whatsapp, email, trello_username))
                 
             print(f"[V3] Seeded {len(team_members)} team members into team_members_cache")
+        
+        # Migration: Fix existing wrong WhatsApp numbers (group IDs → personal numbers)
+        print("[V3] 🔄 Migrating WhatsApp numbers from group IDs to personal numbers...")
+        cursor.execute("SELECT id, name, whatsapp_number FROM team_members_cache WHERE whatsapp_number LIKE '%@g.us'")
+        wrong_numbers = cursor.fetchall()
+        
+        if wrong_numbers:
+            print(f"[V3] Found {len(wrong_numbers)} team members with group IDs instead of personal numbers")
+            
+            # Correct WhatsApp numbers mapping
+            correct_numbers = {
+                'Lancey': '639264438378@c.us',
+                'Levy': '237659250977@c.us',
+                'Wendy': '237677079267@c.us',
+                'Forka': '237652275097@c.us',
+                'Brayan': '237676267420@c.us',
+                'Breyden': '13179979692@c.us'
+            }
+            
+            for member_id, name, old_number in wrong_numbers:
+                if name in correct_numbers:
+                    new_number = correct_numbers[name]
+                    cursor.execute("UPDATE team_members_cache SET whatsapp_number = ? WHERE id = ?", 
+                                 (new_number, member_id))
+                    print(f"[V3] ✅ Updated {name}: {old_number} → {new_number}")
+                else:
+                    print(f"[V3] ⚠️ No correct number found for {name}")
+            
+            conn.commit()
+            print("[V3] 🎉 WhatsApp number migration completed!")
         
         cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS whatsapp_templates (
@@ -1166,9 +1197,13 @@ def send_custom_whatsapp():
         try:
             green_api = GreenAPIClient()
             
-            # Format phone number for Green API (remove any + or @ symbols, keep only digits)
-            clean_number = ''.join(filter(str.isdigit, whatsapp_number))
-            chat_id = f"{clean_number}@c.us"
+            # Use the WhatsApp number as stored (should already be in correct @c.us format)
+            if whatsapp_number.endswith('@c.us'):
+                chat_id = whatsapp_number
+            else:
+                # Fallback: format as personal number if not already formatted
+                clean_number = ''.join(filter(str.isdigit, whatsapp_number))
+                chat_id = f"{clean_number}@c.us"
             
             print(f"[V3] 📱 Attempting WhatsApp send to {member_name}")
             print(f"[V3] Original number: {whatsapp_number}")
