@@ -697,11 +697,26 @@
 <div id="settingsModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2 class="modal-title">Automation Settings</h2>
+            <h2 class="modal-title">Settings & Templates</h2>
             <button class="close-btn" onclick="closeModal()">&times;</button>
         </div>
-        <div class="modal-body" id="settingsModalBody">
-            <!-- Settings content -->
+        <div class="modal-body">
+            <div class="modal-tabs">
+                <div class="modal-tab active" data-tab="settings-tab">Settings</div>
+                <div class="modal-tab" data-tab="templates-tab">WhatsApp Templates</div>
+            </div>
+            
+            <div id="settings-tab" class="tab-content active">
+                <div id="settingsModalBody">
+                    <!-- Settings content -->
+                </div>
+            </div>
+            
+            <div id="templates-tab" class="tab-content">
+                <div id="templatesModalBody">
+                    <!-- Templates content -->
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -835,7 +850,20 @@
             
             try {
                 const response = await fetch(`/api/v3/card-details/${cardId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                if (!data.card || !data.card.name) {
+                    throw new Error('Invalid card data received');
+                }
                 
                 document.getElementById('modalCardTitle').textContent = data.card.name;
                 displayCardDetails(data);
@@ -843,6 +871,7 @@
                 
             } catch (error) {
                 console.error('Error loading card details:', error);
+                alert(`Failed to load card details: ${error.message}`);
             }
         }
         
@@ -908,6 +937,7 @@
         function showSettingsModal() {
             document.getElementById('settingsModal').classList.add('show');
             loadAutomationSettings();
+            loadWhatsAppTemplates();
         }
         
         // Load team members
@@ -1264,6 +1294,102 @@
             } catch (error) {
                 console.error('Error deleting team member:', error);
                 showNotification('Error deleting team member', 'error');
+            }
+        }
+        
+        // Load WhatsApp templates
+        async function loadWhatsAppTemplates() {
+            try {
+                const response = await fetch('/api/v3/whatsapp-templates');
+                const data = await response.json();
+                
+                const container = document.getElementById('templatesModalBody');
+                container.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">WhatsApp Templates (${data.templates.length})</h3>
+                        <button onclick="showAddTemplateForm()" style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                            <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Add Template
+                        </button>
+                    </div>
+                    
+                    <div id="addTemplateForm" style="display: none; background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
+                        <h4 style="margin: 0 0 12px 0;">Add New Template</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <input type="text" id="newTemplateName" placeholder="Template Name" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                            <select id="newTemplateType" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                                <option value="assignment">Assignment</option>
+                                <option value="reminder">Reminder</option>
+                                <option value="escalation">Escalation</option>
+                                <option value="completion">Completion</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <textarea id="newTemplateText" placeholder="Template message..." style="width: 100%; height: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; margin-bottom: 8px;"></textarea>
+                        <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">
+                            Available variables: {card_name}, {assignee}, {list_name}, {due_date}, {url}
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="addTemplate()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Save</button>
+                            <button onclick="hideAddTemplateForm()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Cancel</button>
+                        </div>
+                    </div>
+                    
+                    <div class="templates-list">
+                        ${data.templates.length === 0 ? `
+                            <div style="text-align: center; padding: 40px; color: #6b7280;">
+                                <i data-lucide="message-square" style="width: 48px; height: 48px; margin-bottom: 12px;"></i>
+                                <p>No templates found. Add your first WhatsApp template!</p>
+                            </div>
+                        ` : data.templates.map(template => `
+                            <div class="template-item" data-template-id="${template.id}" style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; background: white;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                            <strong>${template.name}</strong>
+                                            <span style="background: #f3f4f6; color: #374151; padding: 2px 6px; border-radius: 10px; font-size: 11px;">${template.type}</span>
+                                        </div>
+                                        <div style="background: #f9fafb; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin-bottom: 8px;">${template.text}</div>
+                                    </div>
+                                    <div style="display: flex; gap: 4px; margin-left: 12px;">
+                                        <button onclick="editTemplate(${template.id})" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;" title="Edit">
+                                            <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i>
+                                        </button>
+                                        <button onclick="deleteTemplate(${template.id}, '${template.name}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;" title="Delete">
+                                            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Edit form (hidden by default) -->
+                                <div id="edit-template-form-${template.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                                        <input type="text" id="edit-template-name-${template.id}" value="${template.name}" style="padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        <select id="edit-template-type-${template.id}" style="padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                            <option value="assignment" ${template.type === 'assignment' ? 'selected' : ''}>Assignment</option>
+                                            <option value="reminder" ${template.type === 'reminder' ? 'selected' : ''}>Reminder</option>
+                                            <option value="escalation" ${template.type === 'escalation' ? 'selected' : ''}>Escalation</option>
+                                            <option value="completion" ${template.type === 'completion' ? 'selected' : ''}>Completion</option>
+                                            <option value="custom" ${template.type === 'custom' ? 'selected' : ''}>Custom</option>
+                                        </select>
+                                    </div>
+                                    <textarea id="edit-template-text-${template.id}" style="width: 100%; height: 80px; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; margin-bottom: 8px; font-size: 12px;">${template.text}</textarea>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button onclick="saveTemplate(${template.id})" style="background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer;">Save</button>
+                                        <button onclick="cancelEditTemplate(${template.id})" style="background: #6b7280; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer;">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                // Re-initialize lucide icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            } catch (error) {
+                console.error('Error loading templates:', error);
             }
         }
 </script>

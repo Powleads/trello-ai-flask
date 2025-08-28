@@ -336,7 +336,7 @@ def get_card_details(card_id):
             'description': card_row[1],
             'list': card_row[2],
             'url': card_row[3],
-            'created_at': card_row[4].isoformat() if card_row[4] else None,
+            'created_at': card_row[4].isoformat() if isinstance(card_row[4], datetime) else card_row[4],
             'last_synced': card_row[5].isoformat() if isinstance(card_row[5], datetime) else card_row[5]
         }
         
@@ -718,8 +718,8 @@ def scan_cards():
             lists_response.raise_for_status()
             lists = lists_response.json()
             
-            # Filter out COMPLETED list
-            active_lists = [l for l in lists if 'COMPLETED' not in l['name'].upper()]
+            # Filter out COMPLETED/COMPLETE lists
+            active_lists = [l for l in lists if not any(word in l['name'].upper() for word in ['COMPLETED', 'COMPLETE', 'DONE', 'FINISHED'])]
             print(f"[V3] Scanning {len(active_lists)} lists (excluding COMPLETED)")
             
             cards_synced = 0
@@ -791,6 +791,8 @@ def scan_cards():
                         assignment_method = None
                         assignment_confidence = 0.0
                         
+                        print(f"[V3] Processing {len(comments)} comments for card {card['name']}")
+                        
                         # Sort comments by date (oldest first) for proper assignment logic
                         comments_sorted = sorted(comments, key=lambda x: x['date'])
                         
@@ -815,22 +817,29 @@ def scan_cards():
                             # Assignment logic
                             comment_lower = comment_text.lower()
                             
+                            print(f"[V3] Comment by {commenter_name} ({commenter_username}): {comment_text[:50]}...")
+                            
                             # Check for explicit assignment (e.g., "assign: lancey" or "assign lancey")
                             import re
                             assign_match = re.search(r'assign[:\s]+(\w+)', comment_lower)
                             if assign_match:
                                 assigned_name = assign_match.group(1).title()
+                                print(f"[V3] Found assignment command: {assigned_name}")
                                 # Check if this is a valid team member
                                 cursor.execute('SELECT name FROM team_members_cache WHERE LOWER(name) = ?', (assigned_name.lower(),))
-                                if cursor.fetchone():
-                                    assigned_member = assigned_name
+                                member_result = cursor.fetchone()
+                                if member_result:
+                                    assigned_member = member_result[0]
                                     assignment_method = 'explicit_assignment'
                                     assignment_confidence = 1.0
-                                    print(f"[V3] Explicit assignment found: {assigned_name} for card {card['name']}")
+                                    print(f"[V3] ✅ Explicit assignment: {assigned_member} for card {card['name']}")
+                                else:
+                                    print(f"[V3] ❌ Assignment target '{assigned_name}' not found in team members")
                             
                             # If no explicit assignment and commenter is not admin, this is the assignee
-                            elif not assigned_member and commenter_username.lower() not in admin_users:
-                                # Check if commenter is a team member
+                            elif not assigned_member and commenter_username.lower() not in [u.lower() for u in admin_users]:
+                                print(f"[V3] Checking if {commenter_name} ({commenter_username}) is a team member...")
+                                # Check if commenter is a team member (by name or username)
                                 cursor.execute('SELECT name FROM team_members_cache WHERE LOWER(name) = ? OR LOWER(trello_username) = ?', 
                                              (commenter_name.lower(), commenter_username.lower()))
                                 team_member = cursor.fetchone()
@@ -838,10 +847,16 @@ def scan_cards():
                                     assigned_member = team_member[0]
                                     assignment_method = 'first_comment'
                                     assignment_confidence = 0.8
-                                    print(f"[V3] First comment assignment: {assigned_member} for card {card['name']}")
+                                    print(f"[V3] ✅ First comment assignment: {assigned_member} for card {card['name']}")
+                                else:
+                                    print(f"[V3] ❌ Commenter {commenter_name} ({commenter_username}) not found in team members")
+                            else:
+                                if commenter_username.lower() in [u.lower() for u in admin_users]:
+                                    print(f"[V3] Skipping admin user: {commenter_username}")
                         
                         # Create/update assignment if found
                         if assigned_member:
+                            print(f"[V3] Creating assignment for {card['name']} → {assigned_member}")
                             # Get WhatsApp number
                             cursor.execute('SELECT whatsapp_number FROM team_members_cache WHERE name = ?', (assigned_member,))
                             whatsapp_result = cursor.fetchone()
@@ -857,6 +872,7 @@ def scan_cards():
                                 VALUES (?, ?, ?, ?, ?, 'auto_scan')
                             ''', (card_id, assigned_member, whatsapp_number, assignment_method, assignment_confidence))
                             assignments_created += 1
+                            print(f"[V3] ✅ Assignment created: {assigned_member} for {card['name']}")
                             
                             # Initialize metrics for this card
                             cursor.execute('''
@@ -864,6 +880,8 @@ def scan_cards():
                                 (card_id, time_in_list_hours, total_ignored_count, escalation_level)
                                 VALUES (?, 0, 0, 0)
                             ''', (card_id,))
+                        else:
+                            print(f"[V3] ❌ No assignment found for card: {card['name']}")
                     
                     except Exception as comment_error:
                         print(f"[V3] Error syncing comments for card {card_id}: {comment_error}")
@@ -888,7 +906,7 @@ def scan_cards():
                 'comments_synced': comments_synced,
                 'assignments_created': assignments_created,
                 'lists_scanned': len(active_lists),
-                'excluded_lists': ['COMPLETED']
+                'excluded_lists': ['COMPLETED', 'COMPLETE', 'DONE', 'FINISHED']
             })
             
         except ImportError as e:
