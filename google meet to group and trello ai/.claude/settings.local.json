@@ -36,7 +36,10 @@
       "Bash(start http://localhost:5000/gmail-tracker)",
       "Bash(sqlite3:*)",
       "Bash(del gmail_tracker.db)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Read(/c:\\Users\\james\\Desktop\\TRELLO AI\\google meet to group and trello ai\\screenshot errors/**)",
+      "Bash(git log:*)",
+      "mcp__JustGoingViral__takeScreenshot"
     ],
     "deny": [],
     "ask": []

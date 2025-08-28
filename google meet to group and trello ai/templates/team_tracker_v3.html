@@ -661,7 +661,7 @@
                 <div class="modal-tab active" data-tab="details">Details</div>
                 <div class="modal-tab" data-tab="comments">Comments</div>
                 <div class="modal-tab" data-tab="history">History</div>
-                <div class="modal-tab" data-tab="metrics">Metrics</div>
+                <div class="modal-tab" data-tab="metrics">Metrics and Manual WhatsApp Messenger</div>
             </div>
             
             <div id="details" class="tab-content active">
@@ -1640,6 +1640,136 @@
             } catch (error) {
                 console.error('Error loading templates:', error);
             }
+        }
+        
+        // Edit WhatsApp template
+        function editTemplate(templateId) {
+            // Show the edit form for this template
+            const viewDiv = document.getElementById(`template-view-${templateId}`);
+            const editDiv = document.getElementById(`template-edit-${templateId}`);
+            if (viewDiv) viewDiv.style.display = 'none';
+            if (editDiv) editDiv.style.display = 'block';
+        }
+        
+        // Save edited template
+        async function saveTemplate(templateId) {
+            const nameInput = document.getElementById(`edit-template-name-${templateId}`);
+            const typeSelect = document.getElementById(`edit-template-type-${templateId}`);
+            const textArea = document.getElementById(`edit-template-text-${templateId}`);
+            
+            if (!nameInput || !typeSelect || !textArea) {
+                alert('Error: Could not find template form elements');
+                return;
+            }
+            
+            const updatedTemplate = {
+                name: nameInput.value.trim(),
+                type: typeSelect.value,
+                text: textArea.value.trim()
+            };
+            
+            if (!updatedTemplate.name || !updatedTemplate.text) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v3/whatsapp-templates/${templateId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedTemplate)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Template updated successfully', 'success');
+                    loadWhatsAppTemplates();
+                } else {
+                    showNotification('Failed to update template', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating template:', error);
+                showNotification('Error updating template', 'error');
+            }
+        }
+        
+        // Cancel editing template
+        function cancelEditTemplate(templateId) {
+            const viewDiv = document.getElementById(`template-view-${templateId}`);
+            const editDiv = document.getElementById(`template-edit-${templateId}`);
+            if (viewDiv) viewDiv.style.display = 'block';
+            if (editDiv) editDiv.style.display = 'none';
+        }
+        
+        // Delete WhatsApp template
+        async function deleteTemplate(templateId) {
+            if (!confirm('Are you sure you want to delete this template?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v3/whatsapp-templates/${templateId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Template deleted successfully', 'success');
+                    loadWhatsAppTemplates();
+                } else {
+                    showNotification('Failed to delete template', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting template:', error);
+                showNotification('Error deleting template', 'error');
+            }
+        }
+        
+        // Show notification helper
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+                color: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+        
+        // Add CSS animations for notifications
+        if (!document.getElementById('notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'notification-styles';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
         }
 </script>
 {% endblock %}

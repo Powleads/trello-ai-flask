@@ -6,7 +6,9 @@ from flask import Blueprint, render_template, jsonify, request
 from datetime import datetime, timedelta
 import json
 import re
+import os
 from production_db import get_production_db
+from green_api_integration import GreenAPIClient
 
 team_tracker_v3_bp = Blueprint('team_tracker_v3', __name__)
 
@@ -1156,16 +1158,54 @@ def send_custom_whatsapp():
         
         card_name, card_url = card_result
         
-        # Log the message send attempt
-        cursor.execute('''
-            INSERT INTO card_comments 
-            (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            card_id, f'manual_whatsapp_{datetime.now().isoformat()}', 
-            f'Manual WhatsApp sent: {message}', 'System', 'system',
-            datetime.now(), 0
-        ))
+        # Send WhatsApp message via Green API
+        try:
+            green_api = GreenAPIClient()
+            
+            # Format phone number for WhatsApp (ensure it has country code)
+            if not whatsapp_number.startswith('+'):
+                whatsapp_number = f'+{whatsapp_number}'
+            
+            # Remove any non-digit characters except +
+            clean_number = '+' + ''.join(filter(str.isdigit, whatsapp_number))
+            chat_id = f"{clean_number[1:]}@c.us"  # Remove + and add @c.us
+            
+            # Send the actual WhatsApp message
+            send_result = green_api.send_message(chat_id, message)
+            
+            # Log the message send attempt based on result
+            if 'error' not in send_result:
+                cursor.execute('''
+                    INSERT INTO card_comments 
+                    (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    card_id, f'manual_whatsapp_{datetime.now().isoformat()}', 
+                    f'✅ WhatsApp sent to {member_name}: {message}', 'System', 'system',
+                    datetime.now(), 0
+                ))
+            else:
+                cursor.execute('''
+                    INSERT INTO card_comments 
+                    (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    card_id, f'manual_whatsapp_failed_{datetime.now().isoformat()}', 
+                    f'❌ WhatsApp failed to {member_name}: {send_result.get("error", "Unknown error")}', 'System', 'system',
+                    datetime.now(), 0
+                ))
+        except Exception as e:
+            # Log error if Green API fails
+            cursor.execute('''
+                INSERT INTO card_comments 
+                (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                card_id, f'manual_whatsapp_error_{datetime.now().isoformat()}', 
+                f'❌ WhatsApp error: {str(e)}', 'System', 'system',
+                datetime.now(), 0
+            ))
+            send_result = {'error': str(e)}
         
         # Update metrics
         cursor.execute('''
@@ -1177,16 +1217,20 @@ def send_custom_whatsapp():
         conn.commit()
         conn.close()
         
-        # Here you would integrate with your WhatsApp API
-        # For now, we'll just log it and return success
-        print(f"[V3] 📱 Custom WhatsApp to {member_name} ({whatsapp_number}): {message}")
-        print(f"[V3] Card context: {card_name} - {card_url}")
-        
-        return jsonify({
-            'success': True,
-            'message': f'Custom message sent to {member_name}',
-            'whatsapp_number': whatsapp_number
-        })
+        if 'error' not in send_result:
+            print(f"[V3] ✅ WhatsApp sent to {member_name} ({clean_number}): {message}")
+            print(f"[V3] Card context: {card_name} - {card_url}")
+            return jsonify({
+                'success': True,
+                'message': f'WhatsApp message sent to {member_name}',
+                'whatsapp_number': clean_number
+            })
+        else:
+            print(f"[V3] ❌ WhatsApp failed to {member_name}: {send_result.get('error')}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to send WhatsApp: {send_result.get("error", "Unknown error")}'
+            }), 500
         
     except Exception as e:
         return jsonify({
@@ -1216,23 +1260,54 @@ def send_assign_request():
         # Create the group message
         group_message = f'Can someone assign this new task by going to {card_url} and commenting "assign (persons name)", thanks'
         
-        # Log the assign request
-        cursor.execute('''
-            INSERT INTO card_comments 
-            (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            card_id, f'assign_request_{datetime.now().isoformat()}', 
-            f'Assignment request sent to group: {group_message}', 'System', 'system',
-            datetime.now(), 1
-        ))
+        # Send to WhatsApp group via Green API
+        try:
+            green_api = GreenAPIClient()
+            
+            # Get the group chat ID from environment or database
+            group_chat_id = os.environ.get('WHATSAPP_GROUP_ID', '120363044057367718@g.us')  # Default group ID
+            
+            # Send the actual WhatsApp message to group
+            send_result = green_api.send_message(group_chat_id, group_message)
+            
+            # Log the assign request based on result
+            if 'error' not in send_result:
+                cursor.execute('''
+                    INSERT INTO card_comments 
+                    (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    card_id, f'assign_request_{datetime.now().isoformat()}', 
+                    f'✅ Assignment request sent to group: {group_message}', 'System', 'system',
+                    datetime.now(), 1
+                ))
+                print(f"[V3] ✅ Group assign request sent for card: {card_name}")
+            else:
+                cursor.execute('''
+                    INSERT INTO card_comments 
+                    (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    card_id, f'assign_request_failed_{datetime.now().isoformat()}', 
+                    f'❌ Failed to send assignment request to group: {send_result.get("error", "Unknown error")}', 'System', 'system',
+                    datetime.now(), 1
+                ))
+                print(f"[V3] ❌ Failed to send group assign request: {send_result.get('error')}")
+        except Exception as e:
+            cursor.execute('''
+                INSERT INTO card_comments 
+                (card_id, comment_id, comment_text, commenter_name, commenter_id, comment_date, is_update_request)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                card_id, f'assign_request_error_{datetime.now().isoformat()}', 
+                f'❌ Assignment request error: {str(e)}', 'System', 'system',
+                datetime.now(), 1
+            ))
+            send_result = {'error': str(e)}
         
         conn.commit()
         conn.close()
         
-        # Here you would send to your group WhatsApp
-        # For now, we'll just log it
-        print(f"[V3] 📢 Group assign request for card: {card_name}")
         print(f"[V3] Message: {group_message}")
         
         return jsonify({
@@ -1285,4 +1360,83 @@ def delete_team_member():
         return jsonify({
             'success': False,
             'error': f'Failed to delete team member: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/whatsapp-templates/<int:template_id>', methods=['PUT'])
+def update_whatsapp_template(template_id):
+    """Update WhatsApp template"""
+    
+    data = request.json
+    name = data.get('name')
+    template_type = data.get('type')
+    text = data.get('text')
+    
+    if not all([name, template_type, text]):
+        return jsonify({'error': 'Missing required parameters'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
+        
+        # Check if template exists
+        cursor.execute('SELECT id FROM whatsapp_templates WHERE id = ?', (template_id,))
+        if not cursor.fetchone():
+            return jsonify({'error': 'Template not found'}), 404
+        
+        # Update the template
+        cursor.execute('''
+            UPDATE whatsapp_templates 
+            SET name = ?, type = ?, text = ?, updated_at = ?
+            WHERE id = ?
+        ''', (name, template_type, text, datetime.now(), template_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Template updated successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to update template: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/whatsapp-templates/<int:template_id>', methods=['DELETE'])
+def delete_whatsapp_template(template_id):
+    """Delete WhatsApp template"""
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if template exists
+        cursor.execute('SELECT name FROM whatsapp_templates WHERE id = ?', (template_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return jsonify({'error': 'Template not found'}), 404
+        
+        template_name = result[0]
+        
+        # Delete the template
+        cursor.execute('DELETE FROM whatsapp_templates WHERE id = ?', (template_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Template "{template_name}" deleted successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete template: {str(e)}'
         }), 500
