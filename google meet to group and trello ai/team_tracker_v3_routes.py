@@ -39,20 +39,29 @@ def get_db_connection():
     db = get_production_db()
     return db.get_connection()
 
+def is_postgres_db():
+    """Check if we're using PostgreSQL database"""
+    db = get_production_db()
+    return hasattr(db, 'is_production') and db.is_production
+
+def get_param_placeholder():
+    """Get the appropriate SQL parameter placeholder"""
+    return '%s' if is_postgres_db() else '?'
+
 def initialize_v3_tables(cursor, conn):
     """Initialize V3 tables if they don't exist"""
     try:
-        # Check if we can determine database type
-        from production_db import get_production_db
-        db = get_production_db()
-        
         # Use appropriate primary key syntax
-        if hasattr(db, 'is_postgres') and db.is_postgres():
+        if is_postgres_db():
             id_field = "SERIAL PRIMARY KEY"
             bool_field = "BOOLEAN"
+            default_true = "TRUE"
         else:
             id_field = "INTEGER PRIMARY KEY AUTOINCREMENT"
             bool_field = "INTEGER"
+            default_true = "1"
+        
+        param_placeholder = get_param_placeholder()
         
         # Create tables with compatible syntax
         cursor.execute(f'''
@@ -62,7 +71,7 @@ def initialize_v3_tables(cursor, conn):
                 whatsapp_number TEXT,
                 email TEXT,
                 trello_username TEXT,
-                is_active {bool_field} DEFAULT 1,
+                is_active {bool_field} DEFAULT {default_true},
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -85,15 +94,15 @@ def initialize_v3_tables(cursor, conn):
             ]
             
             for name, whatsapp, email, trello_username in team_members:
-                cursor.execute('''
+                cursor.execute(f'''
                     INSERT INTO team_members_cache (name, whatsapp_number, email, trello_username, is_active)
-                    VALUES (?, ?, ?, ?, 1)
+                    VALUES ({param_placeholder}, {param_placeholder}, {param_placeholder}, {param_placeholder}, {default_true})
                 ''', (name, whatsapp, email, trello_username))
                 
             print(f"[V3] Seeded {len(team_members)} team members into team_members_cache")
         
         # Migration: Fix existing wrong WhatsApp numbers (group IDs → personal numbers)
-        print("[V3] 🔄 Migrating WhatsApp numbers from group IDs to personal numbers...")
+        print("[V3] Migrating WhatsApp numbers from group IDs to personal numbers...")
         cursor.execute("SELECT id, name, whatsapp_number FROM team_members_cache WHERE whatsapp_number LIKE '%@g.us'")
         wrong_numbers = cursor.fetchall()
         
@@ -113,14 +122,14 @@ def initialize_v3_tables(cursor, conn):
             for member_id, name, old_number in wrong_numbers:
                 if name in correct_numbers:
                     new_number = correct_numbers[name]
-                    cursor.execute("UPDATE team_members_cache SET whatsapp_number = ? WHERE id = ?", 
+                    cursor.execute(f"UPDATE team_members_cache SET whatsapp_number = {param_placeholder} WHERE id = {param_placeholder}", 
                                  (new_number, member_id))
-                    print(f"[V3] ✅ Updated {name}: {old_number} → {new_number}")
+                    print(f"[V3] Updated {name}: {old_number} -> {new_number}")
                 else:
-                    print(f"[V3] ⚠️ No correct number found for {name}")
+                    print(f"[V3] No correct number found for {name}")
             
             conn.commit()
-            print("[V3] 🎉 WhatsApp number migration completed!")
+            print("[V3] WhatsApp number migration completed!")
         
         cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS whatsapp_templates (
@@ -129,7 +138,7 @@ def initialize_v3_tables(cursor, conn):
                 template_type TEXT NOT NULL,
                 template_text TEXT NOT NULL,
                 variables TEXT,
-                is_active {bool_field} DEFAULT 1,
+                is_active {bool_field} DEFAULT {default_true},
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -142,7 +151,7 @@ def initialize_v3_tables(cursor, conn):
                 setting_value TEXT,
                 setting_type TEXT,
                 description TEXT,
-                is_enabled {bool_field} DEFAULT 1,
+                is_enabled {bool_field} DEFAULT {default_true},
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -160,7 +169,7 @@ def initialize_v3_tables(cursor, conn):
                 board_name TEXT,
                 due_date TIMESTAMP,
                 labels TEXT,
-                closed {bool_field} DEFAULT 0,
+                closed {bool_field} DEFAULT FALSE,
                 url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -177,7 +186,7 @@ def initialize_v3_tables(cursor, conn):
                 commenter_name TEXT,
                 commenter_id TEXT,
                 comment_date TIMESTAMP,
-                is_update_request {bool_field} DEFAULT 0,
+                is_update_request {bool_field} DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -192,7 +201,7 @@ def initialize_v3_tables(cursor, conn):
                 confidence_score REAL,
                 assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 assigned_by TEXT,
-                is_active {bool_field} DEFAULT 1
+                is_active {bool_field} DEFAULT {default_true}
             )
         ''')
         
@@ -258,9 +267,9 @@ def initialize_v3_tables(cursor, conn):
             ]
             
             for name, template_type, text, variables in default_templates:
-                cursor.execute('''
+                cursor.execute(f'''
                     INSERT INTO whatsapp_templates (template_name, template_type, template_text, variables, is_active)
-                    VALUES (?, ?, ?, ?, 1)
+                    VALUES ({param_placeholder}, {param_placeholder}, {param_placeholder}, {param_placeholder}, {default_true})
                 ''', (name, template_type, text, variables))
                 
             print(f"[V3] Seeded {len(default_templates)} WhatsApp templates")
@@ -284,10 +293,12 @@ def initialize_v3_tables(cursor, conn):
             ]
             
             for name, value, setting_type, description, enabled in default_settings:
-                cursor.execute('''
+                # Convert enabled integer to boolean for PostgreSQL compatibility
+                enabled_bool = bool(enabled) if is_postgres_db() else enabled
+                cursor.execute(f'''
                     INSERT INTO automation_settings (setting_name, setting_value, setting_type, description, is_enabled)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (name, value, setting_type, description, enabled))
+                    VALUES ({param_placeholder}, {param_placeholder}, {param_placeholder}, {param_placeholder}, {param_placeholder})
+                ''', (name, value, setting_type, description, enabled_bool))
                 
             print(f"[V3] Seeded {len(default_settings)} automation settings")
         
@@ -587,7 +598,7 @@ def reassign_card():
     initialize_v3_tables(cursor, conn)
     
     # Get team member's WhatsApp
-    cursor.execute('SELECT whatsapp_number FROM team_members_cache WHERE name = ?', (new_member,))
+    cursor.execute(f'SELECT whatsapp_number FROM team_members_cache WHERE name = {get_param_placeholder()}', (new_member,))
     result = cursor.fetchone()
     
     if not result:
@@ -596,20 +607,21 @@ def reassign_card():
     whatsapp = result[0]
     
     # Deactivate old assignments
-    cursor.execute('UPDATE card_assignments SET is_active = 0 WHERE card_id = ?', (card_id,))
+    cursor.execute(f'UPDATE card_assignments SET is_active = 0 WHERE card_id = {get_param_placeholder()}', (card_id,))
     
     # Create new assignment
-    cursor.execute('''
+    param_placeholder = get_param_placeholder()
+    cursor.execute(f'''
         INSERT INTO card_assignments 
         (card_id, team_member, whatsapp_number, assignment_method, confidence_score, assigned_by)
-        VALUES (?, ?, ?, 'manual_reassignment', 1.0, 'user')
+        VALUES ({param_placeholder}, {param_placeholder}, {param_placeholder}, 'manual_reassignment', 1.0, 'user')
     ''', (card_id, new_member, whatsapp))
     
     # Track list history if reassignment changes status
-    cursor.execute('''
+    cursor.execute(f'''
         INSERT INTO list_history (card_id, from_list, to_list)
         SELECT card_id, list_name, list_name
-        FROM trello_cards WHERE card_id = ?
+        FROM trello_cards WHERE card_id = {param_placeholder}
     ''', (card_id,))
     
     conn.commit()
