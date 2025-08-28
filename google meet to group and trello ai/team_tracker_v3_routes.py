@@ -1,5 +1,27 @@
 """
 Team Tracker V3 - Enhanced Routes with Modal Support
+
+🗄️ DATA PERSISTENCE ARCHITECTURE:
+- All data stored in PostgreSQL database (not browser cache)
+- Browser clearing/refreshing does NOT affect data
+- Team members, cards, assignments, templates all persist
+- Automatic table initialization on startup
+- Database migrations handle schema updates
+
+📊 PERSISTENT TABLES:
+- trello_cards: Card data and metadata
+- card_comments: Comments and system messages  
+- card_assignments: Assignment history and tracking
+- card_metrics: Performance metrics and escalation
+- team_members_cache: Team member info and WhatsApp
+- whatsapp_templates: Message templates
+- automation_settings: System preferences
+
+✅ BROWSER-INDEPENDENT: All settings and data survive:
+- Browser refresh/reload
+- Cache clearing
+- Application restart
+- Server redeployment
 """
 
 from flask import Blueprint, render_template, jsonify, request
