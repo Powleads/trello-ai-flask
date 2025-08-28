@@ -134,8 +134,16 @@ class GmailTracker:
                     
                     for message in messages:
                         try:
-                            # Extract email data
-                            email_data = self.extract_email_data(message)
+                            # Get full message data (not just list reference)
+                            print(f"[GMAIL DEBUG SCAN-ONLY] Fetching message {message['id']}")
+                            full_message = self.gmail_service.users().messages().get(
+                                userId='me', 
+                                id=message['id']
+                            ).execute()
+                            print(f"[GMAIL DEBUG SCAN-ONLY] Retrieved message {message['id']}, keys: {list(full_message.keys())}")
+                            
+                            # Extract email data from full message
+                            email_data = self.extract_email_data(full_message)
                             if not email_data:
                                 continue
                             
