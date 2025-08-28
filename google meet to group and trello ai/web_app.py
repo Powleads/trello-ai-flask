@@ -432,6 +432,71 @@ def send_selected_emails():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/api/upload-csv-rules', methods=['POST'])
+@login_required
+def upload_csv_rules():
+    """Create multiple watch rules from CSV upload"""
+    try:
+        data = request.get_json()
+        rules = data.get('rules', [])
+        
+        if not rules:
+            return jsonify({'success': False, 'error': 'No rules provided'})
+        
+        # Get existing watch rules
+        watch_rules_data = production_db.get_watch_rules()
+        existing_rules = watch_rules_data.get('watchRules', []) if watch_rules_data else []
+        
+        created_count = 0
+        
+        for rule in rules:
+            # Validate rule structure
+            if not rule.get('subject') and not rule.get('sender') and not rule.get('body'):
+                continue  # Skip empty rules
+            
+            # Add the new rule
+            new_rule = {
+                'subject': rule.get('subject', ''),
+                'sender': rule.get('sender', ''),
+                'body': rule.get('body', ''),
+                'category': rule.get('category', 'other'),
+                'assignees': rule.get('assignees', []),
+                'notifications': 'individual',  # Default notification setting
+                'isActive': True
+            }
+            
+            existing_rules.append(new_rule)
+            created_count += 1
+            
+            print(f"[CSV] Created rule: {rule.get('subject') or rule.get('sender') or rule.get('body')} -> {rule.get('category')}")
+        
+        if created_count == 0:
+            return jsonify({'success': False, 'error': 'No valid rules found in CSV data'})
+        
+        # Save updated rules back to database
+        updated_settings = {
+            'enableAutoScan': watch_rules_data.get('enableAutoScan', False) if watch_rules_data else False,
+            'scanInterval': watch_rules_data.get('scanInterval', 30) if watch_rules_data else 30,
+            'watchRules': existing_rules
+        }
+        
+        success = production_db.save_watch_rules(updated_settings)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'created_count': created_count,
+                'message': f'Successfully created {created_count} watch rules from CSV'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save rules to database'})
+        
+    except Exception as e:
+        print(f"[CSV] ERROR in upload_csv_rules: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
 # ===== AUTOMATED SCHEDULER =====
 
 import threading

@@ -67,9 +67,15 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <!-- Left Panel: Create New Watch Rule -->
                 <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-5 border border-blue-200">
-                    <div class="flex items-center mb-4">
-                        <span class="text-2xl mr-3">📝</span>
-                        <h4 class="font-semibold text-gray-900">Add New Email Watch Rule</h4>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">📝</span>
+                            <h4 class="font-semibold text-gray-900">Add New Email Watch Rule</h4>
+                        </div>
+                        <button onclick="showCSVUpload()" 
+                                class="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium">
+                            📄 Upload CSV
+                        </button>
                     </div>
                     <div class="space-y-4">
                         <div>
@@ -628,6 +634,69 @@ All emails have been flagged for attention.
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- CSV Upload Modal -->
+<div id="csvUploadModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">📄 Upload CSV Email Rules</h3>
+            <button onclick="closeCSVUpload()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="mb-6">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h4 class="font-medium text-blue-800 mb-2">📋 CSV Format Requirements:</h4>
+                <p class="text-sm text-blue-700 mb-2">Your CSV file should have these columns (header row required):</p>
+                <div class="bg-white rounded border p-2 font-mono text-xs">
+                    <div class="font-semibold">subject,sender,body,category,assignees</div>
+                    <div class="text-gray-600">New Tech Onboarding,,setup,onboarding,James Taylor|Ezechiel</div>
+                    <div class="text-gray-600">,support@client.com,urgent,support,Levy|Wendy</div>
+                </div>
+                <p class="text-xs text-blue-600 mt-2">
+                    • Leave columns empty if not needed<br>
+                    • Multiple assignees: separate with | (pipe)<br>
+                    • Each row creates one watch rule
+                </p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="csvFile" class="block text-sm font-medium text-gray-700 mb-2">Select CSV File</label>
+                    <input type="file" 
+                           id="csvFile" 
+                           accept=".csv" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                
+                <div>
+                    <label for="csvRuleCategory" class="block text-sm font-medium text-gray-700 mb-1">Default Category (if not specified in CSV)</label>
+                    <select id="csvRuleCategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="other">Other</option>
+                        <option value="onboarding">Onboarding</option>
+                        <option value="ghl_support">GHL Support</option>
+                        <option value="tech_issues">Tech Issues</option>
+                        <option value="client_communication">Client Communication</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex justify-end space-x-3">
+            <button onclick="closeCSVUpload()" 
+                    class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors">
+                Cancel
+            </button>
+            <button onclick="processCSVUpload()" 
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                📤 Upload & Create Rules
+            </button>
         </div>
     </div>
 </div>
@@ -1942,6 +2011,108 @@ async function sendSelectedEmails() {
         sendBtn.disabled = false;
         sendBtn.textContent = originalText;
     }
+}
+
+// CSV Upload Functions
+function showCSVUpload() {
+    document.getElementById('csvUploadModal').classList.remove('hidden');
+}
+
+function closeCSVUpload() {
+    document.getElementById('csvUploadModal').classList.add('hidden');
+    document.getElementById('csvFile').value = '';
+}
+
+async function processCSVUpload() {
+    const fileInput = document.getElementById('csvFile');
+    const defaultCategory = document.getElementById('csvRuleCategory').value;
+    
+    if (!fileInput.files.length) {
+        showNotification('Please select a CSV file', 'error');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = async function(e) {
+        const csv = e.target.result;
+        const lines = csv.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+            showNotification('CSV file must have at least a header and one data row', 'error');
+            return;
+        }
+        
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const expectedHeaders = ['subject', 'sender', 'body', 'category', 'assignees'];
+        
+        // Validate headers
+        const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+            showNotification(`CSV missing required columns: ${missingHeaders.join(', ')}`, 'error');
+            return;
+        }
+        
+        const rules = [];
+        
+        // Process each data row
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim());
+            const rule = {};
+            
+            headers.forEach((header, index) => {
+                rule[header] = values[index] || '';
+            });
+            
+            // Parse assignees (split by |)
+            const assignees = rule.assignees ? rule.assignees.split('|').map(a => a.trim()).filter(a => a) : [];
+            
+            rules.push({
+                subject: rule.subject,
+                sender: rule.sender,
+                body: rule.body,
+                category: rule.category || defaultCategory,
+                assignees: assignees
+            });
+        }
+        
+        if (rules.length === 0) {
+            showNotification('No valid rules found in CSV', 'error');
+            return;
+        }
+        
+        // Send rules to backend
+        try {
+            const response = await fetch('/api/upload-csv-rules', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    rules: rules
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification(`Successfully created ${data.created_count || rules.length} watch rules from CSV!`, 'success');
+                closeCSVUpload();
+                setTimeout(() => {
+                    location.reload(); // Refresh to show new rules
+                }, 2000);
+            } else {
+                showNotification('Failed to create rules: ' + (data.error || 'Unknown error'), 'error');
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification('Failed to upload CSV rules', 'error');
+        }
+    };
+    
+    reader.readAsText(file);
 }
 </script>
 {% endblock %}
