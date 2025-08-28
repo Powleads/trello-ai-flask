@@ -355,7 +355,7 @@ def get_card_details(card_id):
                     'member': row[0],
                     'method': row[1],
                     'confidence': row[2],
-                    'date': row[3].isoformat() if row[3] else None,
+                    'date': row[3].isoformat() if isinstance(row[3], datetime) else row[3],
                     'is_active': row[4]
                 })
         except Exception as e:
@@ -377,7 +377,7 @@ def get_card_details(card_id):
                 comments.append({
                     'commenter': row[0],
                     'text': row[1],
-                    'date': row[2].isoformat() if row[2] else None,
+                    'date': row[2].isoformat() if isinstance(row[2], datetime) else row[2],
                     'is_request': row[3]
                 })
         except Exception as e:
@@ -399,7 +399,7 @@ def get_card_details(card_id):
                 list_history.append({
                     'from': row[0],
                     'to': row[1],
-                    'date': row[2].isoformat() if row[2] else None
+                    'date': row[2].isoformat() if isinstance(row[2], datetime) else row[2]
                 })
         except Exception as e:
             print(f"[V3] Error getting list history for {card_id}: {e}")
@@ -417,7 +417,7 @@ def get_card_details(card_id):
             metrics = {
                 'time_in_list': metrics_row[0] if metrics_row else 0,
                 'ignored_count': metrics_row[1] if metrics_row else 0,
-                'last_response': metrics_row[2].isoformat() if metrics_row and metrics_row[2] else None,
+                'last_response': metrics_row[2].isoformat() if metrics_row and isinstance(metrics_row[2], datetime) else (metrics_row[2] if metrics_row else None),
                 'escalation_level': metrics_row[3] if metrics_row else 0
             }
         except Exception as e:
@@ -839,10 +839,27 @@ def scan_cards():
                             # If no explicit assignment and commenter is not admin, this is the assignee
                             elif not assigned_member and commenter_username.lower() not in [u.lower() for u in admin_users]:
                                 print(f"[V3] Checking if {commenter_name} ({commenter_username}) is a team member...")
-                                # Check if commenter is a team member (by name or username)
+                                
+                                # Try exact match first
                                 cursor.execute('SELECT name FROM team_members_cache WHERE LOWER(name) = ? OR LOWER(trello_username) = ?', 
                                              (commenter_name.lower(), commenter_username.lower()))
                                 team_member = cursor.fetchone()
+                                
+                                # If no exact match, try fuzzy matching (partial name match)
+                                if not team_member:
+                                    cursor.execute('SELECT name FROM team_members_cache')
+                                    all_members = cursor.fetchall()
+                                    
+                                    for member_row in all_members:
+                                        member_name = member_row[0]
+                                        # Check if any part of the member name is in the commenter name or vice versa
+                                        if (member_name.lower() in commenter_name.lower() or 
+                                            any(part.lower() in commenter_name.lower() for part in member_name.split() if len(part) > 2) or
+                                            any(part.lower() in member_name.lower() for part in commenter_name.split() if len(part) > 2)):
+                                            team_member = (member_name,)
+                                            print(f"[V3] 🔍 Fuzzy match: '{commenter_name}' → '{member_name}'")
+                                            break
+                                
                                 if team_member:
                                     assigned_member = team_member[0]
                                     assignment_method = 'first_comment'
