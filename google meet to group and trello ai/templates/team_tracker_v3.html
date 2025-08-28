@@ -941,15 +941,46 @@
                     
                     <div class="team-list">
                         ${data.members.map(member => `
-                            <div class="team-member" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <strong>${member.name}</strong><br>
-                                    <small>WhatsApp: ${member.whatsapp || 'Not set'}</small><br>
-                                    <small>Email: ${member.email || 'Not set'}</small>
+                            <div class="team-member" id="member-${member.id}" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s;" 
+                                 onclick="editTeamMember(${member.id})" 
+                                 onmouseover="this.style.backgroundColor='#f3f4f6'" 
+                                 onmouseout="this.style.backgroundColor='transparent'">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="flex: 1;">
+                                        <strong>${member.name}</strong><br>
+                                        <small>WhatsApp: ${member.whatsapp || 'Not set'}</small><br>
+                                        <small>Email: ${member.email || 'Not set'}</small>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; ${member.is_active ? 'background: #dcfce7; color: #166534;' : 'background: #fef2f2; color: #dc2626;'}">
+                                            ${member.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                        <button onclick="event.stopPropagation(); deleteTeamMember(${member.id}, '${member.name}')" 
+                                                style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;"
+                                                title="Delete ${member.name}">
+                                            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; ${member.is_active ? 'background: #dcfce7; color: #166534;' : 'background: #fef2f2; color: #dc2626;'}">
-                                    ${member.is_active ? 'Active' : 'Inactive'}
-                                </span>
+                                
+                                <!-- Edit form (hidden by default) -->
+                                <div id="edit-form-${member.id}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                                        <input type="text" id="edit-name-${member.id}" value="${member.name}" placeholder="Full Name" style="padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                        <input type="text" id="edit-whatsapp-${member.id}" value="${member.whatsapp || ''}" placeholder="WhatsApp" style="padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                                    </div>
+                                    <input type="email" id="edit-email-${member.id}" value="${member.email || ''}" placeholder="Email" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 8px; font-size: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                        <label style="display: flex; align-items: center; font-size: 12px;">
+                                            <input type="checkbox" id="edit-active-${member.id}" ${member.is_active ? 'checked' : ''} style="margin-right: 4px;">
+                                            Active Member
+                                        </label>
+                                    </div>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button onclick="saveTeamMember(${member.id})" style="background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer;">Save</button>
+                                        <button onclick="cancelEditMember(${member.id})" style="background: #6b7280; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer;">Cancel</button>
+                                    </div>
+                                </div>
                             </div>
                         `).join('')}
                     </div>
@@ -972,16 +1003,58 @@
                 
                 const container = document.getElementById('settingsModalBody');
                 container.innerHTML = `
-                    <h3>Automation Settings</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">Automation Settings</h3>
+                        <button onclick="saveAllSettings()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                            <i data-lucide="save" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Save All
+                        </button>
+                    </div>
+                    
                     <div class="settings-list">
                         ${data.settings.map(setting => `
-                            <div style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px;">
-                                <strong>${setting.name}</strong>: ${setting.value}<br>
-                                <small>${setting.description}</small>
+                            <div class="setting-item" data-setting-id="${setting.id}" style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; background: #f8fafc;">
+                                <div style="display: flex; justify-content: between; align-items: start; margin-bottom: 8px;">
+                                    <div style="flex: 1;">
+                                        <strong style="display: block; margin-bottom: 4px;">${setting.name}</strong>
+                                        <small style="color: #6b7280;">${setting.description}</small>
+                                    </div>
+                                    <label style="display: flex; align-items: center; margin-left: 12px;">
+                                        <input type="checkbox" ${setting.enabled ? 'checked' : ''} 
+                                               onchange="updateSettingEnabled(${setting.id}, this.checked)" 
+                                               style="margin-right: 6px;">
+                                        <span style="font-size: 12px;">Enabled</span>
+                                    </label>
+                                </div>
+                                
+                                ${setting.type === 'boolean' ? `
+                                    <select onchange="updateSettingValue(${setting.id}, this.value)" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; background: white;">
+                                        <option value="true" ${setting.value === 'true' ? 'selected' : ''}>Yes</option>
+                                        <option value="false" ${setting.value === 'false' ? 'selected' : ''}>No</option>
+                                    </select>
+                                ` : setting.type === 'number' ? `
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="number" value="${setting.value}" 
+                                               onchange="updateSettingValue(${setting.id}, this.value)"
+                                               style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                                        <span style="font-size: 12px; color: #6b7280;">
+                                            ${setting.name.includes('hours') ? 'hours' : 'minutes'}
+                                        </span>
+                                    </div>
+                                ` : `
+                                    <input type="text" value="${setting.value}" 
+                                           onchange="updateSettingValue(${setting.id}, this.value)"
+                                           style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                                `}
                             </div>
                         `).join('')}
                     </div>
                 `;
+                
+                // Re-initialize lucide icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
             } catch (error) {
                 console.error('Error loading settings:', error);
             }
@@ -1062,6 +1135,135 @@
             } catch (error) {
                 console.error('Error adding team member:', error);
                 showNotification('Error adding team member', 'error');
+            }
+        }
+        
+        // Update setting value
+        function updateSettingValue(settingId, value) {
+            // Store in temporary object for batch save
+            if (!window.pendingSettings) window.pendingSettings = {};
+            window.pendingSettings[settingId] = window.pendingSettings[settingId] || {};
+            window.pendingSettings[settingId].value = value;
+        }
+        
+        // Update setting enabled status
+        function updateSettingEnabled(settingId, enabled) {
+            // Store in temporary object for batch save
+            if (!window.pendingSettings) window.pendingSettings = {};
+            window.pendingSettings[settingId] = window.pendingSettings[settingId] || {};
+            window.pendingSettings[settingId].enabled = enabled;
+        }
+        
+        // Save all settings
+        async function saveAllSettings() {
+            if (!window.pendingSettings || Object.keys(window.pendingSettings).length === 0) {
+                showNotification('No changes to save', 'info');
+                return;
+            }
+            
+            try {
+                const promises = Object.entries(window.pendingSettings).map(([settingId, changes]) => {
+                    return fetch('/api/v3/update-setting', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            id: parseInt(settingId),
+                            value: changes.value,
+                            enabled: changes.enabled
+                        })
+                    });
+                });
+                
+                await Promise.all(promises);
+                
+                showNotification('Settings saved successfully!', 'success');
+                window.pendingSettings = {}; // Clear pending changes
+                loadAutomationSettings(); // Reload to show saved values
+                
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showNotification('Error saving settings', 'error');
+            }
+        }
+        
+        // Edit team member
+        function editTeamMember(memberId) {
+            // Hide all other edit forms
+            document.querySelectorAll('[id^="edit-form-"]').forEach(form => {
+                form.style.display = 'none';
+            });
+            
+            // Show edit form for this member
+            const editForm = document.getElementById(`edit-form-${memberId}`);
+            editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // Cancel edit member
+        function cancelEditMember(memberId) {
+            document.getElementById(`edit-form-${memberId}`).style.display = 'none';
+        }
+        
+        // Save team member changes
+        async function saveTeamMember(memberId) {
+            const name = document.getElementById(`edit-name-${memberId}`).value.trim();
+            const whatsapp = document.getElementById(`edit-whatsapp-${memberId}`).value.trim();
+            const email = document.getElementById(`edit-email-${memberId}`).value.trim();
+            const isActive = document.getElementById(`edit-active-${memberId}`).checked;
+            
+            if (!name) {
+                showNotification('Name is required', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v3/update-team-member', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        id: memberId,
+                        name: name,
+                        whatsapp: whatsapp,
+                        email: email,
+                        is_active: isActive
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showNotification(`Team member updated successfully!`, 'success');
+                    loadTeamMembers(); // Reload the team list
+                } else {
+                    showNotification(`Failed to update team member: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error updating team member:', error);
+                showNotification('Error updating team member', 'error');
+            }
+        }
+        
+        // Delete team member
+        async function deleteTeamMember(memberId, memberName) {
+            if (!confirm(`Are you sure you want to delete ${memberName}? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v3/delete-team-member', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: memberId })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showNotification(`${memberName} deleted successfully!`, 'success');
+                    loadTeamMembers(); // Reload the team list
+                } else {
+                    showNotification(`Failed to delete team member: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting team member:', error);
+                showNotification('Error deleting team member', 'error');
             }
         }
 </script>

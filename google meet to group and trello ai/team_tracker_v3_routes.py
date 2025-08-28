@@ -99,11 +99,14 @@ def initialize_v3_tables(cursor, conn):
         if settings_count == 0:
             # Insert default automation settings
             default_settings = [
-                ('whatsapp_notifications', 'true', 'boolean', 'Enable WhatsApp notifications', 1),
-                ('auto_assignment', 'true', 'boolean', 'Enable automatic card assignment', 1),
-                ('escalation_hours', '24', 'number', 'Hours before escalation', 1),
-                ('comment_monitoring', 'true', 'boolean', 'Monitor card comments for updates', 1),
-                ('daily_reports', 'false', 'boolean', 'Send daily progress reports', 0)
+                ('whatsapp_notifications', 'true', 'boolean', 'Enable WhatsApp notifications for card updates', 1),
+                ('auto_assignment', 'true', 'boolean', 'Enable automatic card assignment to team members', 1),
+                ('escalation_hours', '72', 'number', 'Hours before escalation (3 messages * 24h)', 1),
+                ('comment_monitoring', 'true', 'boolean', 'Monitor card comments for team member updates', 1),
+                ('daily_reports', 'false', 'boolean', 'Send daily progress reports to team', 0),
+                ('sync_frequency_minutes', '30', 'number', 'How often to sync Trello data (minutes)', 1),
+                ('message_timing_hours', '24', 'number', 'Hours between automated reminder messages', 1),
+                ('combine_messages', 'true', 'boolean', 'Combine multiple WhatsApp messages into one', 1)
             ]
             
             for name, value, setting_type, description, enabled in default_settings:
@@ -428,13 +431,17 @@ def update_team_member():
     updates = []
     params = []
     
+    if 'name' in data:
+        updates.append('name = ?')
+        params.append(data['name'])
+    
     if 'whatsapp' in data:
         updates.append('whatsapp_number = ?')
-        params.append(data['whatsapp'])
+        params.append(data['whatsapp'] or None)
     
     if 'email' in data:
         updates.append('email = ?')
-        params.append(data['email'])
+        params.append(data['email'] or None)
     
     if 'is_active' in data:
         updates.append('is_active = ?')
@@ -615,4 +622,44 @@ def add_team_member():
         return jsonify({
             'success': False,
             'error': f'Failed to add team member: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/delete-team-member', methods=['POST'])
+def delete_team_member():
+    """Delete a team member"""
+    
+    data = request.json
+    member_id = data.get('id')
+    
+    if not member_id:
+        return jsonify({'error': 'Member ID is required'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if member exists
+        cursor.execute('SELECT name FROM team_members_cache WHERE id = ?', (member_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return jsonify({'error': 'Team member not found'}), 404
+        
+        member_name = result[0]
+        
+        # Delete the team member
+        cursor.execute('DELETE FROM team_members_cache WHERE id = ?', (member_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Team member "{member_name}" deleted successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete team member: {str(e)}'
         }), 500
