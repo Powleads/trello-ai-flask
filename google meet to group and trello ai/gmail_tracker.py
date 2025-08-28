@@ -426,6 +426,11 @@ class GmailTracker:
                                 id=message['id']
                             ).execute()
                             
+                            # Debug: Check message structure
+                            if 'payload' not in msg:
+                                print(f"[GMAIL ERROR] Message {message['id']} missing payload. Keys: {list(msg.keys())}")
+                                continue
+                            
                             # Extract email data
                             email_data = self.extract_email_data(msg)
                             if email_data and not any(e['id'] == email_data['id'] for e in processed_emails):

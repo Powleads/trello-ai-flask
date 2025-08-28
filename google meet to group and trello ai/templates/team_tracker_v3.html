@@ -961,6 +961,10 @@
                             <p><strong>Method:</strong> ${a.method}</p>
                             <p><strong>Confidence:</strong> ${Math.round(a.confidence * 100)}%</p>
                             <p><strong>Assigned on:</strong> ${a.date || 'Unknown'}</p>
+                            ${data.card.hours_since_comment ? 
+                                `<p><strong>Last Comment by Assigned:</strong> <span class="time-badge">${Math.round(data.card.hours_since_comment)}h ago</span></p>` : 
+                                '<p><strong>Last Comment by Assigned:</strong> No comments yet</p>'
+                            }
                         `).join('') : 
                         '<p>No assignments found</p>'
                     }

@@ -323,6 +323,14 @@ def get_dashboard_data():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Debug: Check if we're using PostgreSQL or SQLite
+        try:
+            cursor.execute("SELECT version()")
+            db_version = cursor.fetchone()[0]
+            print(f"[V3 DEBUG] Database version: {db_version}")
+        except:
+            print("[V3 DEBUG] Database type check failed - likely SQLite")
+        
         # Initialize V3 tables if they don't exist - CRITICAL: Must be called first
         initialize_v3_tables(cursor, conn)
         
@@ -400,6 +408,8 @@ def get_dashboard_data():
                     print(f"[V3] Error parsing comment date {row[13]}: {e}")
                     hours_since_comment = None
             
+            print(f"[V3 DEBUG] Card {row[1][:30]}... - Assigned: {row[6]} - Comment date: {row[13]} - Hours: {hours_since_comment}")
+            
             cards.append({
                 'id': row[0],
                 'name': row[1],
@@ -472,6 +482,54 @@ def get_card_details(card_id):
             'created_at': card_row[4].isoformat() if isinstance(card_row[4], datetime) else card_row[4],
             'last_synced': card_row[5].isoformat() if isinstance(card_row[5], datetime) else card_row[5]
         }
+        
+        # Get current assignment and calculate time since last comment by assigned member
+        cursor.execute('''
+            SELECT a.team_member,
+                   (
+                       SELECT comment_date
+                       FROM card_comments cc2
+                       WHERE cc2.card_id = ?
+                         AND cc2.commenter_name = a.team_member
+                       ORDER BY comment_date DESC
+                       LIMIT 1
+                   ) as latest_comment_date
+            FROM card_assignments a
+            WHERE a.card_id = ? AND a.is_active = TRUE
+        ''', (card_id, card_id))
+        
+        assignment_row = cursor.fetchone()
+        hours_since_comment = None
+        assigned_member = None
+        
+        if assignment_row:
+            assigned_member = assignment_row[0]
+            latest_comment_date = assignment_row[1]
+            
+            if latest_comment_date:
+                try:
+                    if isinstance(latest_comment_date, str):
+                        # Handle different timestamp formats
+                        date_str = latest_comment_date.replace('+00:00', '').replace('Z', '')
+                        if '.' in date_str:
+                            comment_date = datetime.fromisoformat(date_str)
+                        else:
+                            comment_date = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                    else:
+                        comment_date = latest_comment_date
+                        if comment_date.tzinfo is not None:
+                            comment_date = comment_date.replace(tzinfo=None)
+                    
+                    hours_since_comment = (datetime.now() - comment_date).total_seconds() / 3600
+                    print(f"[V3 CARD DETAILS] Card {card_id} - Assigned: {assigned_member} - Hours since comment: {hours_since_comment}")
+                except Exception as e:
+                    print(f"[V3 CARD DETAILS] Error parsing comment date {latest_comment_date}: {e}")
+        
+        card_data.update({
+            'assigned_to': assigned_member,
+            'hours_since_comment': round(hours_since_comment, 1) if hours_since_comment else None,
+            'needs_update': hours_since_comment > 24 if hours_since_comment else False
+        })
         
         # Get assignment history
         try:
@@ -636,6 +694,14 @@ def get_team_members():
     
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Debug: Check if we're using PostgreSQL or SQLite
+    try:
+        cursor.execute("SELECT version()")
+        db_version = cursor.fetchone()[0]
+        print(f"[V3 TEAM DEBUG] Database version: {db_version}")
+    except:
+        print("[V3 TEAM DEBUG] Database type check failed - likely SQLite")
     
     # Initialize V3 tables if they don't exist
     initialize_v3_tables(cursor, conn)
@@ -818,17 +884,33 @@ def update_setting():
     data = request.json
     setting_id = data.get('id')
     
+    print(f"[V3 SETTINGS] Updating setting {setting_id}: {data}")
+    
     if not setting_id:
         return jsonify({'error': 'Setting ID required'}), 400
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Debug: Check if we're using PostgreSQL or SQLite
+    try:
+        cursor.execute("SELECT version()")
+        db_version = cursor.fetchone()[0]
+        print(f"[V3 SETTINGS] Database version: {db_version}")
+    except:
+        print("[V3 SETTINGS] Database type check failed - likely SQLite")
+    
+    # Initialize tables first
+    initialize_v3_tables(cursor, conn)
+    
     cursor.execute('''
         UPDATE automation_settings
         SET setting_value = ?, is_enabled = ?, updated_at = ?
         WHERE id = ?
     ''', (data.get('value'), data.get('enabled', True), datetime.now(), setting_id))
+    
+    rows_affected = cursor.rowcount
+    print(f"[V3 SETTINGS] Updated {rows_affected} rows for setting {setting_id}")
     
     conn.commit()
     conn.close()
@@ -1445,12 +1527,25 @@ def delete_team_member():
     data = request.json
     member_id = data.get('id')
     
+    print(f"[V3 TEAM DELETE] Deleting team member {member_id}")
+    
     if not member_id:
         return jsonify({'error': 'Member ID is required'}), 400
     
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Debug: Check if we're using PostgreSQL or SQLite
+        try:
+            cursor.execute("SELECT version()")
+            db_version = cursor.fetchone()[0]
+            print(f"[V3 TEAM DELETE] Database version: {db_version}")
+        except:
+            print("[V3 TEAM DELETE] Database type check failed - likely SQLite")
+        
+        # Initialize V3 tables if they don't exist
+        initialize_v3_tables(cursor, conn)
         
         # Check if member exists
         cursor.execute('SELECT name FROM team_members_cache WHERE id = ?', (member_id,))
@@ -1463,6 +1558,9 @@ def delete_team_member():
         
         # Delete the team member
         cursor.execute('DELETE FROM team_members_cache WHERE id = ?', (member_id,))
+        
+        rows_affected = cursor.rowcount
+        print(f"[V3 TEAM DELETE] Deleted {rows_affected} rows for member {member_id}")
         
         conn.commit()
         conn.close()
