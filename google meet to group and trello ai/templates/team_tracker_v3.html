@@ -319,6 +319,18 @@
             overflow-y: auto;
         }
         
+        .kanban-columns-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .kanban-column-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
         .kanban-header {
             display: flex;
             justify-content: space-between;
@@ -764,34 +776,51 @@
                 lists[card.list].push(card);
             });
             
-            const listOrder = ['DOING - IN PROGRESS', 'NEW TASKS', 'REVIEW - APPROVAL', 'FOREVER TASKS'];
+            const listOrder = ['NEW TASKS', 'DOING - IN PROGRESS', 'REVIEW - APPROVAL', 'FOREVER TASKS'];
             
-            container.innerHTML = listOrder.map(listName => {
-                const listCards = lists[listName] || [];
-                const maxVisible = 4;
-                const visibleCards = listCards.slice(0, maxVisible);
-                const hiddenCards = listCards.slice(maxVisible);
-                
-                return `
-                    <div class="kanban-column">
-                        <div class="kanban-header">
-                            <span class="kanban-title">${listName}</span>
-                            <span class="kanban-count">${listCards.length}</span>
+            // Create 2-column layout with NEW TASKS first
+            const leftColumnLists = ['NEW TASKS', 'REVIEW - APPROVAL'];
+            const rightColumnLists = ['DOING - IN PROGRESS', 'FOREVER TASKS'];
+            
+            const createColumnHTML = (columnLists) => {
+                return columnLists.map(listName => {
+                    const listCards = lists[listName] || [];
+                    const maxVisible = 4;
+                    const visibleCards = listCards.slice(0, maxVisible);
+                    const hiddenCards = listCards.slice(maxVisible);
+                    
+                    return `
+                        <div class="kanban-column">
+                            <div class="kanban-header">
+                                <span class="kanban-title">${listName}</span>
+                                <span class="kanban-count">${listCards.length}</span>
+                            </div>
+                            <div class="kanban-cards">
+                                ${visibleCards.map(card => createCardHTML(card)).join('')}
+                                ${hiddenCards.length > 0 ? `
+                                    <div class="cards-hidden" id="hidden-${listName.replace(/[^a-zA-Z0-9]/g, '-')}">
+                                        ${hiddenCards.map(card => createCardHTML(card)).join('')}
+                                    </div>
+                                    <button class="show-more-btn" onclick="toggleCards('${listName.replace(/[^a-zA-Z0-9]/g, '-')}', this)">
+                                        📂 Show ${hiddenCards.length} more cards
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
-                        <div class="kanban-cards">
-                            ${visibleCards.map(card => createCardHTML(card)).join('')}
-                            ${hiddenCards.length > 0 ? `
-                                <div class="cards-hidden" id="hidden-${listName.replace(/[^a-zA-Z0-9]/g, '-')}">
-                                    ${hiddenCards.map(card => createCardHTML(card)).join('')}
-                                </div>
-                                <button class="show-more-btn" onclick="toggleCards('${listName.replace(/[^a-zA-Z0-9]/g, '-')}', this)">
-                                    📂 Show ${hiddenCards.length} more cards
-                                </button>
-                            ` : ''}
-                        </div>
+                    `;
+                }).join('');
+            };
+            
+            container.innerHTML = `
+                <div class="kanban-columns-wrapper">
+                    <div class="kanban-column-group">
+                        ${createColumnHTML(leftColumnLists)}
                     </div>
-                `;
-            }).join('');
+                    <div class="kanban-column-group">
+                        ${createColumnHTML(rightColumnLists)}
+                    </div>
+                </div>
+            `;
         }
         
         // Create card HTML
@@ -864,10 +893,22 @@
         
         // Update statistics
         function updateStats(cards) {
-            document.getElementById('totalCards').textContent = cards.length;
-            document.getElementById('needsUpdate').textContent = cards.filter(c => c.needs_update).length;
-            document.getElementById('unassigned').textContent = cards.filter(c => c.assigned_to === 'Unassigned').length;
-            document.getElementById('ignored').textContent = cards.filter(c => c.hours_since_comment > 24).length;
+            // Cards Need Messages: Only count DOING - IN PROGRESS cards (as requested)
+            const doingInProgressCards = cards.filter(c => c.list === 'DOING - IN PROGRESS');
+            document.getElementById('totalCards').textContent = doingInProgressCards.length;
+            
+            // Responses Today: Cards that received responses/comments in last 24 hours
+            const responsesToday = cards.filter(c => {
+                return c.hours_since_comment !== null && c.hours_since_comment < 24;
+            }).length;
+            document.getElementById('needsUpdate').textContent = responsesToday;
+            
+            // Messages Sent: Cards that need follow-up (needs_update = true)
+            const messagesSent = cards.filter(c => c.needs_update).length;
+            document.getElementById('unassigned').textContent = messagesSent;
+            
+            // Active Team Members: Count from database (globalTeamMembers)
+            document.getElementById('ignored').textContent = Object.keys(globalTeamMembers || {}).length;
         }
         
         // Show card details modal

@@ -362,14 +362,31 @@ def get_dashboard_data():
         
         cards = []
         for row in cursor.fetchall():
-            # Calculate hours since last comment
+            # Calculate hours since last comment with proper timezone handling
             hours_since_comment = None
             if row[13]:  # latest_comment_date
-                if isinstance(row[13], str):
-                    comment_date = datetime.fromisoformat(row[13].replace('Z', '+00:00').replace('+00:00', ''))
-                else:
-                    comment_date = row[13]
-                hours_since_comment = (datetime.now() - comment_date).total_seconds() / 3600
+                try:
+                    if isinstance(row[13], str):
+                        # Handle different timestamp formats
+                        date_str = row[13]
+                        # Remove timezone info if present for consistent parsing
+                        date_str = date_str.replace('+00:00', '').replace('Z', '')
+                        # Handle microseconds
+                        if '.' in date_str:
+                            comment_date = datetime.fromisoformat(date_str)
+                        else:
+                            comment_date = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                    else:
+                        comment_date = row[13]
+                        # Remove timezone info if it's a timezone-aware datetime
+                        if comment_date.tzinfo is not None:
+                            comment_date = comment_date.replace(tzinfo=None)
+                    
+                    # Calculate hours difference
+                    hours_since_comment = (datetime.now() - comment_date).total_seconds() / 3600
+                except (ValueError, TypeError) as e:
+                    print(f"[V3] Error parsing comment date {row[13]}: {e}")
+                    hours_since_comment = None
             
             cards.append({
                 'id': row[0],
