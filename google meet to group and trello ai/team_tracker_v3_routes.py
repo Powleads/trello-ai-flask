@@ -44,6 +44,29 @@ def initialize_v3_tables(cursor):
             )
         ''')
         
+        # Seed team members if table is empty
+        cursor.execute('SELECT COUNT(*) FROM team_members_cache')
+        count = cursor.fetchone()[0]
+        
+        if count == 0:
+            # Insert the known team members
+            team_members = [
+                ('Lancey', '120363177796803705@g.us', 'lancey@example.com', 'lancey'),
+                ('Levy', '120363240508968970@g.us', 'levy@example.com', 'levy'),
+                ('Wendy', '120363177796803702@g.us', 'wendy@example.com', 'wendy'),
+                ('Forka', '120363177796803701@g.us', 'forka@example.com', 'forka'),
+                ('Brayan', '120363177796803704@g.us', 'brayan@example.com', 'brayan'),
+                ('Breyden', '120363177796803703@g.us', 'breyden@example.com', 'breyden')
+            ]
+            
+            for name, whatsapp, email, trello_username in team_members:
+                cursor.execute('''
+                    INSERT INTO team_members_cache (name, whatsapp_number, email, trello_username, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                ''', (name, whatsapp, email, trello_username))
+                
+            print(f"[V3] Seeded {len(team_members)} team members into team_members_cache")
+        
         cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS whatsapp_templates (
                 id {id_field},
@@ -68,6 +91,28 @@ def initialize_v3_tables(cursor):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Seed automation settings if table is empty
+        cursor.execute('SELECT COUNT(*) FROM automation_settings')
+        settings_count = cursor.fetchone()[0]
+        
+        if settings_count == 0:
+            # Insert default automation settings
+            default_settings = [
+                ('whatsapp_notifications', 'true', 'boolean', 'Enable WhatsApp notifications', 1),
+                ('auto_assignment', 'true', 'boolean', 'Enable automatic card assignment', 1),
+                ('escalation_hours', '24', 'number', 'Hours before escalation', 1),
+                ('comment_monitoring', 'true', 'boolean', 'Monitor card comments for updates', 1),
+                ('daily_reports', 'false', 'boolean', 'Send daily progress reports', 0)
+            ]
+            
+            for name, value, setting_type, description, enabled in default_settings:
+                cursor.execute('''
+                    INSERT INTO automation_settings (setting_name, setting_value, setting_type, description, is_enabled)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (name, value, setting_type, description, enabled))
+                
+            print(f"[V3] Seeded {len(default_settings)} automation settings")
         
     except Exception as e:
         print(f"[V3] Warning: Could not create some tables: {e}")
@@ -508,3 +553,81 @@ def update_setting():
     conn.close()
     
     return jsonify({'success': True})
+
+@team_tracker_v3_bp.route('/api/v3/scan-cards', methods=['POST'])
+def scan_cards():
+    """Trigger card scanning/syncing with Trello"""
+    try:
+        # Import the enhanced AI scanner
+        import sys
+        import os
+        
+        # Add the current directory to sys.path if not already there
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.append(current_dir)
+        
+        # Import and run the card scanning
+        from enhanced_ai import EnhancedTeamTracker
+        tracker = EnhancedTeamTracker()
+        
+        # Run the card scanning and assignment process
+        scan_result = tracker.run_daily_process()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Card scanning completed successfully',
+            'result': scan_result
+        })
+        
+    except ImportError as e:
+        return jsonify({
+            'success': False,
+            'error': f'Could not import enhanced tracker: {str(e)}'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Card scanning failed: {str(e)}'
+        }), 500
+
+@team_tracker_v3_bp.route('/api/v3/add-team-member', methods=['POST'])
+def add_team_member():
+    """Add a new team member"""
+    
+    data = request.json
+    name = data.get('name', '').strip()
+    whatsapp = data.get('whatsapp', '').strip()
+    email = data.get('email', '').strip()
+    
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if member already exists
+        cursor.execute('SELECT COUNT(*) FROM team_members_cache WHERE name = ?', (name,))
+        if cursor.fetchone()[0] > 0:
+            return jsonify({'error': f'Team member "{name}" already exists'}), 400
+        
+        # Insert new team member
+        cursor.execute('''
+            INSERT INTO team_members_cache (name, whatsapp_number, email, trello_username, is_active)
+            VALUES (?, ?, ?, ?, 1)
+        ''', (name, whatsapp or None, email or None, name.lower().replace(' ', '_')))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Team member "{name}" added successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to add team member: {str(e)}'
+        }), 500

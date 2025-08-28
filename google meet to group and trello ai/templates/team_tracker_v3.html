@@ -874,10 +874,10 @@
         async function syncCards() {
             const button = event.target;
             button.disabled = true;
-            button.textContent = '🔄 Syncing...';
+            button.textContent = '🔄 Scanning...';
             
             try {
-                const response = await fetch('/api/sync-cards', {
+                const response = await fetch('/api/v3/scan-cards', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'}
                 });
@@ -885,7 +885,9 @@
                 const data = await response.json();
                 if (data.success) {
                     loadDashboard();
-                    alert(`Sync complete: ${data.cards_synced} cards, ${data.comments_synced} comments`);
+                    showNotification(`Card scanning completed successfully! ${data.message}`, 'success');
+                } else {
+                    showNotification(`Card scanning failed: ${data.error}`, 'error');
                 }
             } catch (error) {
                 console.error('Error syncing:', error);
@@ -916,17 +918,47 @@
                 
                 const container = document.getElementById('teamModalBody');
                 container.innerHTML = `
-                    <h3>Team Members</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">Team Members (${data.members.length})</h3>
+                        <button onclick="showAddMemberForm()" style="background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                            <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+                            Add Member
+                        </button>
+                    </div>
+                    
+                    <div id="addMemberForm" style="display: none; background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
+                        <h4 style="margin: 0 0 12px 0;">Add New Team Member</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                            <input type="text" id="newMemberName" placeholder="Full Name" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                            <input type="text" id="newMemberWhatsapp" placeholder="WhatsApp Number" style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                        </div>
+                        <input type="email" id="newMemberEmail" placeholder="Email Address" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 12px;">
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="addTeamMember()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Save</button>
+                            <button onclick="hideAddMemberForm()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Cancel</button>
+                        </div>
+                    </div>
+                    
                     <div class="team-list">
                         ${data.members.map(member => `
-                            <div class="team-member" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px;">
-                                <strong>${member.name}</strong><br>
-                                <small>WhatsApp: ${member.whatsapp}</small><br>
-                                <small>Email: ${member.email || 'Not set'}</small>
+                            <div class="team-member" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${member.name}</strong><br>
+                                    <small>WhatsApp: ${member.whatsapp || 'Not set'}</small><br>
+                                    <small>Email: ${member.email || 'Not set'}</small>
+                                </div>
+                                <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; ${member.is_active ? 'background: #dcfce7; color: #166534;' : 'background: #fef2f2; color: #dc2626;'}">
+                                    ${member.is_active ? 'Active' : 'Inactive'}
+                                </span>
                             </div>
                         `).join('')}
                     </div>
                 `;
+                
+                // Re-initialize lucide icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
             } catch (error) {
                 console.error('Error loading team members:', error);
             }
@@ -980,6 +1012,56 @@
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.classList.remove('show');
+            }
+        }
+        
+        // Show add member form
+        function showAddMemberForm() {
+            document.getElementById('addMemberForm').style.display = 'block';
+        }
+        
+        // Hide add member form
+        function hideAddMemberForm() {
+            document.getElementById('addMemberForm').style.display = 'none';
+            // Clear form
+            document.getElementById('newMemberName').value = '';
+            document.getElementById('newMemberWhatsapp').value = '';
+            document.getElementById('newMemberEmail').value = '';
+        }
+        
+        // Add team member
+        async function addTeamMember() {
+            const name = document.getElementById('newMemberName').value.trim();
+            const whatsapp = document.getElementById('newMemberWhatsapp').value.trim();
+            const email = document.getElementById('newMemberEmail').value.trim();
+            
+            if (!name) {
+                showNotification('Please enter a name', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v3/add-team-member', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: name,
+                        whatsapp: whatsapp,
+                        email: email
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showNotification(`Team member ${name} added successfully!`, 'success');
+                    hideAddMemberForm();
+                    loadTeamMembers(); // Reload the team list
+                } else {
+                    showNotification(`Failed to add team member: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error adding team member:', error);
+                showNotification('Error adding team member', 'error');
             }
         }
 </script>
