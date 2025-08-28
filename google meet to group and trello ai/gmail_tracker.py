@@ -422,6 +422,9 @@ class GmailTracker:
                         try:
                             # Get full message
                             print(f"[GMAIL DEBUG] Fetching message {message['id']}")
+                            print(f"[GMAIL DEBUG] Gmail service exists: {self.gmail_service is not None}")
+                            print(f"[GMAIL DEBUG] Message object: {message}")
+                            
                             msg = self.gmail_service.users().messages().get(
                                 userId='me', 
                                 id=message['id']
@@ -440,7 +443,10 @@ class GmailTracker:
                                 print(f"[GMAIL] Email matched: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
                                 
                         except Exception as e:
-                            print(f"Error processing message {message['id']}: {e}")
+                            print(f"[GMAIL ERROR] Failed processing message {message['id']}: {e}")
+                            print(f"[GMAIL ERROR] Exception type: {type(e).__name__}")
+                            import traceback
+                            print(f"[GMAIL ERROR] Traceback: {traceback.format_exc()}")
                             continue
                             
                 except Exception as e:
