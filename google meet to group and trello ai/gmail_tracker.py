@@ -429,7 +429,7 @@ class GmailTracker:
         conn.close()
         return result is not None
     
-    def process_email(self, email_data: Dict) -> Dict:
+    def process_email(self, email_data: Dict, batch_notifications: bool = False) -> Dict:
         """Process a single email with AI categorization and team assignment."""
         try:
             # Analyze email with AI (now includes rule context)
@@ -443,8 +443,8 @@ class GmailTracker:
             # Store in database
             self.store_email_history(email_data, analysis)
             
-            # Send notifications to ALL assignees if required
-            if analysis.get('action_required', False) or analysis.get('priority', 1) >= 3:
+            # Send notifications to ALL assignees if required (unless batching)
+            if not batch_notifications and (analysis.get('action_required', False) or analysis.get('priority', 1) >= 3):
                 self.send_team_notifications_to_all_assignees(email_data, analysis)
             
             return {
@@ -452,7 +452,8 @@ class GmailTracker:
                 'email_id': email_data['id'],
                 'category': analysis['category'],
                 'assigned_to': analysis.get('all_assignees', [analysis.get('suggested_assignee', 'Unassigned')]),
-                'priority': analysis['priority']
+                'priority': analysis['priority'],
+                'analysis': analysis  # Include analysis for batching
             }
             
         except Exception as e:
@@ -486,6 +487,88 @@ class GmailTracker:
             analysis['priority'],
             vegas_time
         )
+    
+    def send_batched_notifications(self, emails_by_assignee: Dict) -> int:
+        """Send batched notifications to team members with multiple emails and URLs."""
+        notifications_sent = 0
+        
+        for assignee, email_list in emails_by_assignee.items():
+            whatsapp_number = self.team_members.get(assignee)
+            
+            if not whatsapp_number:
+                print(f"No WhatsApp number found for {assignee}")
+                continue
+            
+            # Create batched message
+            email_count = len(email_list)
+            if email_count == 1:
+                # Single email - use original format
+                email_item = email_list[0]
+                email_data = email_item['email_data']
+                analysis = email_item['analysis']['analysis']
+                
+                message = f"""📧 NEW EMAIL ALERT
+
+👤 From: {email_data['sender']}
+📋 Subject: {email_data['subject']}
+🏷️ Category: {analysis['category']}
+⚡ Priority: {analysis['priority']}/5
+
+📝 Summary: {analysis.get('summary', 'Email requires attention')}
+
+🔗 Keywords: {', '.join(analysis.get('keywords', []))}
+
+Please check your email and respond as needed.
+
+⏰ Time: {self.get_las_vegas_time()}
+
+- JGV Email Tracker"""
+            else:
+                # Multiple emails - create batched message
+                message = f"""📧 MULTIPLE EMAIL ALERTS ({email_count} emails)
+
+Hi {assignee}, you have {email_count} new emails requiring attention:
+
+"""
+                
+                for i, email_item in enumerate(email_list, 1):
+                    email_data = email_item['email_data']
+                    analysis = email_item['analysis']['analysis']
+                    
+                    # Add Gmail URL for each email
+                    gmail_url = f"https://mail.google.com/mail/u/0/#inbox/{email_data['thread_id']}"
+                    
+                    message += f"""{i}. 📋 {email_data['subject'][:60]}{'...' if len(email_data['subject']) > 60 else ''}
+   👤 From: {email_data['sender']}
+   🏷️ {analysis['category']} | ⚡ Priority: {analysis['priority']}/5
+   🔗 {gmail_url}
+
+"""
+                
+                message += f"""Please check your emails and respond as needed.
+
+⏰ Time: {self.get_las_vegas_time()}
+
+- JGV Email Tracker"""
+            
+            # Send the message
+            if self.send_whatsapp_message(whatsapp_number, message):
+                notifications_sent += 1
+                print(f"Batched notification sent to {assignee} ({email_count} emails)")
+            else:
+                print(f"❌ Failed to send batched notification to {assignee}")
+        
+        print(f"[GMAIL] Sent {notifications_sent} batched notifications")
+        return notifications_sent
+    
+    def get_las_vegas_time(self) -> str:
+        """Get current Las Vegas time as formatted string."""
+        import pytz
+        from datetime import datetime
+        
+        las_vegas_tz = pytz.timezone('America/Los_Angeles')
+        las_vegas_time = datetime.now(las_vegas_tz)
+        return las_vegas_time.strftime('%Y-%m-%d %I:%M %p PST')
     
     def send_team_notifications_to_all_assignees(self, email_data: Dict, analysis: Dict) -> bool:
         """Send WhatsApp notifications to ALL assigned team members."""
@@ -634,13 +717,33 @@ Please check your email and respond as needed.
             notifications_sent = 0
             category_counts = {}
             
+            # Collect all emails for batched notifications
+            emails_by_assignee = {}
+            
             print(f"[GMAIL] Processing {len(emails)} emails matching active rules...")
             
             for email_data in emails:
-                result = self.process_email(email_data)
+                result = self.process_email(email_data, batch_notifications=True)
                 if result['success']:
                     processed_count += 1
                     category = result.get('category', 'other')
+                    
+                    # Group emails by assignee for batching
+                    assignees = result.get('assigned_to', [])
+                    for assignee in assignees:
+                        if assignee not in emails_by_assignee:
+                            emails_by_assignee[assignee] = []
+                        emails_by_assignee[assignee].append({
+                            'email_data': email_data,
+                            'analysis': result
+                        })
+            
+            # Send batched notifications
+            if emails_by_assignee:
+                notifications_sent = self.send_batched_notifications(emails_by_assignee)
+            
+            processed_count += 1
+            category = result.get('category', 'other')
                     category_counts[category] = category_counts.get(category, 0) + 1
                     
                     # Count assignees for notifications

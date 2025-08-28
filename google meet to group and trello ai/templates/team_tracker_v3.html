@@ -560,9 +560,6 @@
             <button class="control-btn btn-scan" onclick="syncCards()">
                 🔍 Scan Cards
             </button>
-            <button class="control-btn btn-refresh" onclick="forceRefresh()">
-                🔄 Force Refresh (Clear DB)
-            </button>
             <button class="control-btn btn-team" onclick="showTeamModal()">
                 👥 Team Management
             </button>
@@ -898,21 +895,6 @@
             }
         }
         
-        // Force refresh
-        async function forceRefresh() {
-            if (confirm('This will clear the database and resync all cards. Continue?')) {
-                const button = event.target;
-                button.disabled = true;
-                button.textContent = '🔄 Refreshing...';
-                
-                // Add force refresh logic here
-                setTimeout(() => {
-                    button.disabled = false;
-                    button.textContent = '🔄 Force Refresh (Clear DB)';
-                    loadDashboard();
-                }, 2000);
-            }
-        }
         
         // Show team modal
         function showTeamModal() {
