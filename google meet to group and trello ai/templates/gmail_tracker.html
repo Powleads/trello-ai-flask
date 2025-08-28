@@ -1801,23 +1801,7 @@ if (scanFrequency) {
     });
 }
 
-// Test function to verify category assignments
-function testCategoryAssignments() {
-    console.log('=== TESTING CATEGORY ASSIGNMENTS ===');
-    console.log('Current assignments:', categoryAssignments);
-    console.log('Team members:', teamMembers.map(m => m.name));
-    
-    // Check localStorage
-    const saved = localStorage.getItem('gmailAutomationSettings');
-    if (saved) {
-        const settings = JSON.parse(saved);
-        console.log('Saved assignments:', settings.categoryAssignments);
-    } else {
-        console.log('No saved settings found');
-    }
-    
-    console.log('=== TEST COMPLETE ===');
-}
+// Test function removed for production
 
 // Load settings on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -1847,8 +1831,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1000);
     }
     
-    // Run test on load (can be removed later)
-    testCategoryAssignments();
+    // Test function removed for production
     
     // Add event listener for automation checkbox
     const enableAutoScan = document.getElementById('enableAutoScan');
