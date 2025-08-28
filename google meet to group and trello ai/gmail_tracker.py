@@ -421,15 +421,13 @@ class GmailTracker:
                     for message in messages:
                         try:
                             # Get full message
+                            print(f"[GMAIL DEBUG] Fetching message {message['id']}")
                             msg = self.gmail_service.users().messages().get(
                                 userId='me', 
                                 id=message['id']
                             ).execute()
                             
-                            # Debug: Check message structure
-                            if 'payload' not in msg:
-                                print(f"[GMAIL ERROR] Message {message['id']} missing payload. Keys: {list(msg.keys())}")
-                                continue
+                            print(f"[GMAIL DEBUG] Retrieved message {message['id']}, keys: {list(msg.keys())}")
                             
                             # Extract email data
                             email_data = self.extract_email_data(msg)
@@ -471,7 +469,17 @@ class GmailTracker:
     def extract_email_data(self, message: Dict) -> Optional[Dict]:
         """Extract relevant data from Gmail message."""
         try:
-            headers = message['payload'].get('headers', [])
+            print(f"[GMAIL DEBUG] Message keys: {list(message.keys())}")
+            
+            if 'payload' not in message:
+                print(f"[GMAIL ERROR] No payload in message {message.get('id', 'unknown')}")
+                return None
+                
+            payload = message['payload']
+            print(f"[GMAIL DEBUG] Payload keys: {list(payload.keys())}")
+            
+            headers = payload.get('headers', [])
+            print(f"[GMAIL DEBUG] Found {len(headers)} headers")
             
             # Extract headers with better fallbacks
             subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
@@ -489,7 +497,12 @@ class GmailTracker:
             date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
             
             # Extract email content
-            content = self.extract_email_content(message['payload'])
+            try:
+                content = self.extract_email_content(payload)
+                print(f"[GMAIL DEBUG] Content extracted: {len(content)} chars")
+            except Exception as content_error:
+                print(f"[GMAIL ERROR] Content extraction failed: {content_error}")
+                content = ""
             
             # Check if already processed
             if self.is_email_processed(message['id']):

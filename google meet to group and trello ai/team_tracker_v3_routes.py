@@ -360,7 +360,9 @@ def get_dashboard_data():
                 SELECT comment_date
                 FROM card_comments cc2
                 WHERE cc2.card_id = c.card_id
-                  AND cc2.commenter_name = a.team_member
+                  AND (cc2.commenter_name = a.team_member 
+                       OR cc2.commenter_name LIKE a.team_member || '%'
+                       OR cc2.commenter_name LIKE '%' || a.team_member || '%')
                 ORDER BY comment_date DESC
                 LIMIT 1
             ) as latest_comment_date
@@ -490,7 +492,9 @@ def get_card_details(card_id):
                        SELECT comment_date
                        FROM card_comments cc2
                        WHERE cc2.card_id = ?
-                         AND cc2.commenter_name = a.team_member
+                         AND (cc2.commenter_name = a.team_member 
+                              OR cc2.commenter_name LIKE a.team_member || '%'
+                              OR cc2.commenter_name LIKE '%' || a.team_member || '%')
                        ORDER BY comment_date DESC
                        LIMIT 1
                    ) as latest_comment_date
