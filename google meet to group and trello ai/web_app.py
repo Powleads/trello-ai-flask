@@ -4154,9 +4154,14 @@ def manual_gmail_scan():
         for i, rule in enumerate(watch_rules):
             print(f"[MANUAL] Rule {i+1}: '{rule.get('subject', '')}' -> {rule.get('category', '')} -> {rule.get('assignees', [])}")
         
-        print("[MANUAL] Calling gmail_tracker.scan_only_mode()...")
+        # Get time range parameters from request
+        data = request.get_json() or {}
+        hours_back = data.get('hours_back', 24)
+        unread_only = data.get('unread_only', True)
+        
+        print(f"[MANUAL] Calling gmail_tracker.scan_emails_only(hours_back={hours_back}, unread_only={unread_only})...")
         # Run scan WITHOUT sending notifications (scan-only mode)
-        emails_found = gmail_tracker.scan_emails_only(hours_back=24)
+        emails_found = gmail_tracker.scan_emails_only(hours_back=hours_back, unread_only=unread_only)
         print(f"[MANUAL] ===== MANUAL GMAIL SCAN COMPLETE - FOUND {len(emails_found)} EMAILS =====")
         return jsonify({'success': True, 'message': 'Gmail scan completed - check email processing section below', 'emails_found': len(emails_found), 'emails': emails_found})
     except Exception as e:

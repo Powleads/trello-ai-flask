@@ -71,7 +71,7 @@ class GmailTracker:
         print(f"[GMAIL] Loaded {len(team_members)} team members")
         return team_members
     
-    def scan_emails_only(self, hours_back=24) -> List[Dict]:
+    def scan_emails_only(self, hours_back=24, unread_only=True) -> List[Dict]:
         """Scan emails without sending notifications - for manual review"""
         if not self.gmail_service:
             print("[GMAIL] Gmail service not available")
@@ -88,6 +88,8 @@ class GmailTracker:
         processed_emails = []
         since = datetime.now(timezone.utc) - timedelta(hours=hours_back)
         
+        print(f"[GMAIL] Scanning emails from last {hours_back} hours (unread only: {unread_only})")
+        
         try:
             # Process each watch rule
             for rule_index, rule in enumerate(watch_rules):
@@ -102,6 +104,10 @@ class GmailTracker:
                 # Build Gmail search query for this rule
                 query_parts = [f'after:{since.strftime("%Y/%m/%d")}']
                 
+                # Add unread filter if requested
+                if unread_only:
+                    query_parts.append('is:unread')
+                
                 if subject_filter:
                     query_parts.append(f'subject:"{subject_filter}"')
                     
@@ -112,6 +118,7 @@ class GmailTracker:
                 # Body filtering will be done post-fetch
                 
                 query = ' '.join(query_parts)
+                print(f"[GMAIL] Query: {query}")
                 
                 print(f"[GMAIL] SCAN-ONLY Rule {rule_index + 1}: '{subject_filter or 'Any subject'}' from '{sender_filter or 'Any sender'}' -> {rule.get('category', 'unknown')}")
                 
@@ -137,10 +144,16 @@ class GmailTracker:
                             email_data['rule_category'] = rule.get('category', 'other')
                             email_data['rule_assignees'] = rule.get('assignees', [])
                             
+                            # Check if WhatsApp notification was already sent today
+                            email_data['sent_today'] = self.db.is_email_sent_today(email_data['id'])
+                            if email_data['sent_today']:
+                                print(f"[GMAIL] Email {email_data['id']} already sent WhatsApp today")
+                            
                             # Check for duplicate
                             if not any(e['id'] == email_data['id'] for e in processed_emails):
                                 processed_emails.append(email_data)
-                                print(f"[GMAIL] SCAN-ONLY Email queued: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
+                                sent_status = "✅ SENT" if email_data['sent_today'] else "PENDING"
+                                print(f"[GMAIL] SCAN-ONLY Email queued [{sent_status}]: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
                                 
                         except Exception as e:
                             print(f"Error processing message {message['id']}: {e}")
