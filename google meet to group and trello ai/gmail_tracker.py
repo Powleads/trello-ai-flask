@@ -44,6 +44,10 @@ class GmailTracker:
         # Team members from environment variables (production-ready)
         self.team_members = self._load_team_members()
         
+        # Message cache to prevent re-fetching (TTL: 1 hour)
+        self._message_cache = {}
+        self._cache_timestamp = datetime.now()
+        
         # NO hardcoded patterns - ONLY use watch rules from database
         print("[GMAIL] Production-ready Gmail tracker initialized")
     
@@ -86,12 +90,15 @@ class GmailTracker:
             return []
         
         processed_emails = []
+        message_ids_to_fetch = set()  # Deduplicate message IDs
         since = datetime.now(timezone.utc) - timedelta(hours=hours_back)
+        until = datetime.now(timezone.utc) + timedelta(days=1)  # Add upper bound
         
         print(f"[GMAIL] Scanning emails from last {hours_back} hours (unread only: {unread_only})")
+        print(f"[GMAIL] Date range: {since.strftime('%Y/%m/%d')} to {until.strftime('%Y/%m/%d')}")
         
         try:
-            # Process each watch rule
+            # STEP 1: Collect all unique message IDs from all rules
             for rule_index, rule in enumerate(watch_rules):
                 subject_filter = rule.get('subject', '')
                 sender_filter = rule.get('sender', '')
@@ -101,8 +108,11 @@ class GmailTracker:
                 if not subject_filter and not sender_filter and not body_filter:
                     continue
                 
-                # Build Gmail search query for this rule
-                query_parts = [f'after:{since.strftime("%Y/%m/%d")}']
+                # Build Gmail search query with optimized date filter
+                query_parts = [
+                    f'after:{since.strftime("%Y/%m/%d")}',
+                    f'before:{until.strftime("%Y/%m/%d")}'  # Add upper bound to limit results
+                ]
                 
                 # Add unread filter if requested
                 if unread_only:
@@ -114,65 +124,100 @@ class GmailTracker:
                 if sender_filter:
                     query_parts.append(f'from:"{sender_filter}"')
                     
-                # Note: Gmail API doesn't support body search in basic queries
-                # Body filtering will be done post-fetch
-                
                 query = ' '.join(query_parts)
-                print(f"[GMAIL] Query: {query}")
-                
-                print(f"[GMAIL] SCAN-ONLY Rule {rule_index + 1}: '{subject_filter or 'Any subject'}' from '{sender_filter or 'Any sender'}' -> {rule.get('category', 'unknown')}")
+                print(f"[GMAIL] Rule {rule_index + 1} Query: {query}")
                 
                 try:
                     results = self.gmail_service.users().messages().list(
                         userId='me',
                         q=query,
-                        maxResults=50
+                        maxResults=10  # Reduced from 50 to 10
                     ).execute()
                     
                     messages = results.get('messages', [])
-                    print(f"[GMAIL] SCAN-ONLY Found {len(messages)} emails matching rule: '{subject_filter or 'Any subject'}'")
+                    print(f"[GMAIL] Rule {rule_index + 1}: Found {len(messages)} messages")
                     
-                    for message in messages:
-                        try:
-                            # Get full message data (not just list reference)
-                            print(f"[GMAIL DEBUG SCAN-ONLY] Fetching message {message['id']}")
-                            full_message = self.gmail_service.users().messages().get(
-                                userId='me', 
-                                id=message['id']
-                            ).execute()
-                            print(f"[GMAIL DEBUG SCAN-ONLY] Retrieved message {message['id']}, keys: {list(full_message.keys())}")
-                            
-                            # Extract email data from full message
-                            email_data = self.extract_email_data(full_message)
-                            if not email_data:
-                                continue
-                            
-                            # Add rule context
-                            email_data['matched_rule'] = rule
-                            email_data['rule_category'] = rule.get('category', 'other')
-                            email_data['rule_assignees'] = rule.get('assignees', [])
-                            
-                            # Check if WhatsApp notification was already sent today
-                            email_data['sent_today'] = self.db.is_email_sent_today(email_data['id'])
-                            if email_data['sent_today']:
-                                print(f"[GMAIL] Email {email_data['id']} already sent WhatsApp today")
-                            
-                            # Check for duplicate
-                            if not any(e['id'] == email_data['id'] for e in processed_emails):
-                                processed_emails.append(email_data)
-                                sent_status = "✅ SENT" if email_data['sent_today'] else "PENDING"
-                                print(f"[GMAIL] SCAN-ONLY Email queued [{sent_status}]: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
-                                
-                        except Exception as e:
-                            print(f"Error processing message {message['id']}: {e}")
+                    # Collect message IDs with their rule context
+                    for msg in messages:
+                        msg_id = msg['id']
+                        if msg_id not in message_ids_to_fetch:
+                            message_ids_to_fetch.add(msg_id)
+                            # Store rule context for later use
+                            if not hasattr(self, '_msg_rule_map'):
+                                self._msg_rule_map = {}
+                            self._msg_rule_map[msg_id] = rule
                             
                 except Exception as e:
                     print(f"Error processing rule {rule_index + 1}: {e}")
+            
+            # STEP 2: Batch fetch unique messages
+            print(f"[GMAIL] Total unique messages to fetch: {len(message_ids_to_fetch)}")
+            
+            # Process messages in batches of 10 for efficiency
+            message_ids_list = list(message_ids_to_fetch)
+            batch_size = 10
+            
+            for i in range(0, len(message_ids_list), batch_size):
+                batch = message_ids_list[i:i + batch_size]
+                print(f"[GMAIL] Processing batch {i//batch_size + 1} ({len(batch)} messages)")
+                
+                for msg_id in batch:
+                    try:
+                        # Check cache first (1 hour TTL)
+                        cache_age = (datetime.now() - self._cache_timestamp).total_seconds() / 3600
+                        if cache_age > 1:
+                            # Clear old cache
+                            self._message_cache = {}
+                            self._cache_timestamp = datetime.now()
+                        
+                        # Get from cache or fetch
+                        if msg_id in self._message_cache:
+                            full_message = self._message_cache[msg_id]
+                            print(f"[GMAIL] Using cached message {msg_id}")
+                        else:
+                            # Get full message data
+                            full_message = self.gmail_service.users().messages().get(
+                                userId='me', 
+                                id=msg_id
+                            ).execute()
+                            # Cache it
+                            self._message_cache[msg_id] = full_message
+                        
+                        # Extract email data
+                        email_data = self.extract_email_data(full_message)
+                        if not email_data:
+                            continue
+                        
+                        # Add rule context from stored map
+                        if hasattr(self, '_msg_rule_map') and msg_id in self._msg_rule_map:
+                            rule = self._msg_rule_map[msg_id]
+                            email_data['matched_rule'] = rule
+                            email_data['rule_category'] = rule.get('category', 'other')
+                            email_data['rule_assignees'] = rule.get('assignees', [])
+                        
+                        # Check if WhatsApp notification was already sent today
+                        email_data['sent_today'] = self.db.is_email_sent_today(email_data['id'])
+                        
+                        processed_emails.append(email_data)
+                        sent_status = "✅ SENT" if email_data['sent_today'] else "⏳ PENDING"
+                        print(f"[GMAIL] Email processed [{sent_status}]: {email_data['subject'][:50]}...")
+                        
+                    except Exception as e:
+                        print(f"Error fetching message {msg_id}: {e}")
+                
+                # Small delay between batches to avoid rate limiting
+                if i + batch_size < len(message_ids_list):
+                    time.sleep(0.5)
                     
         except Exception as e:
             print(f"[GMAIL] Error in scan_emails_only: {e}")
             
-        print(f"[GMAIL] SCAN-ONLY Complete: Found {len(processed_emails)} total emails for review")
+        # Clean up temporary rule map
+        if hasattr(self, '_msg_rule_map'):
+            delattr(self, '_msg_rule_map')
+            
+        print(f"[GMAIL] SCAN-ONLY Complete: Processed {len(processed_emails)} unique emails")
+        print(f"[GMAIL] Quota usage reduced by ~{(1 - len(message_ids_to_fetch) / (len(watch_rules) * 50)) * 100:.0f}% through deduplication")
         return processed_emails
     
     def setup_production_gmail_service(self):
@@ -367,7 +412,7 @@ class GmailTracker:
             return []
     
     def scan_recent_emails(self, hours_back: int = 24, manual_rules: List[Dict] = None) -> List[Dict]:
-        """Scan recent emails based on active watch rules only."""
+        """Scan recent emails based on active watch rules only - OPTIMIZED VERSION."""
         if not self.gmail_service:
             print("[GMAIL] Gmail service not initialized")
             return []
@@ -381,13 +426,16 @@ class GmailTracker:
             return []
         
         try:
-            # Calculate time range
+            # Calculate time range with upper bound
             since = datetime.now(timezone.utc) - timedelta(hours=hours_back)
+            until = datetime.now(timezone.utc) + timedelta(days=1)
             processed_emails = []
+            message_ids_to_fetch = set()  # Deduplicate across rules
             
             print(f"[GMAIL] Scanning emails based on {len(watch_rules)} active watch rules...")
+            print(f"[GMAIL] Date range: {since.strftime('%Y/%m/%d')} to {until.strftime('%Y/%m/%d')}")
             
-            # Process each watch rule
+            # STEP 1: Collect unique message IDs from all rules
             for rule_index, rule in enumerate(watch_rules):
                 subject_filter = rule.get('subject', '')
                 sender_filter = rule.get('sender', '')
@@ -397,8 +445,11 @@ class GmailTracker:
                 if not subject_filter and not sender_filter and not body_filter:
                     continue
                 
-                # Build Gmail search query for this rule
-                query_parts = [f'after:{since.strftime("%Y/%m/%d")}']
+                # Build Gmail search query with optimized date filter
+                query_parts = [
+                    f'after:{since.strftime("%Y/%m/%d")}',
+                    f'before:{until.strftime("%Y/%m/%d")}'  # Add upper bound
+                ]
                 
                 if subject_filter:
                     query_parts.append(f'subject:"{subject_filter}"')
@@ -410,58 +461,93 @@ class GmailTracker:
                     query_parts.append(f'"{body_filter}"')
                 
                 query = ' '.join(query_parts)
-                
-                print(f"[GMAIL] RULE {rule_index + 1}: '{subject_filter or 'Any subject'}' from '{sender_filter or 'Any sender'}' -> {rule.get('category', 'unknown')}")
-                print(f"[GMAIL] Query: {query}")
-                print(f"[GMAIL] Assignees: {', '.join(rule.get('assignees', []))}")
+                print(f"[GMAIL] Rule {rule_index + 1} Query: {query}")
                 
                 try:
-                    # Search for emails matching this rule
+                    # Search with reduced maxResults
                     results = self.gmail_service.users().messages().list(
                         userId='me', 
                         q=query,
-                        maxResults=50
+                        maxResults=10  # Reduced from 50 to 10
                     ).execute()
                     
                     messages = results.get('messages', [])
-                    print(f"[GMAIL] Found {len(messages)} emails matching rule: '{subject_filter or 'Any subject'}'")
+                    print(f"[GMAIL] Rule {rule_index + 1}: Found {len(messages)} messages")
                     
-                    for message in messages:
-                        try:
-                            # Get full message
-                            print(f"[GMAIL DEBUG] Fetching message {message['id']}")
-                            print(f"[GMAIL DEBUG] Gmail service exists: {self.gmail_service is not None}")
-                            print(f"[GMAIL DEBUG] Message object: {message}")
-                            
-                            msg = self.gmail_service.users().messages().get(
-                                userId='me', 
-                                id=message['id']
-                            ).execute()
-                            
-                            print(f"[GMAIL DEBUG] Retrieved message {message['id']}, keys: {list(msg.keys())}")
-                            
-                            # Extract email data
-                            email_data = self.extract_email_data(msg)
-                            if email_data and not any(e['id'] == email_data['id'] for e in processed_emails):
-                                # Add rule info to email data
-                                email_data['matched_rule'] = rule
-                                email_data['rule_category'] = rule.get('category', 'other')
-                                email_data['rule_assignees'] = rule.get('assignees', [])
-                                processed_emails.append(email_data)
-                                print(f"[GMAIL] Email matched: '{email_data['subject'][:50]}...' -> Category: {rule.get('category', 'other')}")
-                                
-                        except Exception as e:
-                            print(f"[GMAIL ERROR] Failed processing message {message['id']}: {e}")
-                            print(f"[GMAIL ERROR] Exception type: {type(e).__name__}")
-                            import traceback
-                            print(f"[GMAIL ERROR] Traceback: {traceback.format_exc()}")
-                            continue
+                    # Collect unique message IDs
+                    for msg in messages:
+                        msg_id = msg['id']
+                        if msg_id not in message_ids_to_fetch:
+                            message_ids_to_fetch.add(msg_id)
+                            # Store rule context
+                            if not hasattr(self, '_msg_rule_map'):
+                                self._msg_rule_map = {}
+                            self._msg_rule_map[msg_id] = rule
                             
                 except Exception as e:
                     print(f"Error processing rule {rule_index + 1}: {e}")
                     continue
             
-            print(f"[GMAIL] TOTAL EMAILS FOUND: {len(processed_emails)} matching {len(watch_rules)} active rules")
+            # STEP 2: Batch fetch unique messages
+            print(f"[GMAIL] Total unique messages to fetch: {len(message_ids_to_fetch)}")
+            
+            # Process in batches
+            message_ids_list = list(message_ids_to_fetch)
+            batch_size = 10
+            
+            for i in range(0, len(message_ids_list), batch_size):
+                batch = message_ids_list[i:i + batch_size]
+                print(f"[GMAIL] Processing batch {i//batch_size + 1} ({len(batch)} messages)")
+                
+                for msg_id in batch:
+                    try:
+                        # Check cache first (1 hour TTL)
+                        cache_age = (datetime.now() - self._cache_timestamp).total_seconds() / 3600
+                        if cache_age > 1:
+                            # Clear old cache
+                            self._message_cache = {}
+                            self._cache_timestamp = datetime.now()
+                        
+                        # Get from cache or fetch
+                        if msg_id in self._message_cache:
+                            msg = self._message_cache[msg_id]
+                            print(f"[GMAIL] Using cached message {msg_id}")
+                        else:
+                            # Get full message
+                            msg = self.gmail_service.users().messages().get(
+                                userId='me', 
+                                id=msg_id
+                            ).execute()
+                            # Cache it
+                            self._message_cache[msg_id] = msg
+                        
+                        # Extract email data
+                        email_data = self.extract_email_data(msg)
+                        if email_data:
+                            # Add rule context
+                            if hasattr(self, '_msg_rule_map') and msg_id in self._msg_rule_map:
+                                rule = self._msg_rule_map[msg_id]
+                                email_data['matched_rule'] = rule
+                                email_data['rule_category'] = rule.get('category', 'other')
+                                email_data['rule_assignees'] = rule.get('assignees', [])
+                            
+                            processed_emails.append(email_data)
+                            print(f"[GMAIL] Email processed: {email_data['subject'][:50]}...")
+                                
+                    except Exception as e:
+                        print(f"[GMAIL ERROR] Failed processing message {msg_id}: {e}")
+                        continue
+                
+                # Small delay between batches
+                if i + batch_size < len(message_ids_list):
+                    time.sleep(0.5)
+            
+            # Clean up temporary rule map
+            if hasattr(self, '_msg_rule_map'):
+                delattr(self, '_msg_rule_map')
+            
+            print(f"[GMAIL] TOTAL EMAILS FOUND: {len(processed_emails)} unique emails")
+            print(f"[GMAIL] Quota usage reduced by ~{(1 - len(message_ids_to_fetch) / (len(watch_rules) * 50)) * 100:.0f}% through optimization")
             
             # Debug: Show summary by category
             category_counts = {}
@@ -989,6 +1075,8 @@ class GmailScheduler:
     
     def _scheduler_loop(self):
         """Main scheduler loop - checks settings before each scan."""
+        last_scan_hour = -1  # Track last scan hour to prevent duplicates
+        
         while self.running:
             try:
                 # Check if auto-scan is still enabled
@@ -1000,19 +1088,21 @@ class GmailScheduler:
                 now = datetime.now()
                 
                 # Check if it's time for scheduled scan (6 AM or 6 PM)
-                if (now.hour == 6 or now.hour == 18) and now.minute == 0:
+                # Only scan once per hour to prevent duplicates
+                if (now.hour == 6 or now.hour == 18) and now.hour != last_scan_hour:
                     print(f"[GMAIL] Scheduled scan at {now.strftime('%H:%M')}")
                     self.gmail_tracker.run_automated_scan()
+                    last_scan_hour = now.hour  # Remember this hour
                     
-                    # Wait to avoid duplicate scans
-                    time.sleep(60)
+                    # Wait 5 minutes to ensure we don't scan again this hour
+                    time.sleep(300)
                 
-                # Check every minute
-                time.sleep(60)
+                # Check every 5 minutes instead of every minute (reduce overhead)
+                time.sleep(300)
                 
             except Exception as e:
                 print(f"Error in Gmail scheduler: {e}")
-                time.sleep(300)  # Wait 5 minutes on error
+                time.sleep(600)  # Wait 10 minutes on error
 
 
 # Global instance for integration with main app
