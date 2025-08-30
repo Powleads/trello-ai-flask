@@ -39,7 +39,16 @@
       "Bash(timeout:*)",
       "Read(/c:\\Users\\james\\Desktop\\TRELLO AI\\google meet to group and trello ai\\screenshot errors/**)",
       "Bash(git log:*)",
-      "mcp__JustGoingViral__takeScreenshot"
+      "mcp__JustGoingViral__takeScreenshot",
+      "mcp__JustGoingViral__server_health",
+      "Read(c:\\Users\\james\\Desktop\\TRELLO AI\\google meet to group and trello ai\\screenshot errors/**)",
+      "mcp__render__get_selected_workspace",
+      "mcp__render__list_workspaces",
+      "mcp__render__list_services",
+      "mcp__render__list_deploys",
+      "mcp__render__list_logs",
+      "mcp__render__list_postgres_instances",
+      "mcp__render__query_render_postgres"
     ],
     "deny": [],
     "ask": []
